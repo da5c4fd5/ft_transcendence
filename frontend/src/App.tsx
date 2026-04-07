@@ -1,3 +1,4 @@
+/** @jsxImportSource preact */
 import { useState } from 'preact/hooks';
 import { Navbar } from './components/Navbar/Navbar';
 import type { Page } from './components/Navbar/Navbar.types';
