@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auth
+// ─────────────────────────────────────────────────────────────
+
+/// Server-side session used for token revocation on logout.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Users
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  passwordHash         String
+  username             String    @unique
+  displayName          String?
+  bio                  String?   @db.VarChar(280)
+  avatarUrl            String?
+  /// JSON blob: { emailDigest, pushEnabled, reminderTime }
+  notificationSettings Json      @default("{}")
+  /// JSON blob for the gamification tree state
+  treeState            Json      @default("{}")
+  lastActiveAt         DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  sessions      Session[]
+  sentRequests  Friend[]       @relation("Requester")
+  recvRequests  Friend[]       @relation("Recipient")
+  memories      Memory[]
+  contributions Contribution[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Friends
+// ─────────────────────────────────────────────────────────────
+
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+}
+
+model Friend {
+  id          String       @id @default(cuid())
+  requesterId String
+  recipientId String
+  status      FriendStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  requester User @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  recipient User @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, recipientId])
+  @@index([recipientId])
+  @@map("friends")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Memories
+// ─────────────────────────────────────────────────────────────
+
+model Memory {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String   @db.Text
+  /// The calendar day this memory belongs to (time portion is ignored)
+  date      DateTime @default(now()) @db.Date
+  mood      String?  @db.VarChar(32)
+  /// When true, anyone with the link can add a contribution
+  isOpen    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media         Media[]
+  contributions Contribution[]
+
+  @@index([userId, date(sort: Desc)])
+  @@map("memories")
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  memoryId  String
+  url       String
+  mimeType  String   @db.VarChar(128)
+  createdAt DateTime @default(now())
+
+  memory Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@index([memoryId])
+  @@map("media")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Contributions
+// ─────────────────────────────────────────────────────────────
+
+model Contribution {
+  id            String   @id @default(cuid())
+  memoryId      String
+  /// Null when the contributor is a guest (not signed in)
+  contributorId String?
+  guestName     String?  @db.VarChar(64)
+  content       String   @db.Text
+  createdAt     DateTime @default(now())
+
+  memory      Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  contributor User?  @relation(fields: [contributorId], references: [id], onDelete: SetNull)
+
+  @@index([memoryId])
+  @@map("contributions")
+}
