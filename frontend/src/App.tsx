@@ -19,6 +19,22 @@ import { GuestPage, MOCK_SHARED_MEMORY } from './pages/guest/GuestPage';
 const ADMIN_USER = { username: 'Alex Explorer', isAdmin: true };
 const REGULAR_USER = { username: 'Sam Sparks', isAdmin: false };
 
+// ---------------------------------------------------------------------------
+// Utilisateurs de test (à remplacer par les données de l'API plus tard)
+// ---------------------------------------------------------------------------
+const ADMIN_USER = { name: 'Alex Explorer', isAdmin: true };
+const REGULAR_USER = { name: 'Sam Sparks', isAdmin: false };
+
+// ---------------------------------------------------------------------------
+// App — routeur racine
+// ---------------------------------------------------------------------------
+// Architecture simple sans librairie de routing :
+//   - Si non connecté → pages auth (pas de Navbar)
+//   - Si connecté    → app principale avec Navbar
+//
+// Le state "authPage" contrôle quelle page auth est affichée.
+// Le state "isAuthenticated" bascule entre auth et app.
+// ---------------------------------------------------------------------------
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPage, setAuthPage] = useState<AuthPage>('welcome');

@@ -1,12 +1,10 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap");
 @import "tailwindcss";
-@import "./tree.css";
 
 @theme {
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
 
   --color-yellow: #FDE856;
-  --color-verylightyellow: #FFF297;
   --color-blue: #A0D2FF;
   --color-orange: #F8C4B4;
   --color-verylightorange: #FFF6F0;
@@ -22,4 +20,3 @@
   --color-lightpink: color-mix(in srgb, #EB6383 47%, transparent);
   --color-lightgrey: color-mix(in srgb, #9A9A8E 13%, transparent);
 }
-

@@ -15,7 +15,6 @@ export function Modal({ isOpen, onClose, children, title }: ModalProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
-
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
