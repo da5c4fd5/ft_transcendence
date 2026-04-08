@@ -12,7 +12,7 @@ export default defineConfig(() => ({
     },
     allowedHosts: ["transcen.dence.fr"],
   },
-  plugins: [preact(), tailwindcss(),],
+  plugins: [preact({ devToolsEnabled: false }), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

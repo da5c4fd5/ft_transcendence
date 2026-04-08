@@ -4,6 +4,7 @@
   "dependencies": {
     "@preact/preset-vite": "^2.10.5",
     "@tailwindcss/vite": "^4.2.2",
+    "lucide-preact": "^1.7.0",
     "preact": "^10.29.1",
     "tailwindcss": "^4.2.2",
     "vite": "^8.0.3"
@@ -13,6 +14,7 @@
     "dev": "vite"
   },
   "devDependencies": {
+    "@types/node": "^25.5.2",
     "@types/react": "^19.2.14"
   }
 }
