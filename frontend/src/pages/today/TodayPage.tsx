@@ -1,31 +1,10 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { Pencil, RefreshCw, Camera, X, Zap, Sparkles, Sprout, Activity, Heart } from 'lucide-preact';
 import { Button } from '../../components/Button/Button';
+import type { SavedMemory, PastMemory } from './today.types';
 
 const MAX_CHARS = 180;
 const MOCK_HISTORICAL_WORDS = 0;
-
-// to replace by IA generation
-const DEFAULT_PROMPTS = [
-  "What's something you're grateful for right now?",
-  "What made you smile today?",
-  "Describe a small moment that felt good.",
-  "What's on your mind right now?",
-  "What did you learn today?",
-  "Who made your day better?",
-  "What's one thing you want to remember about today?",
-  "What surprised you today?",
-];
-
-interface SavedMemory {
-  text: string;
-  image: string | null;
-}
-
-const PAST_MEMORY = {
-  date: 'MARCH 30, 2025',
-  text: 'It was a lazy day today. Ordered pizza, watched a movie, and just relaxed. Much needed! 🍕🎬',
-};
 
 function getTodayString() {
   return new Date().toLocaleDateString('en-US', {
@@ -100,7 +79,7 @@ function EntryCard({
       />
 
       {image && (
-        <div className="relative rounded-2xl overflow-hidden">
+        <div className="relative rounded overflow-hidden">
           <img src={image} alt="Attached" className="w-full max-h-64 object-cover" />
           <button
             type="button"
@@ -178,30 +157,50 @@ function SuccessBanner() {
   return (
     <div className="bg-white rounded-3xl px-7 py-5 flex flex-col items-center gap-2 shadow-sm text-center">
       <div className="flex items-center gap-2">
-        <Heart size={16} className="text-pink" fill="currentColor" />
+        <Heart size={16} className="text-lightpink" fill="currentColor" />
         <span className="font-bold text-darkgrey">Memory safely stored in your capsul!</span>
       </div>
       <p className="text-mediumgrey text-sm">
-        Your tree is thanking you for this beautiful moment. Come back tomorrow to keep it growing.
+        Come back tomorrow to keep your tree growing 🌱
       </p>
     </div>
   );
 }
 
-function PastMemoryCard() {
+function PastMemoryCard({ memory, onRefresh }: {
+  memory: PastMemory | null;
+  onRefresh: () => void;
+}) {
+  if (!memory) {
+    return (
+      <div className="rounded-3xl border-2 border-dashed border-orange/50 p-6 flex flex-col items-center gap-2 text-center">
+        <p className="text-mediumgrey text-sm leading-relaxed">
+          Keep adding memories — they'll resurface here as reminders of your past.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-orange rounded-3xl p-6 flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-white/40 rounded-full flex items-center justify-center flex-shrink-0">
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="w-9 h-9 bg-white/40 rounded-full flex items-center justify-center shrink-0 hover:bg-white/60 transition-colors"
+          aria-label="Show another memory"
+        >
           <RefreshCw size={15} className="text-darkgrey" />
-        </div>
+        </button>
         <div>
-          <p className="font-bold text-darkgrey text-base">One year ago today</p>
-          <p className="text-xs font-semibold text-darkgrey/60 tracking-widest">{PAST_MEMORY.date}</p>
+          <p className="font-bold text-darkgrey text-base">{memory.label}</p>
+          <p className="text-xs text-darkgrey/60 tracking-widest font-semibold">{memory.date}</p>
+          <p className="text-xs text-darkgrey/50 mt-0.5">Mood: {memory.mood}</p>
         </div>
       </div>
+
       <div className="bg-white rounded-2xl p-5">
-        <p className="text-darkgrey text-sm leading-relaxed">{PAST_MEMORY.text}</p>
+        <p className="text-darkgrey text-sm leading-relaxed">{memory.text}</p>
       </div>
     </div>
   );
@@ -282,24 +281,41 @@ function TreeSidebar({ saved, totalWords }: { saved: boolean; totalWords: number
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// FETCHING DU PROMPT
-// ─────────────────────────────────────────────────────────────
-// Cette fonction sera branchée sur l'API backend quand elle sera prête.
-// En attendant, elle pioche dans DEFAULT_PROMPTS de façon aléatoire.
-//
-// Pour brancher l'IA plus tard, il suffira de remplacer le corps par :
-//   const res = await fetch('http://localhost:3000/prompt');
-//   const data = await res.json();
-//   return data.prompt;
-//
-// Le reste de TodayPage n'a pas besoin de changer.
+async function fetchPastMemory(): Promise<PastMemory | null> {
+  // TODO: supprimer la donnée en dur et décommenter l'appel API quand le backend est prêt
+  // const res = await fetch('/api/memories/surfaced');
+  // const data = await res.json();
+  // return data;
+  return {
+    date: 'APRIL 9, 2025',
+    text: 'Had a great walk in the park this morning. The weather was perfect and I felt completely at peace.',
+    label: 'One year ago today',
+    mood: 'Peaceful',
+  };
+}
+
+// TODO: supprimer ce tableau et décommenter l'appel API quand le backend est prêt
+const MOCK_PROMPTS = [
+  "What's something you're grateful for right now?",
+  "What made you smile today?",
+  "Describe a small moment that felt good.",
+  "What's on your mind right now?",
+  "What did you learn today?",
+  "Who made your day better?",
+  "What's one thing you want to remember about today?",
+  "What surprised you today?",
+  "What's a challenge you overcame recently?",
+  "How are you feeling in your body right now?",
+  "What's something you're looking forward to?",
+  "What would make tomorrow a great day?",
+];
+
 async function fetchPrompt(): Promise<string> {
-  // TODO: remplacer par l'appel API quand le backend est prêt
+  // TODO: supprimer le return local et décommenter l'appel API quand le backend est prêt
   // const res = await fetch('/api/prompt');
   // const data = await res.json();
   // return data.prompt;
-  return DEFAULT_PROMPTS[Math.floor(Math.random() * DEFAULT_PROMPTS.length)];
+  return MOCK_PROMPTS[Math.floor(Math.random() * MOCK_PROMPTS.length)];
 }
 
 export function TodayPage() {
@@ -309,14 +325,10 @@ export function TodayPage() {
   // prompt est null pendant le chargement → on affiche un état "loading"
   const [prompt, setPrompt] = useState<string | null>(null);
   const [savedMemory, setSavedMemory] = useState<SavedMemory | null>(null);
+  const [pastMemory, setPastMemory] = useState<PastMemory | null>(null);
 
   const dateStr = getTodayString();
 
-  // Chargement initial du prompt au montage du composant.
-  // useEffect avec [] = s'exécute une seule fois, équivalent de componentDidMount.
-  // La fonction async est déclarée à l'intérieur car useEffect ne peut pas
-  // recevoir directement une fonction async (elle retournerait une Promise
-  // au lieu d'une fonction de cleanup).
   useEffect(() => {
     async function load() {
       const p = await fetchPrompt();
@@ -324,6 +336,20 @@ export function TodayPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (todayState !== 'saved') return;
+    async function load() {
+      const m = await fetchPastMemory();
+      setPastMemory(m);
+    }
+    load();
+  }, [todayState]);
+
+  const handleRefreshPastMemory = async () => {
+    const m = await fetchPastMemory();
+    setPastMemory(m);
+  };
 
   const handleTextChange = (v: string) => {
     if (v.length <= MAX_CHARS) setText(v);
@@ -360,17 +386,7 @@ export function TodayPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-      {/*
-        gap-6 lg:gap-12 : sur desktop la gouttière entre colonne gauche et sidebar
-        est nettement plus large pour aérer.
-      */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 lg:gap-12 items-start">
-
-        {/* ── Colonne gauche ── */}
-        {/*
-          gap-6 lg:gap-8 : espace entre PromptCard et EntryCard.
-          Sur desktop c'est 32px de blanc entre la question et la zone de saisie.
-        */}
         <div className="flex flex-col gap-6 lg:gap-8">
           {todayState === 'prompt' && (
             <>
@@ -399,12 +415,14 @@ export function TodayPage() {
             <>
               <SavedEntryCard dateStr={dateStr} memory={savedMemory} onEdit={handleEdit} />
               <SuccessBanner />
-              <PastMemoryCard />
+              <PastMemoryCard
+                memory={pastMemory}
+                onRefresh={handleRefreshPastMemory}
+              />
             </>
           )}
         </div>
 
-        {/* ── Sidebar droite ── */}
         <div className="lg:sticky lg:top-20">
           <TreeSidebar saved={todayState === 'saved'} totalWords={totalWords} />
         </div>

@@ -3,6 +3,7 @@ import { Sprout } from 'lucide-preact';
 interface AppLogoProps {
   size?: 'sm' | 'lg';
   iconColor?: string;
+  textColor?: string;
   subtitle?: string;
 }
 
@@ -14,6 +15,7 @@ const SIZE_CONFIG = {
 export function AppLogo({
   size = 'sm',
   iconColor = 'text-pink',
+  textColor = 'text-white',
   subtitle,
 }: AppLogoProps) {
 
@@ -26,12 +28,12 @@ export function AppLogo({
         <Sprout size={config.sprout} className={iconColor} />
       </div>
 
-      <h1 className={`${config.title} font-black text-white tracking-tight`}>
+      <h1 className={`${config.title} ${textColor} font-black tracking-tight`}>
         CAPSUL
       </h1>
 
       {subtitle && (
-        <p className="text-white font-semibold text-md">{subtitle}</p>
+        <p className={`${textColor} font-semibold text-md`}>{subtitle}</p>
       )}
     </div>
   );
