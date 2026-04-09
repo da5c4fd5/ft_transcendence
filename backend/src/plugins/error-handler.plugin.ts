@@ -1,20 +1,48 @@
-import { Elysia, status } from 'elysia'
-import { Prisma } from '../../generated/prisma/client'
+import { Elysia, ElysiaCustomStatusResponse } from "elysia";
+import { Prisma } from "../../generated/prisma/client";
 
-export const errorHandlerPlugin = new Elysia({ name: 'error-handler' })
-	.onError(({ code, error }) => {
-		if (error instanceof Prisma.PrismaClientKnownRequestError) {
-			if (error.code === 'P2025') return status(404, { message: 'Not found' })
-			if (error.code === 'P2002') return status(409, { message: 'Already exists' })
-		}
+export const errorHandlerPlugin = new Elysia({ name: "error-handler" }).onError(
+  { as: "global" },
+  ({ code, error, set }) => {
+    // Pass through throw status(...) responses from services unchanged
+    if (error instanceof ElysiaCustomStatusResponse) {
+      set.status = error.code;
+      return error.response;
+    }
 
-		switch (code) {
-			case 'VALIDATION':
-				return status(422, { message: error.message })
-			case 'NOT_FOUND':
-				return status(404, { message: 'Not found' })
-			default:
-				console.error(error)
-				return status(500, { message: 'Internal server error' })
-		}
-	})
+    // Prisma known errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        set.status = 404;
+        return { message: "Not found" };
+      }
+      if (error.code === "P2002") {
+        set.status = 409;
+        return { message: "Already exists" };
+      }
+    }
+
+    switch (code) {
+      case "VALIDATION": {
+        set.status = 422;
+        const parsed = JSON.parse((error as Error).message);
+        return {
+          message: "Validation error",
+          errors: (parsed.errors ?? []).map(
+            (e: { path: string; summary?: string; message: string }) => ({
+              path: e.path,
+              message: e.summary ?? e.message
+            })
+          )
+        };
+      }
+      case "NOT_FOUND":
+        set.status = 404;
+        return { message: "Not found" };
+      default:
+        set.status = 500;
+        console.error(error);
+        return { message: "Internal server error" };
+    }
+  }
+);
