@@ -3,7 +3,7 @@ import { ArrowLeft, Camera, Heart, Send, User, Pencil, X } from 'lucide-preact';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Avatar } from '../../components/Avatar/Avatar';
 import { Button } from '../../components/Button/Button';
-import type { FriendContribution, SharedMemory } from './guest.types';
+import type { FriendContribution, SharedMemory, GuestPageProps } from './guest.types';
 
 export type { SharedMemory };
 
@@ -97,12 +97,20 @@ function SharedMemoryView({ memory, guestName, guestAvatar, onBack, onNavigateTo
   const [contributionText, setContributionText] = useState('');
   const [contributionImage, setContributionImage] = useState<string | null>(null);
   const [contributions, setContributions] = useState<FriendContribution[]>(memory.friendContributions);
-  const [myContribId, setMyContribId] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  // IDs des contributions envoyées dans cette session (perdu si on quitte la page)
+  const [mySessionIds, setMySessionIds] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editImage, setEditImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const editFileRef = useRef<HTMLInputElement>(null);
+
+  // Peut éditer sa contribution si :
+  // - elle a été envoyée dans cette session (anonyme ou connecté)
+  // - OU l'utilisateur est connecté et la contribution lui appartient (TODO: backend → remplacer par userId)
+  const canEdit = (contrib: FriendContribution) =>
+    mySessionIds.has(contrib.id) || (isLoggedIn && contrib.name === guestName);
 
   const handleImageChange = (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -112,10 +120,19 @@ function SharedMemoryView({ memory, guestName, guestAvatar, onBack, onNavigateTo
     reader.readAsDataURL(file);
   };
 
+  const handleEditImageChange = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setEditImage(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const handleSend = () => {
     if (!contributionText.trim()) return;
+    const id = String(Date.now());
     const newContrib: FriendContribution = {
-      id: String(Date.now()),
+      id,
       name: guestName,
       avatar: guestAvatar,
       date: new Date().toLocaleDateString('fr-FR'),
@@ -123,11 +140,29 @@ function SharedMemoryView({ memory, guestName, guestAvatar, onBack, onNavigateTo
       image: contributionImage,
     };
     setContributions(prev => [...prev, newContrib]);
+    setMySessionIds(prev => new Set(prev).add(id));
     setContributionText('');
     setContributionImage(null);
     setSent(true);
     // TODO: POST /api/shared/:token/contributions
   };
+
+  const handleEditStart = (contrib: FriendContribution) => {
+    setEditingId(contrib.id);
+    setEditText(contrib.text);
+    setEditImage(contrib.image);
+  };
+
+  const handleEditSave = () => {
+    if (!editText.trim() || !editingId) return;
+    setContributions(prev => prev.map(c =>
+      c.id === editingId ? { ...c, text: editText.trim(), image: editImage } : c
+    ));
+    setEditingId(null);
+    // TODO: PUT /api/shared/:token/contributions/:id
+  };
+
+  const handleEditCancel = () => setEditingId(null);
 
   return (
     <div className="min-h-screen bg-orange/30">
@@ -169,13 +204,73 @@ function SharedMemoryView({ memory, guestName, guestAvatar, onBack, onNavigateTo
               <div key={contrib.id} className="flex gap-3">
                 <Avatar name={contrib.name} src={contrib.avatar ?? undefined} size="sm" />
                 <div className="flex flex-col gap-1 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-darkgrey text-sm">{contrib.name}</span>
-                    <span className="text-xs text-mediumgrey">{contrib.date}</span>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-darkgrey text-sm">{contrib.name}</span>
+                      <span className="text-xs text-mediumgrey">{contrib.date}</span>
+                    </div>
+                    {canEdit(contrib) && editingId !== contrib.id && (
+                      <button
+                        type="button"
+                        onClick={() => handleEditStart(contrib)}
+                        className="flex items-center gap-1 text-xs text-mediumgrey hover:text-darkgrey transition-colors shrink-0"
+                      >
+                        <Pencil size={11} />
+                        Edit
+                      </button>
+                    )}
                   </div>
-                  <p className="text-sm text-darkgrey leading-relaxed">{contrib.text}</p>
-                  {contrib.image && (
-                    <img src={contrib.image} alt="" className="rounded-xl w-40 object-cover mt-1" />
+
+                  {editingId === contrib.id ? (
+                    <div className="flex flex-col gap-2 mt-1">
+                      <textarea
+                        value={editText}
+                        onInput={(e) => setEditText((e.target as HTMLTextAreaElement).value)}
+                        rows={3}
+                        className="w-full bg-verylightorange rounded-2xl px-3 py-2 outline-none text-darkgrey text-sm resize-none border-2 border-transparent focus:border-yellow transition-colors"
+                      />
+                      {editImage && (
+                        <div className="relative w-fit">
+                          <img src={editImage} alt="" className="rounded-xl w-40 object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setEditImage(null)}
+                            className="absolute top-1 right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow"
+                          >
+                            <X size={10} className="text-darkgrey" />
+                          </button>
+                        </div>
+                      )}
+                      <input ref={editFileRef} type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => editFileRef.current?.click()}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${editImage ? 'bg-pink text-white' : 'bg-verylightorange text-mediumgrey hover:text-darkgrey'}`}
+                        >
+                          <Camera size={13} />
+                        </button>
+                        <div className="flex-1" />
+                        <button type="button" onClick={handleEditCancel} className="text-xs text-mediumgrey hover:text-darkgrey transition-colors">
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleEditSave}
+                          disabled={!editText.trim()}
+                          className="flex items-center gap-1.5 bg-darkgrey rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 transition-opacity"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-darkgrey leading-relaxed">{contrib.text}</p>
+                      {contrib.image && (
+                        <img src={contrib.image} alt="" className="rounded-xl w-40 object-cover mt-1" />
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -244,15 +339,6 @@ function SharedMemoryView({ memory, guestName, guestAvatar, onBack, onNavigateTo
   );
 }
 
-// ─── GuestPage ────────────────────────────────────────────────────────────────
-
-interface GuestPageProps {
-  memory: SharedMemory;
-  onBack: () => void;                  // connecté → Today, non connecté → JoinStep géré en interne
-  onNavigateToWelcome?: () => void;    // bouton "Start with CAPSUL" pour les non connectés
-  currentUser?: { name: string; avatar: string | null }; // défini si l'utilisateur est connecté
-}
-
 export function GuestPage({ memory, onBack, onNavigateToWelcome, currentUser }: GuestPageProps) {
   const isLoggedIn = !!currentUser;
   const [step, setStep] = useState<'join' | 'memory'>(isLoggedIn ? 'memory' : 'join');
@@ -265,9 +351,6 @@ export function GuestPage({ memory, onBack, onNavigateToWelcome, currentUser }: 
     setStep('memory');
   };
 
-  // Back depuis SharedMemoryView :
-  // - connecté → onBack (Today)
-  // - non connecté → retour à JoinStep
   const handleBack = isLoggedIn ? onBack : () => setStep('join');
 
   if (step === 'join') {

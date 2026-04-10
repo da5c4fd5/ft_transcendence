@@ -18,8 +18,7 @@ function countWords(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function PromptCard({ prompt, onRefresh }: { prompt: string; onRefresh: () => void }) {
-  const isLoading = prompt === '...';
+function PromptCard({ prompt, isLoading, onRefresh }: { prompt: string; isLoading: boolean; onRefresh: () => void }) {
   return (
     <div className="bg-blue rounded-3xl p-8 flex flex-col gap-5">
       <h2 className={`text-3xl font-black leading-tight ${isLoading ? 'text-darkgrey/30 animate-pulse' : 'text-darkgrey'}`}>
@@ -385,13 +384,14 @@ export function TodayPage() {
   const totalWords = MOCK_HISTORICAL_WORDS + (savedMemory ? countWords(savedMemory.text) : 0);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-12">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 lg:gap-12 items-start">
         <div className="flex flex-col gap-6 lg:gap-8">
           {todayState === 'prompt' && (
             <>
               <PromptCard
-                prompt={prompt ?? '...'}
+                prompt={prompt ?? ''}
+                isLoading={prompt === null}
                 onRefresh={async () => {
                   setPrompt(null);
                   const p = await fetchPrompt();

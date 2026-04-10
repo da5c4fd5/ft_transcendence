@@ -8,6 +8,8 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { TodayPage } from './pages/today/TodayPage';
 import { TimelinePage } from './pages/timeline/TimelinePage';
+import { MemoriesPage } from './pages/memories/MemoriesPage';
+import { TreePage } from './pages/tree/TreePage';
 import { GuestPage, MOCK_SHARED_MEMORY } from './pages/guest/GuestPage';
 
 // ---------------------------------------------------------------------------
@@ -91,7 +93,9 @@ const App = () => {
       <main>
         {currentPage === 'today'    && <TodayPage />}
         {currentPage === 'timeline' && <TimelinePage onNavigateToToday={() => setCurrentPage('today')} onPreviewGuest={() => setShowGuestPreview(true)} />}
-        {currentPage !== 'today' && currentPage !== 'timeline' && (
+        {currentPage === 'memories' && <MemoriesPage />}
+        {currentPage === 'tree'     && <TreePage />}
+        {currentPage !== 'today' && currentPage !== 'timeline' && currentPage !== 'memories' && currentPage !== 'tree' && (
           <div className="p-6 flex flex-col gap-4 max-w-lg mx-auto">
             <h1 className="text-2xl font-bold text-darkgrey">Page : {currentPage}</h1>
             <button

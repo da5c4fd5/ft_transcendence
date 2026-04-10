@@ -1,11 +1,5 @@
-export interface FriendContribution {
-  id: string;
-  name: string;
-  avatar: string | null;
-  date: string;
-  text: string;
-  image: string | null;
-}
+export type { FriendContribution } from '../../components/MemoryModal/MemoryModal.types';
+import type { FriendContribution } from '../../components/MemoryModal/MemoryModal.types';
 
 export interface SharedMemory {
   date: string;
@@ -13,4 +7,11 @@ export interface SharedMemory {
   image: string | null;
   ownerName: string;
   friendContributions: FriendContribution[];
+}
+
+export interface GuestPageProps {
+  memory: SharedMemory;
+  onBack: () => void;
+  onNavigateToWelcome?: () => void;
+  currentUser?: { name: string; avatar: string | null };
 }

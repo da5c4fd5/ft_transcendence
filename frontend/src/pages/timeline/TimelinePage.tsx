@@ -3,7 +3,9 @@ import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-preact';
 import { Button } from '../../components/Button/Button';
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_CONFIG } from './timeline.types';
-import type { Mood, DayEntry, TimelineStats } from './timeline.types';
+import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal.types';
+import type { Mood, DaySummary, TimelineStats } from './timeline.types';
+import type { MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_LABELS   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -11,7 +13,7 @@ const DAY_LABELS   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 function generateYearGrid(year: number): (string | null)[][] {
   const weeks: (string | null)[][] = [];
   const jan1 = new Date(year, 0, 1);
-  const startDow = (jan1.getDay() + 6) % 7; // 0=Lun, 6=Dim
+  const startDow = (jan1.getDay() + 6) % 7;
 
   let week: (string | null)[] = Array(startDow).fill(null);
   const cur = new Date(year, 0, 1);
@@ -30,7 +32,6 @@ function generateYearGrid(year: number): (string | null)[][] {
   return weeks;
 }
 
-// Retourne la position (index de semaine) du premier jour de chaque mois.
 function getMonthPositions(weeks: (string | null)[][]): { label: string; weekIndex: number }[] {
   const positions: { label: string; weekIndex: number }[] = [];
   let lastMonth = -1;
@@ -50,44 +51,50 @@ function getMonthPositions(weeks: (string | null)[][]): { label: string; weekInd
 
 // ─── Mock data (TODO: supprimer quand le backend est prêt) ───────────────────
 
-const MOCK_ENTRIES: DayEntry[] = [
+const MOCK_SUMMARIES: DaySummary[] = [
+  { date: '2026-04-02', mood: 'Peaceful' },
+  { date: '2026-04-07', mood: 'Joyful' },
+  { date: '2026-04-09', mood: 'Excited' },
+  { date: '2026-03-30', mood: 'Peaceful' },
+  { date: '2026-03-22', mood: 'Sad' },
+  { date: '2026-03-15', mood: 'Nostalgic' },
+  { date: '2026-03-08', mood: 'Anxious' },
+  { date: '2026-02-14', mood: 'Joyful' },
+  { date: '2026-01-01', mood: 'Excited' },
+];
+
+const MOCK_ENTRIES: MemoryDetails[] = [
   {
-    date: '2026-04-02',
-    mood: 'Peaceful',
+    date: '2026-04-02', mood: 'Peaceful',
     text: 'Spent the whole evening laughing until our stomachs hurt. Sunsets with these two never get old. We talked about everything and nothing. I want to remember this feeling of complete peace.',
     image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&q=80',
     isShared: true,
     shareUrl: 'https://capsul.app/shared/9bfb4077-fa56-400e-831f',
     friendContributions: [
-      {
-        id: '1', name: 'Léa', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80',
-        date: '02/04/2026',
-        text: "This was such a perfect evening!! Look at this polaroid I took!",
-        image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80',
-      },
-      {
-        id: '2', name: 'Thomas', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&q=80',
-        date: '02/04/2026',
-        text: "Next time I'm picking the restaurant though!",
-        image: null,
-      },
+      { id: '1', name: 'Léa', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80', date: '02/04/2026', text: "This was such a perfect evening!! Look at this polaroid I took!", image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80' },
+      { id: '2', name: 'Thomas', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&q=80', date: '02/04/2026', text: "Next time I'm picking the restaurant though!", image: null },
     ],
   },
-  { date: '2026-04-07', mood: 'Joyful',    text: 'Beautiful spring day. Went for a run in the park and felt amazing.', image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-04-09', mood: 'Excited',   text: 'Started working on the new project today. So many ideas flowing!', image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-30', mood: 'Peaceful',  text: 'Super aprem bar à jeux avec Victor et Auriane au Nid Cocon Ludique!', image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-22', mood: 'Sad',       text: "Rainy day, feeling a bit low. But that's okay.", image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-15', mood: 'Nostalgic', text: 'Found old photos from childhood. Spent hours going through them.', image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-08', mood: 'Anxious',   text: 'Big presentation tomorrow. Trying to stay calm.', image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-02-14', mood: 'Joyful',    text: "Valentine's day! Best surprise ever.", image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-01-01', mood: 'Excited',   text: 'New year, new adventures! Feeling hopeful.', image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-04-07', mood: 'Joyful',    text: 'Beautiful spring day. Went for a run in the park and felt amazing.',    image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-04-09', mood: 'Excited',   text: 'Started working on the new project today. So many ideas flowing!',      image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-30', mood: 'Peaceful',  text: 'Super aprem bar à jeux avec Victor et Auriane au Nid Cocon Ludique!',   image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-22', mood: 'Sad',       text: "Rainy day, feeling a bit low. But that's okay.",                        image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-15', mood: 'Nostalgic', text: 'Found old photos from childhood. Spent hours going through them.',       image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-08', mood: 'Anxious',   text: 'Big presentation tomorrow. Trying to stay calm.',                        image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-02-14', mood: 'Joyful',    text: "Valentine's day! Best surprise ever.",                                   image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-01-01', mood: 'Excited',   text: 'New year, new adventures! Feeling hopeful.',                             image: null, isShared: false, shareUrl: null, friendContributions: [] },
 ];
 
-const MOCK_STATS: TimelineStats = { capsuls: 9, completePercent: 2, shared: 1, streak: 2 };
+const MOCK_STATS: TimelineStats = { capsuls: 9, shared: 1, streak: 2 };
 
-async function fetchEntries(year: number): Promise<DayEntry[]> {
+async function fetchSummaries(year: number): Promise<DaySummary[]> {
   // TODO: const res = await fetch(`/api/timeline?year=${year}`); return res.json();
-  return MOCK_ENTRIES.filter(e => e.date.startsWith(String(year)));""
+  return MOCK_SUMMARIES.filter(e => e.date.startsWith(String(year)));
+}
+
+async function fetchEntry(date: string): Promise<MemoryDetails | null> {
+  // TODO: const res = await fetch(`/api/entries/${date}`); return res.json();
+  return MOCK_ENTRIES.find(e => e.date === date) ?? null;
 }
 
 async function fetchStats(): Promise<TimelineStats> {
@@ -97,19 +104,16 @@ async function fetchStats(): Promise<TimelineStats> {
 
 async function fetchYearsWithEntries(): Promise<number[]> {
   // TODO: const res = await fetch('/api/timeline/years'); return res.json();
-  // Le backend retourne la liste triée des années ayant au moins un memory.
-  const years = [...new Set(MOCK_ENTRIES.map(e => parseInt(e.date.split('-')[0])))];
+  const years = [...new Set(MOCK_SUMMARIES.map(e => parseInt(e.date.split('-')[0])))];
   return years.sort((a, b) => a - b);
 }
 
-// ─── CalendarGrid ─────────────────────────────────────────────────────────────
-
-function CalendarGrid({ entries, year, onDayClick }: {
-  entries: DayEntry[];
+function CalendarGrid({ summaries, year, onDayClick }: {
+  summaries: DaySummary[];
   year: number;
-  onDayClick: (entry: DayEntry) => void;
+  onDayClick: (date: string) => void;
 }) {
-  const entryMap = new Map(entries.map(e => [e.date, e]));
+  const entryMap = new Map(summaries.map(e => [e.date, e]));
   const weeks = generateYearGrid(year);
   const monthPositions = getMonthPositions(weeks);
 
@@ -117,7 +121,6 @@ function CalendarGrid({ entries, year, onDayClick }: {
     <div className="overflow-x-auto pb-2">
       <div className="inline-flex flex-col gap-1">
 
-        {/* Labels des mois */}
         <div className="flex pl-7 gap-0.5">
           {weeks.map((_, wi) => {
             const mp = monthPositions.find(m => m.weekIndex === wi);
@@ -133,10 +136,8 @@ function CalendarGrid({ entries, year, onDayClick }: {
           })}
         </div>
 
-        {/* Grille + labels des jours */}
         <div className="flex gap-1 mt-3">
 
-          {/* Labels des jours */}
           <div className="flex flex-col gap-1 w-6 shrink-0">
             {DAY_LABELS.map((label, i) => (
               <div key={i} className="h-3 flex items-center">
@@ -145,7 +146,6 @@ function CalendarGrid({ entries, year, onDayClick }: {
             ))}
           </div>
 
-          {/* Colonnes de semaines */}
           <div className="flex gap-1">
             {weeks.map((week, wi) => (
               <div key={wi} className="flex flex-col gap-1">
@@ -156,7 +156,7 @@ function CalendarGrid({ entries, year, onDayClick }: {
                     <button
                       key={di}
                       type="button"
-                      onClick={() => entry && onDayClick(entry)}
+                      onClick={() => entry && onDayClick(entry.date)}
                       title={day}
                       className={[
                         'w-3 h-3 rounded-sm transition-transform',
@@ -176,8 +176,6 @@ function CalendarGrid({ entries, year, onDayClick }: {
   );
 }
 
-// ─── MoodLegend ───────────────────────────────────────────────────────────────
-
 function MoodLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-5 mt-4 border-t border-black/5">
@@ -186,15 +184,13 @@ function MoodLegend() {
         <div key={mood} className="flex items-center gap-1.5">
           <div className={`w-3 h-3 rounded-sm shrink-0 ${MOOD_CONFIG[mood].cellColor}`} />
           <span className="text-xs text-mediumgrey">
-            {MOOD_CONFIG[mood].emoji} {MOOD_CONFIG[mood].label}
+            {MOOD_EMOJI[mood]} {mood}
           </span>
         </div>
       ))}
     </div>
   );
 }
-
-// ─── EmptyCalendar ────────────────────────────────────────────────────────────
 
 function EmptyCalendar({ onAddMemory }: { onAddMemory: () => void }) {
   return (
@@ -213,8 +209,6 @@ function EmptyCalendar({ onAddMemory }: { onAddMemory: () => void }) {
   );
 }
 
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-
 function StatCard({ value, label, color }: { value: string | number; label: string; color: string }) {
   return (
     <div className={`${color} rounded-3xl p-6 flex flex-col items-center gap-1.5 text-center`}>
@@ -224,38 +218,39 @@ function StatCard({ value, label, color }: { value: string | number; label: stri
   );
 }
 
-// ─── TimelinePage ─────────────────────────────────────────────────────────────
-
 export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigateToToday?: () => void; onPreviewGuest?: () => void }) {
   const currentYear = new Date().getFullYear();
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState(currentYear);
-  const [entries, setEntries] = useState<DayEntry[]>([]);
+  const [summaries, setSummaries] = useState<DaySummary[]>([]);
   const [stats, setStats] = useState<TimelineStats | null>(null);
-  const [selectedEntry, setSelectedEntry] = useState<DayEntry | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<MemoryDetails | null>(null);
 
-  // Chargement initial : années disponibles + stats globales
   useEffect(() => {
     async function init() {
-      const [availableYears, s] = await Promise.all([fetchYearsWithEntries(), fetchStats()]);
+      const availableYears = await fetchYearsWithEntries();
       setYears(availableYears);
+      if (availableYears.length === 0) return;
+      setYear(availableYears[availableYears.length - 1]);
+      const s = await fetchStats();
       setStats(s);
-      // Démarre sur la dernière année avec des memories (ou l'année courante si aucun)
-      if (availableYears.length > 0) {
-        setYear(availableYears[availableYears.length - 1]);
-      }
     }
     init();
   }, []);
 
-  // Chargement des entries quand l'année change
   useEffect(() => {
+    if (years.length === 0) return;
     async function load() {
-      const e = await fetchEntries(year);
-      setEntries(e);
+      const s = await fetchSummaries(year);
+      setSummaries(s);
     }
     load();
-  }, [year]);
+  }, [year, years]);
+
+  const handleDayClick = async (date: string) => {
+    const entry = await fetchEntry(date);
+    if (entry) setSelectedEntry(entry);
+  };
 
   const hasAnyEntry = years.length > 0;
   const yearIndex   = years.indexOf(year);
@@ -263,15 +258,13 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
   const canGoNext   = yearIndex < years.length - 1;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-12">
 
-      {/* Titre */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-black text-darkgrey">Life Calendar</h1>
         <p className="text-mediumgrey mt-2 text-sm">Each square is a day. Colors show your mood.</p>
       </div>
 
-      {/* Sélecteur d'année — caché si aucun memory */}
       {hasAnyEntry && (
         <div className="flex items-center justify-center gap-6 mb-8">
           <button
@@ -294,35 +287,31 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
         </div>
       )}
 
-      {/* Carte calendrier */}
       <div className="bg-white rounded-3xl p-6 shadow-sm">
         {hasAnyEntry
           ? <>
-              <CalendarGrid entries={entries} year={year} onDayClick={setSelectedEntry} />
+              <CalendarGrid summaries={summaries} year={year} onDayClick={handleDayClick} />
               <MoodLegend />
             </>
           : <EmptyCalendar onAddMemory={() => onNavigateToToday?.()} />
         }
       </div>
 
-      {/* Statistiques */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
           <StatCard value={stats.capsuls}               label="CAPSULS"  color="bg-yellow/60"  />
-          <StatCard value={`${stats.completePercent}%`} label="COMPLETE" color="bg-orange/50"  />
           <StatCard value={stats.shared}                label="SHARED"   color="bg-lightpink"  />
           <StatCard value={stats.streak}                label="STREAK"   color="bg-blue/60"    />
         </div>
       )}
 
-      {/* Modal détail memory */}
       {selectedEntry && (
         <MemoryModal
           entry={selectedEntry}
           onClose={() => setSelectedEntry(null)}
           onDelete={() => {
             // TODO: DELETE /api/entries/:date
-            setEntries(prev => prev.filter(e => e.date !== selectedEntry.date));
+            setSummaries(prev => prev.filter(s => s.date !== selectedEntry.date));
             setSelectedEntry(null);
           }}
           onPreviewGuest={() => { setSelectedEntry(null); onPreviewGuest?.(); }}

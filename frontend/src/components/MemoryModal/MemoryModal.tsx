@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { X, Users, Lock, Link2, Copy, Heart, Eye } from 'lucide-preact';
 import { Button } from '../Button/Button';
 import { Avatar } from '../Avatar/Avatar';
-import { MOOD_CONFIG } from '../../pages/timeline/timeline.types';
+import { MOOD_EMOJI } from './MemoryModal.types';
 import type { MemoryModalProps } from './MemoryModal.types';
 
 function formatFullDate(dateStr: string): string {
@@ -14,12 +14,12 @@ function formatFullDate(dateStr: string): string {
 
 export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: MemoryModalProps) {
   const [isShared, setIsShared] = useState(entry.isShared);
-  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`;
+  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`; // To do: a modifier avec la vraie URL
   const [shareStep, setShareStep] = useState<'idle' | 'confirming'>('idle');
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const moodCfg = MOOD_CONFIG[entry.mood];
+  const moodEmoji = MOOD_EMOJI[entry.mood];
 
   const handleShare = () => {
     setIsShared(true);
@@ -48,8 +48,8 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
 
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 ${moodCfg.cellColor}/20`}>
-                {moodCfg.emoji}
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 bg-verylightorange">
+                {moodEmoji}
               </div>
               <div>
                 <p className="text-xs font-bold text-darkgrey tracking-widest leading-tight">
@@ -73,7 +73,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
             <img
               src={entry.image}
               alt="Memory"
-              className="w-full rounded-2xl object-cover max-h-64"
+              className="w-full rounded object-contain"
             />
           )}
 
@@ -179,7 +179,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
           )}
 
           {confirmDelete ? (
-            <div className="bg-verylightpink rounded-3xl p-5 flex flex-col gap-4">
+            <div className="bg-verylightpink/50 rounded-3xl p-5 flex flex-col gap-4">
               <div className="flex flex-col gap-1 text-center">
                 <p className="text-lg font-black text-darkgrey">Delete this memory?</p>
                 <p className="text-sm pb-0 mb-0  text-darkgrey/70 leading-relaxed">
