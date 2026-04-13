@@ -15,8 +15,9 @@ export interface DaySummary {
   mood: Mood;
 }
 
+// Champs issus de GET /memories/stats
 export interface TimelineStats {
-  capsuls: number;
+  totalCapsuls: number;  // was: capsuls
   shared: number;
-  streak: number;
+  dayStreak: number;     // was: streak
 }

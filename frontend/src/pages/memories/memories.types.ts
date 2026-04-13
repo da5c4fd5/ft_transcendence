@@ -1,22 +1,23 @@
 import type { Mood } from '../../components/MemoryModal/MemoryModal.types';
 
+// Réponse de GET /memories/capsuls — 3 souvenirs sélectionnés par le backend
 export interface TimeCapsule {
   id: string;
-  label: string; // computed by backend: "1 month ago", "3 years ago", etc.
-  text: string;
-  image: string | null;
+  date: string;          // ISO "2025-04-09" — pour calculer le label côté frontend
+  content: string;       // was: text
+  media: string | null;  // was: image
+  mood: Mood;
 }
 
 // Entrée légère pour la grille — le détail complet est chargé dans MemoryModal au clic
+// relativeLabel et formattedDate sont calculés côté frontend à partir de date
 export interface MemoryCard {
   id: string;
-  date: string;          // ISO date string, e.g. "2026-04-02" — pour le tri et le MemoryModal
-  relativeLabel: string; // computed by backend: "Yesterday", "3 years ago"
-  formattedDate: string; // e.g. "THU, APR 2, 2026"
-  text: string;
-  image: string | null;
+  date: string;          // ISO "2026-04-09"
+  content: string;       // was: text
+  media: string | null;  // was: image
   mood: Mood;
-  isShared: boolean;
+  isOpen: boolean;       // was: isShared — true = souvenir partagé
 }
 
 export type MoodFilter = Mood | 'all';
@@ -29,4 +30,12 @@ export interface CollectionFilters {
   dateFrom: string;
   dateTo: string;
   sharedOnly: boolean;
+}
+
+// Réponse de GET /memories/stats
+export interface MemoryStats {
+  totalCapsuls: number;
+  shared: number;
+  dayStreak: number;
+  wordsWritten: number;
 }

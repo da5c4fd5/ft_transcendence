@@ -66,47 +66,49 @@ const MOCK_SUMMARIES: DaySummary[] = [
 const MOCK_ENTRIES: MemoryDetails[] = [
   {
     date: '2026-04-02', mood: 'Peaceful',
-    text: 'Spent the whole evening laughing until our stomachs hurt. Sunsets with these two never get old. We talked about everything and nothing. I want to remember this feeling of complete peace.',
-    image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&q=80',
-    isShared: true,
+    content: 'Spent the whole evening laughing until our stomachs hurt. Sunsets with these two never get old. We talked about everything and nothing. I want to remember this feeling of complete peace.',
+    media: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&q=80',
+    isOpen: true,
     shareUrl: 'https://capsul.app/shared/9bfb4077-fa56-400e-831f',
     friendContributions: [
-      { id: '1', name: 'Léa', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80', date: '02/04/2026', text: "This was such a perfect evening!! Look at this polaroid I took!", image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80' },
-      { id: '2', name: 'Thomas', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&q=80', date: '02/04/2026', text: "Next time I'm picking the restaurant though!", image: null },
+      { id: '1', guestName: 'Léa', avatarURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80', date: '02/04/2026', content: "This was such a perfect evening!! Look at this polaroid I took!", media: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80' },
+      { id: '2', guestName: 'Thomas', avatarURL: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&q=80', date: '02/04/2026', content: "Next time I'm picking the restaurant though!", media: null },
     ],
   },
-  { date: '2026-04-07', mood: 'Joyful',    text: 'Beautiful spring day. Went for a run in the park and felt amazing.',    image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-04-09', mood: 'Excited',   text: 'Started working on the new project today. So many ideas flowing!',      image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-30', mood: 'Peaceful',  text: 'Super aprem bar à jeux avec Victor et Auriane au Nid Cocon Ludique!',   image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-22', mood: 'Sad',       text: "Rainy day, feeling a bit low. But that's okay.",                        image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-15', mood: 'Nostalgic', text: 'Found old photos from childhood. Spent hours going through them.',       image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-03-08', mood: 'Anxious',   text: 'Big presentation tomorrow. Trying to stay calm.',                        image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-02-14', mood: 'Joyful',    text: "Valentine's day! Best surprise ever.",                                   image: null, isShared: false, shareUrl: null, friendContributions: [] },
-  { date: '2026-01-01', mood: 'Excited',   text: 'New year, new adventures! Feeling hopeful.',                             image: null, isShared: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-04-07', mood: 'Joyful',    content: 'Beautiful spring day. Went for a run in the park and felt amazing.',    media: null, isOpen: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-04-09', mood: 'Excited',   content: 'Started working on the new project today. So many ideas flowing!',      media: null, isOpen: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-30', mood: 'Peaceful',  content: 'Super aprem bar à jeux avec Victor et Auriane au Nid Cocon Ludique!',   media: null, isOpen: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-22', mood: 'Sad',       content: "Rainy day, feeling a bit low. But that's okay.",                        media: null, isOpen: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-15', mood: 'Nostalgic', content: 'Found old photos from childhood. Spent hours going through them.',       media: null, isOpen: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-03-08', mood: 'Anxious',   content: 'Big presentation tomorrow. Trying to stay calm.',                        media: null, isOpen: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-02-14', mood: 'Joyful',    content: "Valentine's day! Best surprise ever.",                                   media: null, isOpen: false, shareUrl: null, friendContributions: [] },
+  { date: '2026-01-01', mood: 'Excited',   content: 'New year, new adventures! Feeling hopeful.',                             media: null, isOpen: false, shareUrl: null, friendContributions: [] },
 ];
 
-const MOCK_STATS: TimelineStats = { capsuls: 9, shared: 1, streak: 2 };
+const MOCK_STATS: TimelineStats = { totalCapsuls: 9, shared: 1, dayStreak: 2 };
 
 async function fetchSummaries(year: number): Promise<DaySummary[]> {
-  // TODO: const res = await fetch(`/api/timeline?year=${year}`); return res.json();
+  // TODO: const res = await fetch(`/api/timeline?year=${year}`, { headers: { Authorization: `Bearer ${token}` } }); return res.json();
   return MOCK_SUMMARIES.filter(e => e.date.startsWith(String(year)));
 }
 
 async function fetchEntry(date: string): Promise<MemoryDetails | null> {
-  // TODO: const res = await fetch(`/api/entries/${date}`); return res.json();
+  // TODO: const res = await fetch(`/api/entries/${date}`, { headers: { Authorization: `Bearer ${token}` } }); return res.json();
   return MOCK_ENTRIES.find(e => e.date === date) ?? null;
 }
 
 async function fetchStats(): Promise<TimelineStats> {
-  // TODO: const res = await fetch('/api/stats'); return res.json();
+  // TODO: const res = await fetch('/api/memories/stats', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
   return MOCK_STATS;
 }
 
 async function fetchYearsWithEntries(): Promise<number[]> {
-  // TODO: const res = await fetch('/api/timeline/years'); return res.json();
+  // TODO: const res = await fetch('/api/timeline/years', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
   const years = [...new Set(MOCK_SUMMARIES.map(e => parseInt(e.date.split('-')[0])))];
   return years.sort((a, b) => a - b);
 }
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function CalendarGrid({ summaries, year, onDayClick }: {
   summaries: DaySummary[];
@@ -218,6 +220,8 @@ function StatCard({ value, label, color }: { value: string | number; label: stri
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigateToToday?: () => void; onPreviewGuest?: () => void }) {
   const currentYear = new Date().getFullYear();
   const [years, setYears] = useState<number[]>([]);
@@ -240,11 +244,7 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
 
   useEffect(() => {
     if (years.length === 0) return;
-    async function load() {
-      const s = await fetchSummaries(year);
-      setSummaries(s);
-    }
-    load();
+    fetchSummaries(year).then(setSummaries);
   }, [year, years]);
 
   const handleDayClick = async (date: string) => {
@@ -299,9 +299,9 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
 
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
-          <StatCard value={stats.capsuls}               label="CAPSULS"  color="bg-yellow/60"  />
-          <StatCard value={stats.shared}                label="SHARED"   color="bg-lightpink"  />
-          <StatCard value={stats.streak}                label="STREAK"   color="bg-blue/60"    />
+          <StatCard value={stats.totalCapsuls} label="CAPSULS"  color="bg-yellow/60" />
+          <StatCard value={stats.shared}       label="SHARED"   color="bg-lightpink" />
+          <StatCard value={stats.dayStreak}    label="STREAK"   color="bg-blue/60"   />
         </div>
       )}
 

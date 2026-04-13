@@ -29,7 +29,6 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
   return (
     <div className="min-h-screen bg-blue flex flex-col items-center justify-center px-6 py-12 gap-8">
 
-      {/* Logo avec icône Sprout colorée en bleu pour matcher le fond */}
       <AppLogo size="sm" iconColor="text-blue" subtitle="Welcome back!" />
 
       <form

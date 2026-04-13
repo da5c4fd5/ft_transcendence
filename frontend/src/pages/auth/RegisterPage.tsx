@@ -30,7 +30,6 @@ export function RegisterPage({ onNavigate, onLogin }: RegisterPageProps) {
   return (
     <div className="min-h-screen bg-orange flex flex-col items-center justify-center px-6 py-12 gap-8">
 
-      {/* Icône Sprout colorée en orange pour matcher le fond saumon */}
       <AppLogo size="sm" iconColor="text-orange" subtitle="Start your memory journey" />
 
       <form

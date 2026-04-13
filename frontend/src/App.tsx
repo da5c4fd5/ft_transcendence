@@ -10,6 +10,8 @@ import { TodayPage } from './pages/today/TodayPage';
 import { TimelinePage } from './pages/timeline/TimelinePage';
 import { MemoriesPage } from './pages/memories/MemoriesPage';
 import { TreePage } from './pages/tree/TreePage';
+import { ProfilePage } from './pages/profile/ProfilePage';
+import { AdminPage } from './pages/admin/AdminPage';
 import { GuestPage, MOCK_SHARED_MEMORY } from './pages/guest/GuestPage';
 
 // ---------------------------------------------------------------------------
@@ -95,29 +97,20 @@ const App = () => {
         {currentPage === 'timeline' && <TimelinePage onNavigateToToday={() => setCurrentPage('today')} onPreviewGuest={() => setShowGuestPreview(true)} />}
         {currentPage === 'memories' && <MemoriesPage />}
         {currentPage === 'tree'     && <TreePage />}
-        {currentPage !== 'today' && currentPage !== 'timeline' && currentPage !== 'memories' && currentPage !== 'tree' && (
-          <div className="p-6 flex flex-col gap-4 max-w-lg mx-auto">
-            <h1 className="text-2xl font-bold text-darkgrey">Page : {currentPage}</h1>
-            <button
-              onClick={() => setIsAdmin((v) => !v)}
-              className="px-4 py-2 bg-yellow rounded-full text-darkgrey font-semibold text-sm w-fit"
-            >
-              Switcher le rôle ({isAdmin ? 'passer en User' : 'passer en Admin'})
-            </button>
-            {/* TODO: supprimer ce bouton quand le routing /shared/:token sera implémenté */}
-            <button
-              onClick={() => setShowGuestPreviewAnon(true)}
-              className="px-4 py-2 bg-blue rounded-full text-darkgrey font-semibold text-sm w-fit"
-            >
-              Preview vue invité (non connecté)
-            </button>
-            <button
-              onClick={() => { setIsAuthenticated(false); setAuthPage('welcome'); }}
-              className="px-4 py-2 bg-lightpink rounded-full text-pink font-semibold text-sm w-fit"
-            >
-              Se déconnecter
-            </button>
-          </div>
+        {currentPage === 'profile'  && (
+          <ProfilePage
+            user={user}
+            onLogout={() => { setIsAuthenticated(false); setAuthPage('welcome'); }}
+            onNavigateToAdmin={() => setCurrentPage('admin')}
+          />
+        )}
+        {currentPage === 'admin' && (
+          <AdminPage
+            currentUserId="u1"
+            isAdmin={isAdmin}
+            onToggleAdmin={() => setIsAdmin(v => !v)}
+            onPreviewGuestAnon={() => setShowGuestPreviewAnon(true)}
+          />
         )}
       </main>
     </div>

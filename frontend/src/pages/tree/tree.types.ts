@@ -1,15 +1,10 @@
-export type TreeStage = 'seed' | 'sprout' | 'sapling' | 'young' | 'mature' | 'ancient';
-
 export interface TreeData {
-  stage: TreeStage;
-  lifeForce: number;       // 0–100
-  stageName: string;       // e.g. "Struggling"
-  stageMotivation: string; // e.g. "Don't give up!"
-  totalCapsuls: number;
-  dayStreak: number;
-  wordsWritten: number;
+  lifeForce: number;    // 0–100 (score calculé par le backend)
+  isDecreasing: boolean; // true si le lifeForce est en baisse
 }
 
+// Achievements — le backend renvoie uniquement les IDs débloqués : string[]
+// Le mapping id → emoji/titre/description est statique côté frontend (voir TreePage)
 export interface Achievement {
   id: string;
   emoji: string;

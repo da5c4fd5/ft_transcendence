@@ -75,7 +75,7 @@ export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
             aria-label="User menu"
           >
             {user ? (
-              <Avatar name={user.name} src={user.avatar} size="md" />
+              <Avatar name={user.username} src={user.avatarURL} size="md" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-yellow flex items-center justify-center">
                 <User size={18} className="text-darkgrey" />

@@ -11,19 +11,19 @@ export const MOOD_EMOJI: Record<Mood, string> = {
 
 export interface FriendContribution {
   id: string;
-  name: string;
-  avatar: string | null;
+  guestName: string;        // was: name
+  avatarURL: string | null; // was: avatar
   date: string;
-  text: string;
-  image: string | null;
+  content: string;          // was: text
+  media: string | null;     // was: image
 }
 
 export interface MemoryDetails {
   date: string;
   mood: Mood;
-  text: string;
-  image: string | null;
-  isShared: boolean;
+  content: string;          // was: text
+  media: string | null;     // was: image
+  isOpen: boolean;          // was: isShared — true = souvenir partagé
   shareUrl: string | null;
   friendContributions: FriendContribution[];
 }

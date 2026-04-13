@@ -1,172 +1,63 @@
 import { useState, useEffect } from 'preact/hooks';
-import { Activity, Zap, Sparkles, Sprout } from 'lucide-preact';
+import { Zap, Sparkles, Sprout, ChevronRight, ChevronLeft } from 'lucide-preact';
+import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { TreeData, Achievement } from './tree.types';
+import type { MemoryStats } from '../memories/memories.types';
 
 // ─── Mock data (TODO: supprimer quand le backend est prêt) ────────────────────
 
 const MOCK_TREE: TreeData = {
-  stage: 'sprout',
-  lifeForce: 10,
-  stageName: 'Struggling',
-  stageMotivation: "Don't give up!",
-  totalCapsuls: 10,
-  dayStreak: 1,
-  wordsWritten: 139,
+  lifeForce: 0,
+  isDecreasing: false,
 };
 
-const MOCK_ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_capsul',    emoji: '🌱', title: 'First Capsul',      description: 'Started your journey',  unlocked: true  },
-  { id: 'week_warrior',    emoji: '🔥', title: 'Week Warrior',      description: '7 day streak',           unlocked: false },
-  { id: 'photographer',    emoji: '📷', title: 'Photographer',      description: '10 photos captured',     unlocked: false },
-  { id: 'monthly_master',  emoji: '⭐', title: 'Monthly Master',    description: '30 capsuls',             unlocked: false },
-  { id: 'visual_storyteller', emoji: '🎨', title: 'Visual Storyteller', description: '25 photo memories', unlocked: false },
-  { id: 'consistency_king', emoji: '💪', title: 'Consistency King', description: '30 day streak',          unlocked: false },
+const MOCK_STATS: MemoryStats = {
+  totalCapsuls: 0,
+  shared: 0,
+  dayStreak: 0,
+  wordsWritten: 0,
+};
+
+// Le backend renvoie uniquement les IDs débloqués — le mapping est statique ici
+const ALL_ACHIEVEMENTS: Achievement[] = [
+  { id: 'first_capsul',       emoji: '🌱', title: 'First Capsul',       description: '1 souvenir créé',           unlocked: false },
+  { id: 'week_warrior',       emoji: '🔥', title: 'Week Warrior',       description: '7 day streak',              unlocked: false },
+  { id: 'wordsmith',          emoji: '✍️', title: 'Wordsmith',          description: '500 words written',         unlocked: false },
+  { id: 'monthly_master',     emoji: '⭐', title: 'Monthly Master',     description: '30 capsuls',                unlocked: false },
+  { id: 'visual_storyteller', emoji: '🎨', title: 'Visual Storyteller', description: '25 photo memories',        unlocked: false },
+  { id: 'consistency_king',   emoji: '💪', title: 'Consistency King',   description: '30 day streak',             unlocked: false },
 ];
 
-// ─── Fetch functions ──────────────────────────────────────────────────────────
-
 async function fetchTreeData(): Promise<TreeData> {
-  // TODO: const res = await fetch('/api/tree'); return res.json();
+  // TODO: const res = await fetch('/api/tree', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
   return MOCK_TREE;
 }
 
-async function fetchAchievements(): Promise<Achievement[]> {
-  // TODO: const res = await fetch('/api/achievements'); return res.json();
-  return MOCK_ACHIEVEMENTS;
+async function fetchStats(): Promise<MemoryStats> {
+  // TODO: const res = await fetch('/api/memories/stats', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
+  return MOCK_STATS;
 }
 
-async function petTree(): Promise<void> {
-  // TODO: POST /api/tree/pet
+async function fetchUnlockedAchievements(): Promise<string[]> {
+  // TODO: const res = await fetch('/api/achievements', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
+  // Le backend renvoie un tableau d'IDs : ["first_capsul", "week_warrior"]
+  return [];
 }
 
-// ─── TreeVisual ───────────────────────────────────────────────────────────────
+// ─── Demo stages ──────────────────────────────────────────────────────────────
 
-function TreeVisual({ lifeForce, onPet }: { lifeForce: number; onPet: () => void }) {
-  const [petted, setPetted] = useState(false);
-  const [particles, setParticles] = useState<{ id: number; x: number; y: number }[]>([]);
+const DEMO_STAGES: Array<{ health: number; name: string }> = [
+  { health:  5, name: 'Stage 1 — Dormant Seed'   },
+  { health: 18, name: 'Stage 2 — New Seedling'   },
+  { health: 31, name: 'Stage 3 — Fragile Sprout' },
+  { health: 44, name: 'Stage 4 — Young Plant'    },
+  { health: 56, name: 'Stage 5 — Strong Sapling' },
+  { health: 68, name: 'Stage 6 — Flourishing Tree' },
+  { health: 80, name: 'Stage 7 — Blooming Tree'  },
+  { health: 94, name: 'Stage 8 — Paradise Tree'  },
+];
 
-  const handlePet = async () => {
-    if (petted) return;
-    setPetted(true);
-    setParticles([
-      { id: 1, x: -20, y: -30 },
-      { id: 2, x: 20,  y: -40 },
-      { id: 3, x: 0,   y: -50 },
-    ]);
-    await petTree();
-    setTimeout(() => setParticles([]), 800);
-  };
-
-  const healthColor =
-    lifeForce < 20  ? 'text-moodsad' :
-    lifeForce < 50  ? 'text-orange' :
-    lifeForce < 80  ? 'text-yellow' :
-                      'text-green-500';
-
-  const healthLabel =
-    lifeForce < 20  ? 'Very weak' :
-    lifeForce < 50  ? 'Growing' :
-    lifeForce < 80  ? 'Healthy' :
-                      'Thriving';
-
-  const healthDotColor =
-    lifeForce < 20  ? 'bg-moodsad' :
-    lifeForce < 50  ? 'bg-orange' :
-    lifeForce < 80  ? 'bg-yellow' :
-                      'bg-green-400';
-
-  return (
-    <div className="relative bg-gradient-to-b from-blue/40 via-blue/20 to-blue/5 rounded-3xl p-8 flex flex-col items-center gap-5 overflow-hidden">
-
-      {/* Glow background */}
-      <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl opacity-40 pointer-events-none"
-        style={{ width: 200, height: 200, background: `radial-gradient(circle, rgba(147,197,253,0.8) 0%, transparent 70%)` }}
-      />
-
-      {/* Tree illustration */}
-      <div className="relative flex flex-col items-center">
-        {/* Particles on pet */}
-        {particles.map(p => (
-          <div
-            key={p.id}
-            className="absolute text-yellow text-lg animate-bounce pointer-events-none"
-            style={{ left: `calc(50% + ${p.x}px)`, top: p.y, animationDuration: '0.6s' }}
-          >
-            ✨
-          </div>
-        ))}
-
-        {/* Simple SVG tree matching the screenshot style */}
-        <svg width="120" height="130" viewBox="0 0 120 130" fill="none" className="drop-shadow-sm">
-          {/* Trunk */}
-          <rect x="50" y="90" width="20" height="35" rx="6" fill="#C4956A" />
-          {/* Ground mound */}
-          <ellipse cx="60" cy="118" rx="38" ry="10" fill="#D4A574" opacity="0.6" />
-          {/* Leaves — small sprout stage */}
-          <ellipse cx="60" cy="72" rx="28" ry="22" fill="#86EFAC" opacity="0.9" />
-          <ellipse cx="42" cy="80" rx="18" ry="14" fill="#6EE7B7" opacity="0.8" />
-          <ellipse cx="78" cy="80" rx="18" ry="14" fill="#6EE7B7" opacity="0.8" />
-          <ellipse cx="60" cy="58" rx="20" ry="18" fill="#A7F3D0" opacity="0.9" />
-          {/* Little decorative dots */}
-          <circle cx="48" cy="70" r="3" fill="#FCD34D" opacity="0.7" />
-          <circle cx="72" cy="65" r="2.5" fill="#FCD34D" opacity="0.6" />
-          <circle cx="60" cy="75" r="2" fill="#FDE68A" opacity="0.8" />
-        </svg>
-      </div>
-
-      {/* Health badge */}
-      <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm rounded-full px-4 py-1.5 shadow-sm">
-        <span className={`w-2 h-2 rounded-full ${healthDotColor}`} />
-        <span className={`text-sm font-semibold ${healthColor}`}>{healthLabel}</span>
-      </div>
-
-      {/* Pet button */}
-      <button
-        type="button"
-        onClick={handlePet}
-        className={`flex items-center gap-1.5 bg-white/80 backdrop-blur-sm rounded-full px-4 py-1.5 text-xs font-semibold text-darkgrey shadow-sm transition-all ${
-          petted ? 'opacity-50 cursor-default' : 'hover:shadow-md hover:bg-white active:scale-95'
-        }`}
-      >
-        <span>✨</span>
-        {petted ? 'Tree petted!' : 'Click to pet your tree!'}
-      </button>
-
-      {/* Life force bar */}
-      <div className="w-full max-w-xs bg-white/60 backdrop-blur-sm rounded-2xl px-5 py-3 flex flex-col gap-2 shadow-sm">
-        <div className="flex items-center justify-between text-sm font-semibold text-darkgrey">
-          <span>Life Force</span>
-          <span className="text-blue font-bold">{lifeForce}%</span>
-        </div>
-        <div className="h-2 bg-lightgrey rounded-full overflow-hidden">
-          <div
-            className="h-full bg-blue rounded-full transition-all duration-1000"
-            style={{ width: `${lifeForce}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── StageCard ────────────────────────────────────────────────────────────────
-
-function StageCard({ tree }: { tree: TreeData }) {
-  return (
-    <div className="flex flex-col items-center gap-2 py-2">
-      <h2 className="text-3xl font-black text-darkgrey">{tree.stageName}</h2>
-      <p className="text-mediumgrey text-sm">{tree.stageMotivation}</p>
-      <div className="flex items-center gap-2 bg-white rounded-full px-5 py-2.5 shadow-sm mt-1">
-        <Activity size={16} className="text-pink" />
-        <span className="font-bold text-darkgrey text-sm">{tree.lifeForce}%</span>
-        <span className="text-mediumgrey text-sm">Life Force</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── StatCard ─────────────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({ icon, value, label, sublabel, color }: {
   icon: preact.ComponentChildren;
@@ -188,8 +79,6 @@ function StatCard({ icon, value, label, sublabel, color }: {
     </div>
   );
 }
-
-// ─── AchievementCard ──────────────────────────────────────────────────────────
 
 function AchievementCard({ achievement }: { achievement: Achievement }) {
   return (
@@ -214,60 +103,129 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
   );
 }
 
-// ─── TreePage ─────────────────────────────────────────────────────────────────
+function DemoBar({ stageIndex, onPrev, onNext, isDecreasing, onToggleDecreasing }: {
+  stageIndex: number;
+  onPrev: () => void;
+  onNext: () => void;
+  isDecreasing: boolean;
+  onToggleDecreasing: () => void;
+}) {
+  const current = DEMO_STAGES[stageIndex];
+  return (
+    <div className="bg-purple/40 rounded-3xl px-5 py-4 flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-bold text-darkgrey/60 tracking-widest uppercase shrink-0">Demo</span>
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={stageIndex === 0}
+          className="w-8 h-8 rounded-full bg-white/60 flex items-center justify-center disabled:opacity-30 hover:bg-white transition-colors shrink-0"
+        >
+          <ChevronLeft size={16} className="text-darkgrey" />
+        </button>
+        <div className="flex-1 text-center">
+          <p className="text-sm font-bold text-darkgrey">{current.name}</p>
+          <p className="text-xs text-darkgrey/50">Life Force: {current.health}%</p>
+        </div>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={stageIndex === DEMO_STAGES.length - 1}
+          className="w-8 h-8 rounded-full bg-white/60 flex items-center justify-center disabled:opacity-30 hover:bg-white transition-colors shrink-0"
+        >
+          <ChevronRight size={16} className="text-darkgrey" />
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onToggleDecreasing}
+        className={[
+          'w-full rounded-2xl px-4 py-2 text-xs font-bold transition-colors',
+          isDecreasing
+            ? 'bg-blue/60 text-darkgrey'
+            : 'bg-white/40 text-mediumgrey hover:bg-white/60',
+        ].join(' ')}
+      >
+        {isDecreasing ? '😢 Decreasing (on)' : '😢 Simulate decreasing'}
+      </button>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function TreePage() {
-  const [tree, setTree]                 = useState<TreeData | null>(null);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [tree, setTree]                   = useState<TreeData | null>(null);
+  const [stats, setStats]                 = useState<MemoryStats | null>(null);
+  const [achievements, setAchievements]   = useState<Achievement[]>([]);
+  const [demoIndex, setDemoIndex]         = useState(0);
+  const [demoDecreasing, setDemoDecreasing] = useState(false);
 
   useEffect(() => {
-    fetchTreeData().then(setTree);
-    fetchAchievements().then(setAchievements);
+    async function load() {
+      const [t, s, unlockedIds] = await Promise.all([
+        fetchTreeData(),
+        fetchStats(),
+        fetchUnlockedAchievements(),
+      ]);
+      setTree(t);
+      setStats(s);
+      // Mapper les IDs débloqués sur la liste statique
+      setAchievements(ALL_ACHIEVEMENTS.map(a => ({ ...a, unlocked: unlockedIds.includes(a.id) })));
+    }
+    load();
   }, []);
 
   if (!tree) return null;
 
-  return (
-    <div className="max-w-lg mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
+  const displayHealth = DEMO_STAGES[demoIndex].health;
 
-      {/* Header */}
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
+
       <div className="text-center">
         <h1 className="text-4xl font-black text-darkgrey">My Tree</h1>
-        <p className="text-mediumgrey mt-1 text-sm">Watch it grow with your daily presence 🌿</p>
+        <p className="text-mediumgrey mt-1 text-sm">Watch it grow with your daily presence</p>
       </div>
 
-      {/* Tree visual + stage info */}
-      <div className="bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm">
-        <TreeVisual lifeForce={tree.lifeForce} onPet={() => {}} />
-        <StageCard tree={tree} />
+      <DemoBar
+        stageIndex={demoIndex}
+        onPrev={() => setDemoIndex(i => Math.max(0, i - 1))}
+        onNext={() => setDemoIndex(i => Math.min(DEMO_STAGES.length - 1, i + 1))}
+        isDecreasing={demoDecreasing}
+        onToggleDecreasing={() => setDemoDecreasing(v => !v)}
+      />
+
+      <div className="bg-white rounded-3xl p-6 shadow-sm">
+        <div className="bg-linear-to-b from-blue/40 via-blue/20 to-blue/5 rounded-2xl p-6 flex flex-col items-center gap-4">
+          <TreeVisual health={displayHealth} size="large" showDetails isDecreasing={demoDecreasing} />
+        </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <StatCard
           icon={<Sprout size={18} className="text-darkgrey" />}
-          value={tree.totalCapsuls}
+          value={stats?.totalCapsuls ?? 0}
           label="Total Capsuls"
           sublabel="Every memory forms the roots"
           color="bg-yellow/60"
         />
         <StatCard
           icon={<Zap size={18} className="text-darkgrey" />}
-          value={tree.dayStreak}
+          value={stats?.dayStreak ?? 0}
           label="Day Streak"
           sublabel="Daily visits drive the growth"
-          color="bg-lightpink"
+          color="bg-orange"
         />
         <StatCard
           icon={<Sparkles size={18} className="text-darkgrey" />}
-          value={tree.wordsWritten}
+          value={stats?.wordsWritten ?? 0}
           label="Words Written"
           sublabel="Every word waters the tree"
           color="bg-lightpink"
         />
       </div>
 
-      {/* Achievements */}
       <div className="bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="text-xl">🏆</span>

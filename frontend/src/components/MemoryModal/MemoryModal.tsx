@@ -13,8 +13,8 @@ function formatFullDate(dateStr: string): string {
 }
 
 export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: MemoryModalProps) {
-  const [isShared, setIsShared] = useState(entry.isShared);
-  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`; // To do: a modifier avec la vraie URL
+  const [isOpen, setIsOpen] = useState(entry.isOpen);
+  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`; // TODO: remplacer avec la vraie URL
   const [shareStep, setShareStep] = useState<'idle' | 'confirming'>('idle');
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -22,14 +22,14 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
   const moodEmoji = MOOD_EMOJI[entry.mood];
 
   const handleShare = () => {
-    setIsShared(true);
+    setIsOpen(true);
     setShareStep('confirming');
-    // TODO: POST /api/entries/:date/share
+    // TODO: POST /api/memories/:id/share
   };
 
   const handleMakePrivate = () => {
-    setIsShared(false);
-    // TODO: POST /api/entries/:date/unshare
+    setIsOpen(false);
+    // TODO: PATCH /api/memories/:id { isOpen: false }
   };
 
   const handleCopy = async () => {
@@ -67,11 +67,11 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
             </button>
           </div>
 
-          <p className="text-darkgrey text-base font-semibold leading-relaxed">{entry.text}</p>
+          <p className="text-darkgrey text-base font-semibold leading-relaxed">{entry.content}</p>
 
-          {entry.image && (
+          {entry.media && (
             <img
-              src={entry.image}
+              src={entry.media}
               alt="Memory"
               className="w-full rounded object-contain"
             />
@@ -85,15 +85,15 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
               </div>
               {entry.friendContributions.map(contrib => (
                 <div key={contrib.id} className="flex gap-3">
-                  <Avatar name={contrib.name} src={contrib.avatar ?? undefined} size="sm" />
+                  <Avatar name={contrib.guestName} src={contrib.avatarURL ?? undefined} size="sm" />
                   <div className="flex flex-col gap-1 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-bold text-darkgrey text-sm">{contrib.name}</span>
+                      <span className="font-bold text-darkgrey text-sm">{contrib.guestName}</span>
                       <span className="text-xs text-mediumgrey">{contrib.date}</span>
                     </div>
-                    <p className="text-sm text-darkgrey leading-relaxed">{contrib.text}</p>
-                    {contrib.image && (
-                      <img src={contrib.image} alt="" className="rounded-xl w-40 object-cover mt-1" />
+                    <p className="text-sm text-darkgrey leading-relaxed">{contrib.content}</p>
+                    {contrib.media && (
+                      <img src={contrib.media} alt="" className="rounded-xl w-40 object-cover mt-1" />
                     )}
                   </div>
                 </div>
@@ -137,17 +137,17 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {isShared
+                  {isOpen
                     ? <><Users size={15} className="text-mediumgrey" /><span className="text-sm text-mediumgrey font-semibold">Shared with friends</span></>
                     : <><Lock  size={15} className="text-mediumgrey" /><span className="text-sm text-mediumgrey font-semibold">Private capsul</span></>
                   }
                 </div>
-                {isShared
+                {isOpen
                   ? <Button variant="secondary" size="sm" onClick={handleMakePrivate}>Make Private</Button>
                   : <Button variant="primary"   size="sm" onClick={handleShare}>Share with Friends</Button>
                 }
               </div>
-              {isShared && (
+              {isOpen && (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2 bg-verylightorange rounded-xl px-3 py-2.5">
                     <p className="text-xs text-darkgrey truncate flex-1">{shareUrl}</p>
@@ -182,7 +182,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
             <div className="bg-verylightpink/50 rounded-3xl p-5 flex flex-col gap-4">
               <div className="flex flex-col gap-1 text-center">
                 <p className="text-lg font-black text-darkgrey">Delete this memory?</p>
-                <p className="text-sm pb-0 mb-0  text-darkgrey/70 leading-relaxed">
+                <p className="text-sm pb-0 mb-0 text-darkgrey/70 leading-relaxed">
                   This capsul will be gone forever. There's no way to recover it.
                 </p>
               </div>
