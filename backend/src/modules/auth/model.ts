@@ -32,12 +32,11 @@ export const AuthModel = {
     message: t.Literal("Logged out")
   }),
 
-  tokenPayload: t.Object({
-    sub: t.String(),
+  userPayload: t.Object({
+    id: t.String(),
     email: t.String(),
-    iat: t.Number(),
-    exp: t.Number(),
-    jti: t.String()
+    isAdmin: t.Number(),
+    sessionId: t.String()
   })
 } as const;
 

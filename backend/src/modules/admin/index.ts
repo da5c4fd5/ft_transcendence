@@ -4,9 +4,10 @@ import { authPlugin } from "../../plugins/auth.plugin";
 import { Auth } from "./service";
 import { AuthModel } from "./model";
 
-export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
+export const admin = new Elysia({ prefix: "/auth", tags: ["Auth"] })
   .use(jwtPlugin)
   .use(authPlugin)
+  .use({})
   .post(
     "/signup",
     async ({ body, jwt, cookie: { session } }) => {

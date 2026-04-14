@@ -31,7 +31,7 @@ const app = new Elysia()
   .onBeforeHandle(({ request, status }) => {
     if (["POST", "PUT", "PATCH"].includes(request.method)) {
       const contentType = request.headers.get("content-type") ?? "";
-      if (!contentType.startsWith("application/json")) {
+      if (contentType !== "" && !contentType.startsWith("application/json")) {
         return status(415, { error: "Content-Type must be application/json" });
       }
     }
