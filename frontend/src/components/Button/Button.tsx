@@ -1,3 +1,4 @@
+import { clsx as cn } from 'clsx';
 import type { ButtonProps, ButtonVariant, ButtonSize } from './Button.types';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
@@ -15,6 +16,8 @@ const SIZE_CLASSES: Record<ButtonSize, string> = {
   lg: 'px-8 py-4 text-lg',
 };
 
+const base = 'rounded-full font-semibold transition-all duration-200 inline-flex items-center justify-center';
+
 export function Button({
   children,
   variant = 'primary',
@@ -25,22 +28,19 @@ export function Button({
   onClick,
   className = '',
 }: ButtonProps) {
-
-  const classes = [
-    'rounded-full font-semibold transition-all duration-200 inline-flex items-center justify-center',
-    VARIANT_CLASSES[variant],
-    SIZE_CLASSES[size],
-    fullWidth ? 'w-full' : '',
-    disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer',
-    className,
-  ].join(' ');
-
   return (
     <button
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={classes}
+      className={cn(
+        base,
+        VARIANT_CLASSES[variant],
+        SIZE_CLASSES[size],
+        fullWidth && 'w-full',
+        disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer',
+        className,
+      )}
     >
       {children}
     </button>

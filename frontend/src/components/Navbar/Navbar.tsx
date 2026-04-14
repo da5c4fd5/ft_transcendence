@@ -1,17 +1,20 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { Home, Clock, Sparkles, Sprout, User, ShieldCheck, ChevronDown } from 'lucide-preact';
+import { clsx as cn } from 'clsx';
 import { Avatar } from '../Avatar/Avatar';
 import type { NavbarProps, Page } from './Navbar.types';
 
 const NAV_ITEMS = [
-  { page: 'today' as Page,    label: 'Today',    Icon: Home },
-  { page: 'timeline' as Page, label: 'Timeline', Icon: Clock },
+  { page: 'today'    as Page, label: 'Today',    Icon: Home    },
+  { page: 'timeline' as Page, label: 'Timeline', Icon: Clock   },
   { page: 'memories' as Page, label: 'Memories', Icon: Sparkles },
-  { page: 'tree' as Page,     label: 'Tree',     Icon: Sprout },
+  { page: 'tree'     as Page, label: 'Tree',     Icon: Sprout  },
 ] as const;
 
-export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
+const navBtnBase = 'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200';
+const dropdownItemBase = 'w-full flex items-center gap-3 px-4 py-3 text-sm text-darkgrey hover:bg-verylightorange transition-colors';
 
+export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -54,12 +57,12 @@ export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
               <button
                 key={page}
                 onClick={() => onNavigate(page)}
-                className={[
-                  'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200',
+                className={cn(
+                  navBtnBase,
                   isActive
                     ? 'bg-yellow text-darkgrey'
                     : 'text-mediumgrey hover:text-darkgrey hover:bg-lightgrey',
-                ].join(' ')}
+                )}
               >
                 <Icon size={18} strokeWidth={1.8} />
                 {label}
@@ -85,7 +88,7 @@ export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
               <ChevronDown
                 size={14}
                 strokeWidth={2.5}
-                className={`text-mediumgrey transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+                className={cn('text-mediumgrey transition-transform duration-200', dropdownOpen && 'rotate-180')}
               />
             )}
           </button>
@@ -94,7 +97,7 @@ export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
             <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-black/5 overflow-hidden py-1">
               <button
                 onClick={() => { onNavigate('profile'); setDropdownOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-darkgrey hover:bg-verylightorange transition-colors"
+                className={dropdownItemBase}
               >
                 <User size={16} className="text-mediumgrey" />
                 My Profile
@@ -102,7 +105,7 @@ export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
               <div className="h-px bg-black/5 mx-3" />
               <button
                 onClick={() => { onNavigate('admin'); setDropdownOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-darkgrey hover:bg-verylightorange transition-colors"
+                className={dropdownItemBase}
               >
                 <ShieldCheck size={16} className="text-mediumgrey" />
                 Admin Dashboard
@@ -112,7 +115,6 @@ export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
         </div>
       </header>
 
-      {/* Navbar for Mobile */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex bg-white border-t border-black/5">
         {[...NAV_ITEMS, { page: 'profile' as Page, label: 'Profile', Icon: User }].map(({ page, label, Icon }) => {
           const isActive = currentPage === page;
@@ -122,13 +124,13 @@ export function Navbar({ currentPage, onNavigate, user }: NavbarProps) {
               onClick={() => onNavigate(page)}
               className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors"
             >
-              <div className={[
+              <div className={cn(
                 'flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200',
-                isActive ? 'bg-yellow' : '',
-              ].join(' ')}>
+                isActive && 'bg-yellow',
+              )}>
                 <Icon size={18} strokeWidth={1.8} className={isActive ? 'text-darkgrey' : 'text-mediumgrey'} />
               </div>
-              <span className={`text-[10px] font-semibold ${isActive ? 'text-darkgrey' : 'text-mediumgrey'}`}>
+              <span className={cn('text-[10px] font-semibold', isActive ? 'text-darkgrey' : 'text-mediumgrey')}>
                 {label}
               </span>
             </button>

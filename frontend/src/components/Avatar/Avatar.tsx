@@ -1,3 +1,4 @@
+import { clsx as cn } from 'clsx';
 import type { AvatarProps, AvatarSize } from './Avatar.types';
 
 const SIZE_CLASSES: Record<AvatarSize, string> = {
@@ -6,6 +7,8 @@ const SIZE_CLASSES: Record<AvatarSize, string> = {
   lg: 'w-14 h-14 text-base',
   xl: 'w-20 h-20 text-xl',
 };
+
+const base = 'rounded-full overflow-hidden shrink-0';
 
 function getInitials(name: string): string {
   return name
@@ -18,9 +21,7 @@ function getInitials(name: string): string {
 
 export function Avatar({ src, name, size = 'md', className = '' }: AvatarProps) {
   return (
-    <div
-      className={`${SIZE_CLASSES[size]} rounded-full overflow-hidden shrink-0 ${className}`}
-    >
+    <div className={cn(base, SIZE_CLASSES[size], className)}>
       {src ? (
         <img
           src={src}

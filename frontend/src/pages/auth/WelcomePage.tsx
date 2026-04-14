@@ -1,11 +1,7 @@
 import { Clock, Sparkles, Sprout, Heart } from 'lucide-preact';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Button } from '../../components/Button/Button';
-import type { AuthPage } from './auth.types';
-
-interface WelcomePageProps {
-  onNavigate: (page: AuthPage) => void;
-}
+import type { WelcomePageProps } from './auth.types';
 
 function FeatureCard({
   icon,

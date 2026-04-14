@@ -1,16 +1,6 @@
 import { Sprout } from 'lucide-preact';
-
-interface AppLogoProps {
-  size?: 'sm' | 'lg';
-  iconColor?: string;
-  textColor?: string;
-  subtitle?: string;
-}
-
-const SIZE_CONFIG = {
-  sm: { box: 'w-16 h-16', sprout: 24, title: 'text-3xl' },
-  lg: { box: 'w-20 h-20', sprout: 36, title: 'text-5xl' },
-} as const;
+import { SIZE_CONFIG } from './AppLogo.types';
+import type { AppLogoProps } from './AppLogo.types';
 
 export function AppLogo({
   size = 'sm',

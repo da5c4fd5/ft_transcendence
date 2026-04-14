@@ -1,21 +1,5 @@
 import { useState } from 'preact/hooks';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface TreeVisualProps {
-  health: number; //life force
-  size?: 'small' | 'medium' | 'large';
-  showDetails?: boolean;
-  isDecreasing?: boolean;
-}
-
-interface StageData {
-  stage: number;
-  color: string;
-  accent: string;
-  message: string;
-  mood: 'ecstatic' | 'happy' | 'content' | 'neutral' | 'sleeping';
-}
+import type { TreeVisualProps, StageData } from './TreeVisual.types';
 
 function getStageData(health: number): StageData {
   if (health >= 88) return { stage: 8, color: '#FF8EAA', accent: '#FF6B9D', message: 'Absolutely magnificent!', mood: 'ecstatic' };
@@ -33,7 +17,7 @@ function Face({ cx, cy, mood, isPetting, isDecreasing }: {
 }) {
   return (
     <g transform={`translate(${cx}, ${cy})`}>
-      {/* Blush — masqué quand triste */}
+      {/* Blush -> hidden when sad */}
       {!isDecreasing && (
         <>
           <circle cx="-12" cy="4" r="4" fill="#FF6B9D" opacity="0.4" />
@@ -41,7 +25,7 @@ function Face({ cx, cy, mood, isPetting, isDecreasing }: {
         </>
       )}
 
-      {/* Larmes */}
+      {/* Tears */}
       {isDecreasing && (
         <>
           <ellipse cx="-14" cy="5" rx="1.5" ry="3" fill="#A0D2FF"
@@ -62,7 +46,7 @@ function Face({ cx, cy, mood, isPetting, isDecreasing }: {
           <>
             <circle cx="-12" cy="1" r="2.5" fill="#5A4A42" />
             <circle cx=" 12" cy="1" r="2.5" fill="#5A4A42" />
-            {/* Cernes */}
+            {/* Dark circles */}
             <path d="M -15 4 Q -12 6 -9 4" fill="none" stroke="#5A4A42" strokeWidth="1" opacity="0.3" strokeLinecap="round" />
             <path d="M   9 4 Q  12 6 15 4" fill="none" stroke="#5A4A42" strokeWidth="1" opacity="0.3" strokeLinecap="round" />
           </>
@@ -98,21 +82,21 @@ function StageTree({ s, isPetting, isDecreasing }: { s: StageData; isPetting: bo
 
   if (s.stage === 1) return (
     <>
-      {/* Coque de la graine */}
+      {/* Seed shell */}
       <ellipse cx="100" cy="168" rx="20" ry="24" fill="#A6845E" stroke="#8B6F47" strokeWidth="2" />
       <ellipse cx="100" cy="168" rx="16" ry="20" fill={s.color} />
-      {/* Reflet */}
+      {/* Shine */}
       <ellipse cx="94" cy="162" rx="6" ry="8" fill="#FFFFFF" opacity="0.15" />
-      {/* Fissure */}
+      {/* Crack */}
       <path d="M 100 146 Q 102 158 100 172 Q 98 182 100 192" fill="none" stroke="#8B6F47" strokeWidth="2.5" strokeLinecap="round" />
       <path d="M 100 146 Q 98 158 100 172" fill="none" stroke="#FFFFFF" strokeWidth="1" opacity="0.4" strokeLinecap="round" />
-      {/* Petite pousse animée */}
+      {/* Animated sprout */}
       <g style={{ animation: 'tree-sway 2.5s ease-in-out infinite', transformBox: 'fill-box', transformOrigin: 'bottom center' }}>
         <path d="M 100 146 Q 98 140 100 134" fill="none" stroke="#A6845E" strokeWidth="3" strokeLinecap="round" />
         <ellipse cx="97" cy="136" rx="4" ry="6" fill={s.accent} transform="rotate(-30 97 136)" />
         <ellipse cx="103" cy="136" rx="4" ry="6" fill={s.accent} transform="rotate(30 103 136)" />
       </g>
-      {/* Visage endormi */}
+      {/* Sleeping face */}
       <g transform="translate(100, 168)">
         <path d="M -8 -4 Q -6 -8 -4 -4" fill="none" stroke="#5A4A42" strokeWidth="1.5" strokeLinecap="round" />
         <path d="M  4 -4 Q  6 -8  8 -4" fill="none" stroke="#5A4A42" strokeWidth="1.5" strokeLinecap="round" />
@@ -316,10 +300,10 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
           aria-label="Pet your tree"
         >
           <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible">
-            {/* Sol */}
+            {/* Ground */}
             <ellipse cx="100" cy="180" rx="45" ry="12" fill="#EAE0D5" />
             <ellipse cx="100" cy="180" rx="35" ry="8"  fill="#D6C5B3" />
-            {/* Arbre */}
+            {/* Tree */}
             <StageTree s={s} isPetting={isPetting} isDecreasing={isDecreasing} />
           </svg>
         </button>
@@ -367,7 +351,7 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
               </div>
             ))}
 
-            {/* Feuilles tombantes (stade 3+) */}
+            {/* Falling leaves (stage 3+) */}
             {s.stage >= 3 && PET_LEAVES.map((l, i) => (
               <div
                 key={`l${i}`}
@@ -381,7 +365,7 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
               </div>
             ))}
 
-            {/* Fruits tombants (stade 7+) */}
+            {/* Falling fruits (stage 7+) */}
             {s.stage >= 7 && PET_FRUITS.map((f, i) => (
               <div
                 key={`f${i}`}

@@ -14,22 +14,10 @@ import { ProfilePage } from './pages/profile/ProfilePage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { GuestPage, MOCK_SHARED_MEMORY } from './pages/guest/GuestPage';
 
-// ---------------------------------------------------------------------------
-// Utilisateurs de test (à remplacer par les données de l'API plus tard)
-// ---------------------------------------------------------------------------
-const ADMIN_USER = { name: 'Alex Explorer', isAdmin: true };
-const REGULAR_USER = { name: 'Sam Sparks', isAdmin: false };
+// TODO: Utilisateurs de test (à remplacer par les données de l'API plus tard)
+const ADMIN_USER = { username: 'Alex Explorer', isAdmin: true };
+const REGULAR_USER = { username: 'Sam Sparks', isAdmin: false };
 
-// ---------------------------------------------------------------------------
-// App — routeur racine
-// ---------------------------------------------------------------------------
-// Architecture simple sans librairie de routing :
-//   - Si non connecté → pages auth (pas de Navbar)
-//   - Si connecté    → app principale avec Navbar
-//
-// Le state "authPage" contrôle quelle page auth est affichée.
-// Le state "isAuthenticated" bascule entre auth et app.
-// ---------------------------------------------------------------------------
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPage, setAuthPage] = useState<AuthPage>('welcome');
@@ -42,11 +30,7 @@ const App = () => {
 
   const user = isAdmin ? ADMIN_USER : REGULAR_USER;
 
-  // --- Flux non authentifié ---
   if (!isAuthenticated) {
-    // Rendu conditionnel simple : chaque page auth est un composant indépendant.
-    // onNavigate : pour changer de page auth (ex: login → forgot-password)
-    // onLogin    : appelé quand l'auth réussit, bascule vers l'app
     if (authPage === 'welcome') {
       return <WelcomePage onNavigate={setAuthPage} />;
     }
@@ -66,7 +50,7 @@ const App = () => {
     return (
       <GuestPage
         memory={MOCK_SHARED_MEMORY}
-        currentUser={{ name: user.name, avatar: null }}
+        currentUser={{ username: user.username, avatarURL: null }}
         onBack={() => { setShowGuestPreview(false); setCurrentPage('today'); }}
         onNavigateToWelcome={() => { setShowGuestPreview(false); setIsAuthenticated(false); setAuthPage('welcome'); }}
       />
@@ -82,7 +66,6 @@ const App = () => {
     );
   }
 
-  // --- Flux authentifié ---
   return (
     <div className="min-h-screen bg-verylightorange pt-16 pb-20 md:pb-0">
 

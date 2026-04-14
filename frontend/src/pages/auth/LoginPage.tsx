@@ -3,12 +3,7 @@ import { Mail, Lock, ArrowLeft } from 'lucide-preact';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Input } from '../../components/Input/Input';
 import { Button } from '../../components/Button/Button';
-import type { AuthPage } from './auth.types';
-
-interface LoginPageProps {
-  onNavigate: (page: AuthPage) => void;
-  onLogin: () => void;
-}
+import type { LoginPageProps } from './auth.types';
 
 export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
 

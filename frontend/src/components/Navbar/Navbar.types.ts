@@ -1,8 +1,8 @@
 export type Page = 'today' | 'timeline' | 'memories' | 'tree' | 'profile' | 'admin';
 
 export interface NavUser {
-  username: string;    // was: name
-  avatarURL?: string;  // was: avatar
+  username: string;
+  avatarURL?: string;
   isAdmin?: boolean;
 }
 

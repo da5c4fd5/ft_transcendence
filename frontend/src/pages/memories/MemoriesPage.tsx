@@ -1,14 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { Clock, Heart, Search, SlidersHorizontal, Share2 } from 'lucide-preact';
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
-import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal.types';
+import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
 import type { Mood, MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
 import type { TimeCapsule, MemoryCard, MoodFilter, PeriodFilter, CollectionFilters } from './memories.types';
 
 const PAGE_SIZE = 9;
 const ALL_MOODS: Mood[] = ['Joyful', 'Excited', 'Peaceful', 'Nostalgic', 'Sad', 'Anxious'];
-
-// ─── Helpers date (calculés côté frontend) ───────────────────────────────────
 
 function getRelativeLabel(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -33,8 +31,6 @@ function getFormattedDate(dateStr: string): string {
   }).toUpperCase();
 }
 
-// ─── Layout helper ────────────────────────────────────────────────────────────
-
 function distributeToColumns(items: MemoryCard[]): [MemoryCard[], MemoryCard[], MemoryCard[]] {
   const cols: [MemoryCard[], MemoryCard[], MemoryCard[]] = [[], [], []];
   const heights = [0, 0, 0];
@@ -56,7 +52,7 @@ const EMPTY_FILTERS: CollectionFilters = {
   sharedOnly: false,
 };
 
-// ─── Mock data (TODO: supprimer quand le backend est prêt) ────────────────────
+// ─── Mock data (TODO: supprimer quand backend pret) ────────────────────
 
 const MOCK_CAPSULES: TimeCapsule[] = [
   { id: 'c1', date: '2025-03-10', mood: 'Nostalgic', content: 'Found an old photo that brought back so many memories. Time really does fly.',             media: 'https://picsum.photos/seed/otter/400/300'  },
@@ -123,8 +119,6 @@ async function fetchMemoryDetails(id: string): Promise<MemoryDetails> {
     friendContributions: [],
   };
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function TimeCapsuleCard({ capsule, onClick }: { capsule: TimeCapsule; onClick: () => void }) {
   return (
@@ -291,8 +285,6 @@ function FilterPanel({ filters, onChange }: {
     </div>
   );
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function MemoriesPage() {
   const [capsules, setCapsules]           = useState<TimeCapsule[]>([]);
@@ -479,13 +471,11 @@ export function MemoriesPage() {
           </div>
         ) : (
           <>
-            {/* Mobile: single column */}
             <div className="flex flex-col sm:hidden gap-4">
               {visibleItems.map(card => (
                 <MemoryCardItem key={card.id} card={card} onClick={() => handleCardClick(card.id)} />
               ))}
             </div>
-            {/* Desktop: 3 colonnes, distribution par hauteur estimée */}
             <div className="hidden sm:grid sm:grid-cols-3 gap-4 items-start">
               {distributeToColumns(visibleItems).map((col, i) => (
                 <div key={i} className="flex flex-col gap-4">

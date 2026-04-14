@@ -1,29 +1,20 @@
 export type Mood = 'Joyful' | 'Excited' | 'Peaceful' | 'Nostalgic' | 'Sad' | 'Anxious';
 
-export const MOOD_EMOJI: Record<Mood, string> = {
-  Joyful:    '😊',
-  Excited:   '🎉',
-  Peaceful:  '😌',
-  Nostalgic: '🥹',
-  Sad:       '😢',
-  Anxious:   '😰',
-};
-
 export interface FriendContribution {
   id: string;
-  guestName: string;        // was: name
-  avatarURL: string | null; // was: avatar
+  guestName: string;
+  avatarURL: string | null;
   date: string;
-  content: string;          // was: text
-  media: string | null;     // was: image
+  content: string;
+  media: string | null;
 }
 
 export interface MemoryDetails {
   date: string;
   mood: Mood;
-  content: string;          // was: text
-  media: string | null;     // was: image
-  isOpen: boolean;          // was: isShared — true = souvenir partagé
+  content: string;
+  media: string | null;
+  isOpen: boolean;
   shareUrl: string | null;
   friendContributions: FriendContribution[];
 }
@@ -32,5 +23,5 @@ export interface MemoryModalProps {
   entry: MemoryDetails;
   onClose: () => void;
   onDelete: () => void;
-  onPreviewGuest?: () => void; // TODO: supprimer quand le routing invité sera réel
+  onPreviewGuest?: () => void; // TODO: a supprimer quand le routing invité sera fait
 }

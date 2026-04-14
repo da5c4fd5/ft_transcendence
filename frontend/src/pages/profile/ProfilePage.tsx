@@ -1,30 +1,15 @@
-import { useState } from 'preact/hooks';
-import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check } from 'lucide-preact';
+import { useState, useEffect, useRef } from 'preact/hooks';
+import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff } from 'lucide-preact';
+import { clsx as cn } from 'clsx';
+import type { ProfilePageProps, Friend, Session } from './profile.types';
+import type { User as UserType } from './profile.types';
+import { MOCK_FRIENDS, MOCK_SESSIONS } from './profile.mocks';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface ProfilePageProps {
-  user: { name: string; isAdmin: boolean };
-  onLogout: () => void;
-  onNavigateToAdmin: () => void;
-}
-
-interface Friend {
-  id: string;
-  name: string;
-  avatar: string | null;
-  online: boolean;
-}
-
-// ─── Mock data (TODO: supprimer quand le backend est prêt) ────────────────────
-
-const MOCK_EMAIL  = 'alex.explorer@example.com';
-const MOCK_AVATAR = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face';
-
-const MOCK_FRIENDS: Friend[] = [
-  { id: 'f1', name: 'Sam Sparks',   avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&crop=face', online: true  },
-  { id: 'f2', name: 'Jordan River', avatar: null, online: false },
-];
+const cardBase   = 'bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm';
+const inputBase  = 'w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey';
+const ghostBtn   = 'flex items-center gap-1.5 text-xs font-semibold text-darkgrey border border-black/10 rounded-full px-3 py-1.5 hover:bg-lightgrey/30 transition-colors';
+const logoutBtn  = 'w-full flex items-center justify-center gap-2 py-3 rounded-full bg-verylightpink/30 text-pink font-semibold text-sm hover:bg-lightpink/80 transition-colors';
+const avatarBase = 'w-10 h-10 rounded-full object-cover shrink-0';
 
 function PasswordInput({ placeholder, value, onChange }: {
   placeholder: string;
@@ -39,11 +24,12 @@ function PasswordInput({ placeholder, value, onChange }: {
         placeholder={placeholder}
         value={value}
         onInput={(e) => onChange((e.target as HTMLInputElement).value)}
-        className="w-full px-4 py-3 pr-12 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey placeholder:text-mediumgrey"
+        className={cn(inputBase, 'pr-12 placeholder:text-mediumgrey')}
       />
       <button
         type="button"
         onClick={() => setShow(v => !v)}
+        aria-label={show ? 'Hide password' : 'Show password'}
         className="absolute right-4 top-1/2 -translate-y-1/2 text-mediumgrey hover:text-darkgrey transition-colors"
       >
         {show ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -52,21 +38,38 @@ function PasswordInput({ placeholder, value, onChange }: {
   );
 }
 
-function ProfileCard({ user, onLogout }: { user: { name: string }; onLogout: () => void }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName]   = useState(user.name);
-  const [editEmail, setEditEmail] = useState(MOCK_EMAIL);
-  const [currentPw, setCurrentPw] = useState('');
-  const [error, setError]         = useState<string | null>(null);
+function AvatarDisplay({ avatarURL, className }: { avatarURL: string | null; className: string }) {
+  if (avatarURL) {
+    return (
+      <img
+        src={avatarURL}
+        alt="Profile picture"
+        className={cn('rounded-full object-cover', className)}
+      />
+    );
+  }
+  return (
+    <div className={cn('rounded-full bg-yellow/60 flex items-center justify-center', className)}>
+      <User size={32} className="text-darkgrey" />
+    </div>
+  );
+}
 
-  const emailChanged = editEmail !== MOCK_EMAIL;
+function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void }) {
+  const [isEditing, setIsEditing]       = useState(false);
+  const [editUsername, setEditUsername] = useState(user.username);
+  const [editEmail, setEditEmail]       = useState(user.email);
+  const [currentPw, setCurrentPw]       = useState('');
+  const [error, setError]               = useState<string | null>(null);
+
+  const emailChanged = editEmail !== user.email;
 
   const handleSave = () => {
     if (emailChanged && !currentPw.trim()) {
       setError('Please enter your current password to confirm the email change.');
       return;
     }
-    // TODO: PATCH /api/profile
+    // TODO: PATCH /api/users/me { username, email, currentPassword? }
     setIsEditing(false);
     setError(null);
     setCurrentPw('');
@@ -74,19 +77,23 @@ function ProfileCard({ user, onLogout }: { user: { name: string }; onLogout: () 
 
   const handleCancel = () => {
     setIsEditing(false);
-    setEditName(user.name);
-    setEditEmail(MOCK_EMAIL);
+    setEditUsername(user.username);
+    setEditEmail(user.email);
     setCurrentPw('');
     setError(null);
   };
 
   if (isEditing) {
     return (
-      <div className="bg-white rounded-3xl p-6 flex flex-col items-center gap-4 shadow-sm">
+      <form
+        onSubmit={(e) => { e.preventDefault(); handleSave(); }}
+        className={cn(cardBase, 'items-center')}
+      >
         <div className="relative w-fit">
-          <img src={MOCK_AVATAR} alt="" className="w-20 h-20 rounded-full object-cover" />
+          <AvatarDisplay avatarURL={user.avatarURL} className="w-20 h-20" />
           <button
             type="button"
+            aria-label="Change profile picture"
             className="absolute -bottom-1 -right-1 w-7 h-7 bg-darkgrey rounded-full flex items-center justify-center p-0 leading-none hover:bg-darkgrey/80 transition-colors"
           >
             <Camera size={13} className="text-white shrink-0" />
@@ -96,15 +103,15 @@ function ProfileCard({ user, onLogout }: { user: { name: string }; onLogout: () 
         <div className="w-full flex flex-col gap-3">
           <input
             type="text"
-            value={editName}
-            onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
-            className="w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey font-semibold"
+            value={editUsername}
+            onInput={(e) => setEditUsername((e.target as HTMLInputElement).value)}
+            className={cn(inputBase, 'font-semibold placeholder:text-mediumgrey')}
           />
           <input
             type="email"
             value={editEmail}
             onInput={(e) => setEditEmail((e.target as HTMLInputElement).value)}
-            className="w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey"
+            className={cn(inputBase, 'placeholder:text-mediumgrey')}
           />
 
           {emailChanged && (
@@ -120,9 +127,7 @@ function ProfileCard({ user, onLogout }: { user: { name: string }; onLogout: () 
                 value={currentPw}
                 onChange={(v) => { setCurrentPw(v); setError(null); }}
               />
-              {error && (
-                <p className="text-xs text-pink px-1">{error}</p>
-              )}
+              {error && <p className="text-xs text-pink px-1">{error}</p>}
             </div>
           )}
         </div>
@@ -136,37 +141,27 @@ function ProfileCard({ user, onLogout }: { user: { name: string }; onLogout: () 
             <X size={14} /> Cancel
           </button>
           <button
-            type="button"
-            onClick={handleSave}
+            type="submit"
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors"
           >
             <Check size={14} /> Save
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={onLogout}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-verylightpink/30 text-pink font-semibold text-sm hover:bg-lightpink/80 transition-colors"
-        >
+        <button type="button" onClick={onLogout} className={logoutBtn}>
           <LogOut size={15} /> Log Out
         </button>
-      </div>
+      </form>
     );
   }
 
   return (
-    <div className="bg-white rounded-3xl p-8 flex flex-col items-center gap-5 shadow-sm">
-      <div className="relative w-fit">
-        <img src={MOCK_AVATAR} alt="" className="w-24 h-24 rounded-full object-cover" />
-        <div className="absolute bottom-0 right-0 w-7 h-7 bg-darkgrey rounded-full flex items-center justify-center leading-none shadow">
-          <Camera size={12} className="text-white block translate-x-px" />
-        </div>
-      </div>
+    <div className={cn(cardBase, 'items-center p-8 gap-5')}>
+      <AvatarDisplay avatarURL={user.avatarURL} className="w-24 h-24" />
 
       <div className="text-center">
-        <h2 className="text-xl font-black text-darkgrey">{user.name}</h2>
-        <p className="text-sm text-mediumgrey mt-0.5">{MOCK_EMAIL}</p>
+        <h2 className="text-xl font-black text-darkgrey">{user.username}</h2>
+        <p className="text-sm text-mediumgrey mt-0.5">{user.email}</p>
       </div>
 
       <button
@@ -177,11 +172,7 @@ function ProfileCard({ user, onLogout }: { user: { name: string }; onLogout: () 
         <Pencil size={14} /> Edit Profile
       </button>
 
-      <button
-        type="button"
-        onClick={onLogout}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-verylightpink/30 text-pink font-semibold text-sm hover:bg-lightpink/80 transition-colors"
-      >
+      <button type="button" onClick={onLogout} className={logoutBtn}>
         <LogOut size={15} /> Log Out
       </button>
     </div>
@@ -189,16 +180,39 @@ function ProfileCard({ user, onLogout }: { user: { name: string }; onLogout: () 
 }
 
 function FriendsCard({ friends }: { friends: Friend[] }) {
-  const [input, setInput] = useState('');
+  const [input, setInput]         = useState('');
+  const [pingedIds, setPingedIds] = useState<Set<string>>(new Set());
+
+  // Store timer IDs so we can cancel them if the component unmounts.
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    return () => { timersRef.current.forEach(clearTimeout); };
+  }, []);
 
   const handleAdd = () => {
     if (!input.trim()) return;
-    // TODO: POST /api/friends
+    // TODO: GET /api/users/search?q={input} then PUT /api/friends/:id
     setInput('');
   };
 
+  const handlePing = async (id: string) => {
+    if (pingedIds.has(id)) return;
+    try {
+      // TODO: POST /api/friends/:id/ping
+      setPingedIds(prev => new Set(prev).add(id));
+      const timer = setTimeout(() => {
+        setPingedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+        timersRef.current.delete(id);
+      }, 3000);
+      timersRef.current.set(id, timer);
+    } catch {
+      // TODO: show error toast
+    }
+  };
+
   return (
-    <div className="bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm">
+    <div className={cardBase}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <UserPlus size={18} className="text-pink" />
@@ -228,24 +242,142 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
       </div>
 
       <div className="flex flex-col gap-2">
-        {friends.map(f => (
-          <div key={f.id} className="flex items-center gap-3 p-3 rounded-2xl border border-black/5">
-            {f.avatar ? (
-              <img src={f.avatar} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-yellow/60 flex items-center justify-center shrink-0">
-                <User size={18} className="text-darkgrey" />
+        {friends.map(f => {
+          const pinged = pingedIds.has(f.id);
+          const pingLabel = !f.online ? `${f.username} is offline` : pinged ? 'Ping sent!' : 'Remind to create a memory';
+          return (
+            <div key={f.id} className="flex items-center gap-3 p-3 rounded-2xl border border-black/5">
+              {f.avatarURL ? (
+                <img src={f.avatarURL} alt={f.username} className={avatarBase} />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-yellow/60 flex items-center justify-center shrink-0">
+                  <User size={18} className="text-darkgrey" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-darkgrey">{f.username}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={cn('w-2 h-2 rounded-full shrink-0', f.online ? 'bg-blue' : 'bg-mediumgrey')} />
+                  <span className={cn('text-xs font-medium', f.online ? 'text-blue' : 'text-mediumgrey')}>
+                    {f.online ? 'Online' : 'Offline'}
+                  </span>
+                </div>
               </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-darkgrey">{f.name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${f.online ? 'bg-blue' : 'bg-mediumgrey'}`} />
-                <span className={`text-xs font-medium ${f.online ? 'text-blue' : 'text-mediumgrey'}`}>
-                  {f.online ? 'Online' : 'Offline'}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => handlePing(f.id)}
+                disabled={!f.online || pinged}
+                aria-label={pingLabel}
+                title={pingLabel}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0',
+                  pinged
+                    ? 'bg-blue/20 text-blue cursor-default'
+                    : f.online
+                      ? 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey'
+                      : 'bg-verylightorange text-mediumgrey/40 cursor-not-allowed',
+                )}
+              >
+                {pinged ? <BellRing size={13} /> : <Bell size={13} />}
+                {pinged ? 'Pinged!' : 'Ping'}
+              </button>
             </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function getSessionIcon(userAgent: string) {
+  const ua = userAgent.toLowerCase();
+  if (ua.includes('iphone') || ua.includes('android') || ua.includes('mobile'))
+    return <Smartphone size={16} className="text-mediumgrey" />;
+  if (ua.includes('safari') || ua.includes('chrome') || ua.includes('firefox'))
+    return <Monitor size={16} className="text-mediumgrey" />;
+  return <Globe size={16} className="text-mediumgrey" />;
+}
+
+function formatSessionDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    + ' · '
+    + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function SessionsCard({ sessions }: { sessions: Session[] }) {
+  const [list, setList]           = useState<Session[]>(sessions);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const handleRevoke = async (id: string) => {
+    try {
+      // TODO: DELETE /api/users/me/sessions/:id
+      setList(prev => prev.filter(s => s.id !== id));
+      setConfirmId(null);
+    } catch {
+      // TODO: show error toast
+    }
+  };
+
+  return (
+    <div className={cardBase}>
+      <div className="flex items-center gap-2">
+        <ShieldOff size={18} className="text-pink" />
+        <h2 className="text-lg font-black text-darkgrey">Active Sessions</h2>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {list.map(s => (
+          <div
+            key={s.id}
+            className={cn(
+              'flex items-center gap-3 p-3 rounded-2xl border',
+              s.isCurrent ? 'border-yellow bg-yellow/10' : 'border-black/5',
+            )}
+          >
+            <div className="w-9 h-9 rounded-xl bg-lightgrey/60 flex items-center justify-center shrink-0">
+              {getSessionIcon(s.userAgent)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-bold text-darkgrey truncate">{s.userAgent}</p>
+                {s.isCurrent && (
+                  <span className="text-[10px] font-bold bg-yellow text-darkgrey px-2 py-0.5 rounded-full shrink-0">
+                    Current
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-mediumgrey mt-0.5">{formatSessionDate(s.connectedAt)}</p>
+            </div>
+            {!s.isCurrent && (
+              confirmId === s.id ? (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(null)}
+                    className="text-xs font-semibold text-mediumgrey hover:text-darkgrey transition-colors px-2 py-1"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRevoke(s.id)}
+                    className="text-xs font-bold text-white bg-pink rounded-full px-3 py-1.5 hover:bg-pink/80 transition-colors"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmId(s.id)}
+                  aria-label={`Revoke session: ${s.userAgent}`}
+                  className="text-xs font-semibold text-pink hover:text-pink/70 transition-colors shrink-0 px-2 py-1"
+                >
+                  Revoke
+                </button>
+              )
+            )}
           </div>
         ))}
       </div>
@@ -254,7 +386,7 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
 }
 
 function PasswordCard() {
-  const [isOpen, setIsOpen]     = useState(false);
+  const [isOpen, setIsOpen]       = useState(false);
   const [pwCurrent, setPwCurrent] = useState('');
   const [pwNew, setPwNew]         = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
@@ -265,49 +397,41 @@ function PasswordCard() {
   };
 
   const handleChange = () => {
-    // TODO: PATCH /api/profile/password
+    // TODO: PATCH /api/users/me/password { currentPassword, newPassword }
     handleCancel();
   };
 
   return (
-    <div className="bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm">
+    <div className={cardBase}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Lock size={18} className="text-pink" />
           <h2 className="text-lg font-black text-darkgrey">Password</h2>
         </div>
-        {isOpen ? (
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="flex items-center gap-1.5 text-xs font-semibold text-darkgrey border border-black/10 rounded-full px-3 py-1.5 hover:bg-lightgrey/30 transition-colors"
-          >
-            <X size={12} /> Cancel
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-darkgrey border border-black/10 rounded-full px-3 py-1.5 hover:bg-lightgrey/30 transition-colors"
-          >
-            <Pencil size={12} /> Change Password
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={isOpen ? handleCancel : () => setIsOpen(true)}
+          className={ghostBtn}
+        >
+          {isOpen ? <><X size={12} /> Cancel</> : <><Pencil size={12} /> Change Password</>}
+        </button>
       </div>
 
       {isOpen && (
-        <div className="flex flex-col gap-3">
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleChange(); }}
+          className="flex flex-col gap-3"
+        >
           <PasswordInput placeholder="Current password" value={pwCurrent} onChange={setPwCurrent} />
           <PasswordInput placeholder="New password"     value={pwNew}     onChange={setPwNew}     />
           <PasswordInput placeholder="Confirm password" value={pwConfirm} onChange={setPwConfirm} />
           <button
-            type="button"
-            onClick={handleChange}
+            type="submit"
             className="w-full py-3 rounded-full bg-yellow text-darkgrey font-bold text-sm hover:bg-yellow/80 transition-colors mt-1"
           >
             Change Password
           </button>
-        </div>
+        </form>
       )}
     </div>
   );
@@ -337,6 +461,7 @@ export function ProfilePage({ user, onLogout, onNavigateToAdmin }: ProfilePagePr
 
       <FriendsCard friends={MOCK_FRIENDS} />
       <PasswordCard />
+      <SessionsCard sessions={MOCK_SESSIONS} />
 
     </div>
   );

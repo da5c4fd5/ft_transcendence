@@ -1,11 +1,20 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-preact';
+import { clsx as cn } from 'clsx';
 import { Button } from '../../components/Button/Button';
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
-import { MOOD_CONFIG } from './timeline.types';
-import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal.types';
-import type { Mood, DaySummary, TimelineStats } from './timeline.types';
+import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
+import type { Mood, DaySummary } from './timeline.types';
 import type { MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
+
+const MOOD_CONFIG: Record<Mood, { cellColor: string }> = {
+  Joyful:    { cellColor: 'bg-yellow'  },
+  Excited:   { cellColor: 'bg-pink'    },
+  Peaceful:  { cellColor: 'bg-blue'    },
+  Nostalgic: { cellColor: 'bg-purple'  },
+  Sad:       { cellColor: 'bg-moodsad' },
+  Anxious:   { cellColor: 'bg-orange'  },
+};
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_LABELS   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -49,7 +58,7 @@ function getMonthPositions(weeks: (string | null)[][]): { label: string; weekInd
   return positions;
 }
 
-// ─── Mock data (TODO: supprimer quand le backend est prêt) ───────────────────
+// Mock data (TODO: supprimer quand le backend est prêt)
 
 const MOCK_SUMMARIES: DaySummary[] = [
   { date: '2026-04-02', mood: 'Peaceful' },
@@ -85,7 +94,6 @@ const MOCK_ENTRIES: MemoryDetails[] = [
   { date: '2026-01-01', mood: 'Excited',   content: 'New year, new adventures! Feeling hopeful.',                             media: null, isOpen: false, shareUrl: null, friendContributions: [] },
 ];
 
-const MOCK_STATS: TimelineStats = { totalCapsuls: 9, shared: 1, dayStreak: 2 };
 
 async function fetchSummaries(year: number): Promise<DaySummary[]> {
   // TODO: const res = await fetch(`/api/timeline?year=${year}`, { headers: { Authorization: `Bearer ${token}` } }); return res.json();
@@ -97,10 +105,6 @@ async function fetchEntry(date: string): Promise<MemoryDetails | null> {
   return MOCK_ENTRIES.find(e => e.date === date) ?? null;
 }
 
-async function fetchStats(): Promise<TimelineStats> {
-  // TODO: const res = await fetch('/api/memories/stats', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_STATS;
-}
 
 async function fetchYearsWithEntries(): Promise<number[]> {
   // TODO: const res = await fetch('/api/timeline/years', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
@@ -108,73 +112,104 @@ async function fetchYearsWithEntries(): Promise<number[]> {
   return years.sort((a, b) => a - b);
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function formatDayLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
 
-function CalendarGrid({ summaries, year, onDayClick }: {
+function getTodayStr(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+}
+
+function CalendarGrid({ summaries, year, onDayClick, onAddMemory }: {
   summaries: DaySummary[];
   year: number;
   onDayClick: (date: string) => void;
+  onAddMemory?: () => void;
 }) {
-  const entryMap = new Map(summaries.map(e => [e.date, e]));
-  const weeks = generateYearGrid(year);
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+
+  const entryMap  = new Map(summaries.map(e => [e.date, e]));
+  const weeks     = generateYearGrid(year);
   const monthPositions = getMonthPositions(weeks);
+  const todayStr  = getTodayStr();
 
   return (
-    <div className="overflow-x-auto pb-2">
-      <div className="inline-flex flex-col gap-1">
+    <>
+      <div className="overflow-x-auto pb-2">
+        <div className="inline-flex flex-col gap-1">
 
-        <div className="flex pl-7 gap-0.5">
-          {weeks.map((_, wi) => {
-            const mp = monthPositions.find(m => m.weekIndex === wi);
-            return (
-              <div key={wi} className="w-3 shrink-0 relative">
-                {mp && (
-                  <span className="absolute left-0 text-[10px] font-semibold text-mediumgrey whitespace-nowrap">
-                    {mp.label}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="flex gap-1 mt-3">
-
-          <div className="flex flex-col gap-1 w-6 shrink-0">
-            {DAY_LABELS.map((label, i) => (
-              <div key={i} className="h-3 flex items-center">
-                <span className="text-[9px] text-mediumgrey font-semibold leading-none">{label}</span>
-              </div>
-            ))}
+          <div className="flex pl-7 gap-1">
+            {weeks.map((_, wi) => {
+              const mp = monthPositions.find(m => m.weekIndex === wi);
+              return (
+                <div key={wi} className="w-3 shrink-0 relative">
+                  {mp && (
+                    <span className="absolute left-0 text-xs font-semibold text-darkgrey/70 whitespace-nowrap">
+                      {mp.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          <div className="flex gap-1">
-            {weeks.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-1">
-                {week.map((day, di) => {
-                  if (!day) return <div key={di} className="w-3 h-3" />;
-                  const entry = entryMap.get(day);
-                  return (
-                    <button
-                      key={di}
-                      type="button"
-                      onClick={() => entry && onDayClick(entry.date)}
-                      title={day}
-                      className={[
-                        'w-3 h-3 rounded-sm transition-transform',
-                        entry
-                          ? `${MOOD_CONFIG[entry.mood].cellColor} hover:scale-125 cursor-pointer`
-                          : 'bg-lightgrey cursor-default',
-                      ].join(' ')}
-                    />
-                  );
-                })}
-              </div>
-            ))}
+          <div className="flex gap-1 mt-3">
+            <div className="flex flex-col gap-1 w-6 shrink-0">
+              {DAY_LABELS.map((label, i) => (
+                <div key={i} className="h-3 flex items-center">
+                  <span className="text-[11px] text-darkgrey/60 font-semibold leading-none">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-1">
+              {weeks.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-1">
+                  {week.map((day, di) => {
+                    if (!day) return <div key={di} className="w-3 h-3" />;
+                    const entry      = entryMap.get(day);
+                    const isToday    = day === todayStr;
+                    const isClickable = !!entry || (isToday && !entry);
+                    const tipText    = entry
+                      ? `${formatDayLabel(day)} · ${MOOD_EMOJI[entry.mood]} ${entry.mood}`
+                      : isToday
+                        ? `${formatDayLabel(day)} · Click to add a memory`
+                        : formatDayLabel(day);
+
+                    return (
+                      <button
+                        key={di}
+                        type="button"
+                        onClick={() => entry ? onDayClick(entry.date) : isToday ? onAddMemory?.() : undefined}
+                        onMouseEnter={(e) => setTooltip({ text: tipText, x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY })}
+                        onMouseLeave={() => setTooltip(null)}
+                        className={cn(
+                          'w-3 h-3 rounded-sm transition-transform',
+                          isClickable ? 'hover:scale-125 cursor-pointer' : 'cursor-default',
+                          entry ? MOOD_CONFIG[entry.mood].cellColor : 'bg-lightgrey',
+                          isToday && 'ring-1 ring-darkgrey/40 ring-offset-1',
+                        )}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {tooltip && (
+        <div
+          className="fixed z-50 pointer-events-none bg-darkgrey text-white text-[11px] font-medium rounded-xl px-3 py-1.5 shadow-lg -translate-x-1/2 whitespace-nowrap"
+          style={{ left: tooltip.x, top: tooltip.y - 36 }}
+        >
+          {tooltip.text}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -211,23 +246,50 @@ function EmptyCalendar({ onAddMemory }: { onAddMemory: () => void }) {
   );
 }
 
-function StatCard({ value, label, color }: { value: string | number; label: string; color: string }) {
+function MoodBreakdown({ summaries }: { summaries: DaySummary[] }) {
+  const { counts, total } = useMemo(() => {
+    const map: Partial<Record<Mood, number>> = {};
+    for (const s of summaries) map[s.mood] = (map[s.mood] ?? 0) + 1;
+    const counts = (Object.keys(MOOD_CONFIG) as Mood[])
+      .map(mood => ({ mood, count: map[mood] ?? 0 }))
+      .filter(x => x.count > 0)
+      .sort((a, b) => b.count - a.count);
+    return { counts, total: summaries.length };
+  }, [summaries]);
+
+  if (counts.length === 0) return null;
+
   return (
-    <div className={`${color} rounded-3xl p-6 flex flex-col items-center gap-1.5 text-center`}>
-      <span className="text-3xl font-black text-darkgrey">{value}</span>
-      <span className="text-[11px] font-bold text-darkgrey/60 tracking-widest">{label}</span>
-    </div>
+    <>
+      <h2 className="text-sm font-bold text-darkgrey mb-3">Mood overview</h2>
+      <div className="flex flex-col gap-2.5">
+        {counts.map(({ mood, count }) => {
+          const pct = Math.round((count / total) * 100);
+          return (
+            <div key={mood} className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-darkgrey w-28 shrink-0">
+                {MOOD_EMOJI[mood]} {mood}
+              </span>
+              <div className="flex-1 h-2 bg-lightgrey/60 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${MOOD_CONFIG[mood].cellColor}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="text-xs font-semibold text-mediumgrey w-8 text-right shrink-0">{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigateToToday?: () => void; onPreviewGuest?: () => void }) {
   const currentYear = new Date().getFullYear();
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState(currentYear);
   const [summaries, setSummaries] = useState<DaySummary[]>([]);
-  const [stats, setStats] = useState<TimelineStats | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<MemoryDetails | null>(null);
 
   useEffect(() => {
@@ -236,8 +298,6 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
       setYears(availableYears);
       if (availableYears.length === 0) return;
       setYear(availableYears[availableYears.length - 1]);
-      const s = await fetchStats();
-      setStats(s);
     }
     init();
   }, []);
@@ -266,7 +326,7 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
       </div>
 
       {hasAnyEntry && (
-        <div className="flex items-center justify-center gap-6 mb-8">
+        <div className="flex items-center justify-center gap-4 mb-6">
           <button
             type="button"
             onClick={() => setYear(years[yearIndex - 1])}
@@ -288,20 +348,22 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
       )}
 
       <div className="bg-white rounded-3xl p-6 shadow-sm">
-        {hasAnyEntry
-          ? <>
-              <CalendarGrid summaries={summaries} year={year} onDayClick={handleDayClick} />
-              <MoodLegend />
-            </>
-          : <EmptyCalendar onAddMemory={() => onNavigateToToday?.()} />
-        }
+        {hasAnyEntry ? (
+          <>
+            <p className="text-lg font-bold text-darkgrey">
+              {summaries.length} memor{summaries.length === 1 ? 'y' : 'ies'} in {year}
+            </p>
+            <CalendarGrid summaries={summaries} year={year} onDayClick={handleDayClick} onAddMemory={onNavigateToToday} />
+            <MoodLegend />
+          </>
+        ) : (
+          <EmptyCalendar onAddMemory={() => onNavigateToToday?.()} />
+        )}
       </div>
 
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
-          <StatCard value={stats.totalCapsuls} label="CAPSULS"  color="bg-yellow/60" />
-          <StatCard value={stats.shared}       label="SHARED"   color="bg-lightpink" />
-          <StatCard value={stats.dayStreak}    label="STREAK"   color="bg-blue/60"   />
+      {hasAnyEntry && summaries.length > 0 && (
+        <div className="mt-4 bg-lightgrey/30 rounded-3xl p-6">
+          <MoodBreakdown summaries={summaries} />
         </div>
       )}
 

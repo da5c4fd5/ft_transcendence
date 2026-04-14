@@ -4,7 +4,7 @@ import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { TreeData, Achievement } from './tree.types';
 import type { MemoryStats } from '../memories/memories.types';
 
-// ─── Mock data (TODO: supprimer quand le backend est prêt) ────────────────────
+// Mock data (TODO: supprimer quand le backend est prêt)
 
 const MOCK_TREE: TreeData = {
   lifeForce: 0,
@@ -18,12 +18,11 @@ const MOCK_STATS: MemoryStats = {
   wordsWritten: 0,
 };
 
-// Le backend renvoie uniquement les IDs débloqués — le mapping est statique ici
 const ALL_ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_capsul',       emoji: '🌱', title: 'First Capsul',       description: '1 souvenir créé',           unlocked: false },
+  { id: 'first_capsul',       emoji: '🌱', title: 'First Capsul',       description: '1 memory created',           unlocked: false },
   { id: 'week_warrior',       emoji: '🔥', title: 'Week Warrior',       description: '7 day streak',              unlocked: false },
   { id: 'wordsmith',          emoji: '✍️', title: 'Wordsmith',          description: '500 words written',         unlocked: false },
-  { id: 'monthly_master',     emoji: '⭐', title: 'Monthly Master',     description: '30 capsuls',                unlocked: false },
+  { id: 'monthly_master',     emoji: '⭐', title: 'Monthly Master',     description: '30 memories',                unlocked: false },
   { id: 'visual_storyteller', emoji: '🎨', title: 'Visual Storyteller', description: '25 photo memories',        unlocked: false },
   { id: 'consistency_king',   emoji: '💪', title: 'Consistency King',   description: '30 day streak',             unlocked: false },
 ];
@@ -44,8 +43,6 @@ async function fetchUnlockedAchievements(): Promise<string[]> {
   return [];
 }
 
-// ─── Demo stages ──────────────────────────────────────────────────────────────
-
 const DEMO_STAGES: Array<{ health: number; name: string }> = [
   { health:  5, name: 'Stage 1 — Dormant Seed'   },
   { health: 18, name: 'Stage 2 — New Seedling'   },
@@ -56,8 +53,6 @@ const DEMO_STAGES: Array<{ health: number; name: string }> = [
   { health: 80, name: 'Stage 7 — Blooming Tree'  },
   { health: 94, name: 'Stage 8 — Paradise Tree'  },
 ];
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({ icon, value, label, sublabel, color }: {
   icon: preact.ComponentChildren;
@@ -151,8 +146,6 @@ function DemoBar({ stageIndex, onPrev, onNext, isDecreasing, onToggleDecreasing 
     </div>
   );
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function TreePage() {
   const [tree, setTree]                   = useState<TreeData | null>(null);

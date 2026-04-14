@@ -10,7 +10,6 @@ export interface InputProps {
   onChange: (value: string) => void;
   error?: string;
   disabled?: boolean;
-  // Accepte maintenant un composant Lucide ou n'importe quel JSX (pas juste une string)
   icon?: ComponentChildren;
   className?: string;
 }

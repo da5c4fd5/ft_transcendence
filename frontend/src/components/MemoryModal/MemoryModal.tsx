@@ -2,8 +2,16 @@ import { useState } from 'preact/hooks';
 import { X, Users, Lock, Link2, Copy, Heart, Eye } from 'lucide-preact';
 import { Button } from '../Button/Button';
 import { Avatar } from '../Avatar/Avatar';
-import { MOOD_EMOJI } from './MemoryModal.types';
-import type { MemoryModalProps } from './MemoryModal.types';
+import type { Mood, MemoryModalProps } from './MemoryModal.types';
+
+export const MOOD_EMOJI: Record<Mood, string> = {
+  Joyful:    '😊',
+  Excited:   '🎉',
+  Peaceful:  '😌',
+  Nostalgic: '🥹',
+  Sad:       '😢',
+  Anxious:   '😰',
+};
 
 function formatFullDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -14,7 +22,7 @@ function formatFullDate(dateStr: string): string {
 
 export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: MemoryModalProps) {
   const [isOpen, setIsOpen] = useState(entry.isOpen);
-  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`; // TODO: remplacer avec la vraie URL
+  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`; // TODO: remplacer avec l'URL fournie par le backend
   const [shareStep, setShareStep] = useState<'idle' | 'confirming'>('idle');
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -139,7 +147,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
                 <div className="flex items-center gap-2">
                   {isOpen
                     ? <><Users size={15} className="text-mediumgrey" /><span className="text-sm text-mediumgrey font-semibold">Shared with friends</span></>
-                    : <><Lock  size={15} className="text-mediumgrey" /><span className="text-sm text-mediumgrey font-semibold">Private capsul</span></>
+                    : <><Lock  size={15} className="text-mediumgrey" /><span className="text-sm text-mediumgrey font-semibold">Private memory</span></>
                   }
                 </div>
                 {isOpen
@@ -162,7 +170,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
                       }
                     </button>
                   </div>
-                  {/* TODO: supprimer ce bouton — lien temporaire pour prévisualiser la vue invité */}
+                  {/* TODO: supprimer ce bouton, lien temporaire pour guest preview */}
                   {onPreviewGuest && (
                     <button
                       type="button"
@@ -183,7 +191,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
               <div className="flex flex-col gap-1 text-center">
                 <p className="text-lg font-black text-darkgrey">Delete this memory?</p>
                 <p className="text-sm pb-0 mb-0 text-darkgrey/70 leading-relaxed">
-                  This capsul will be gone forever. There's no way to recover it.
+                  This memory will be gone forever. There's no way to recover it.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -209,7 +217,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
               onClick={() => setConfirmDelete(true)}
               className="w-full py-4 bg-lightpink rounded-2xl text-pink font-bold text-sm hover:opacity-90 transition-opacity"
             >
-              Delete Capsul
+              Delete Memory
             </button>
           )}
 

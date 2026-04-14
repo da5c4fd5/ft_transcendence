@@ -3,24 +3,19 @@ import { User, Mail, Lock, ArrowLeft } from 'lucide-preact';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Input } from '../../components/Input/Input';
 import { Button } from '../../components/Button/Button';
-import type { AuthPage } from './auth.types';
-
-interface RegisterPageProps {
-  onNavigate: (page: AuthPage) => void;
-  onLogin: () => void;
-}
+import type { RegisterPageProps } from './auth.types';
 
 export function RegisterPage({ onNavigate, onLogin }: RegisterPageProps) {
 
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string }>({});
 
   const handleSubmit = (e: Event) => {
     e.preventDefault();
     const newErrors: typeof errors = {};
-    if (name.trim().length < 2) newErrors.name = 'Please enter your name.';
+    if (username.trim().length < 2) newErrors.username = 'Please enter your username.';
     if (!email.includes('@')) newErrors.email = 'Please enter a valid email address.';
     if (password.length < 8) newErrors.password = 'Password must be at least 8 characters.';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
@@ -37,12 +32,12 @@ export function RegisterPage({ onNavigate, onLogin }: RegisterPageProps) {
         className="w-full max-w-sm bg-white rounded-3xl p-7 flex flex-col gap-5 shadow-lg"
       >
         <Input
-          label="Name"
+          label="Username"
           type="text"
-          placeholder="Your name"
-          value={name}
-          onChange={setName}
-          error={errors.name}
+          placeholder="Your username"
+          value={username}
+          onChange={setUsername}
+          error={errors.username}
           icon={<User size={16} />}
         />
         <Input

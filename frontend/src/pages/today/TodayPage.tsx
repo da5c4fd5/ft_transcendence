@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { Pencil, RefreshCw, Camera, X, Zap, Sparkles, Sprout, Heart } from 'lucide-preact';
+import { clsx as cn } from 'clsx';
 import { Button } from '../../components/Button/Button';
 import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { SavedMemory, PastMemory } from './today.types';
 import type { TreeData } from '../tree/tree.types';
 import type { MemoryStats } from '../memories/memories.types';
 
-// ─── Mock data (TODO: supprimer quand le backend est prêt) ────────────────────
+// Mock data (TODO: supprimer quand le backend est prêt)
 
 const MOCK_TREE: TreeData = {
   lifeForce: 10,
@@ -40,7 +41,7 @@ function getTodayString() {
   }).toUpperCase();
 }
 
-// ─── Calcul du label "One year ago today" côté frontend ──────────────────────
+// Calcul du label "One year ago today" côté frontend -> a refacto car utilise aussi dans Timeline
 
 function getPastMemoryLabel(dateStr: string): string {
   const date = new Date(dateStr);
@@ -64,12 +65,10 @@ function getPastMemoryDate(dateStr: string): string {
   }).toUpperCase();
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
 function PromptCard({ prompt, isLoading, onRefresh }: { prompt: string; isLoading: boolean; onRefresh: () => void }) {
   return (
     <div className="bg-blue rounded-3xl p-8 flex flex-col gap-5">
-      <h2 className={`text-3xl font-black leading-tight h-[4.8rem] flex items-center ${isLoading ? 'text-darkgrey/30 animate-pulse' : 'text-darkgrey'}`}>
+      <h2 className={cn('text-3xl font-black leading-tight h-[4.8rem] flex items-center', isLoading ? 'text-darkgrey/30 animate-pulse' : 'text-darkgrey')}>
         {prompt}
       </h2>
       <button
@@ -150,12 +149,10 @@ function EntryCard({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className={[
+          className={cn(
             'w-10 h-10 rounded-full flex items-center justify-center transition-all',
-            media
-              ? 'bg-pink text-white'
-              : 'bg-verylightorange text-mediumgrey hover:text-darkgrey',
-          ].join(' ')}
+            media ? 'bg-pink text-white' : 'bg-verylightorange text-mediumgrey hover:text-darkgrey',
+          )}
         >
           <Camera size={18} />
         </button>
@@ -295,12 +292,12 @@ function TreeSidebar({ tree, stats, saved }: { tree: TreeData | null; stats: Mem
         </div>
       </div>
 
-      <div className={[
+      <div className={cn(
         'border-2 rounded-2xl p-4 flex flex-col items-center gap-1.5 text-center transition-colors duration-500',
         saved ? 'border-pink/20 bg-verylightorange' : 'border-dashed border-lightgrey',
-      ].join(' ')}>
-        <Sprout size={18} className={saved ? 'text-pink' : 'text-mediumgrey'} />
-        <span className={`text-sm font-semibold ${saved ? 'text-pink' : 'text-mediumgrey'}`}>
+      )}>
+        <Sprout size={18} className={cn(saved ? 'text-pink' : 'text-mediumgrey')} />
+        <span className={cn('text-sm font-semibold', saved ? 'text-pink' : 'text-mediumgrey')}>
           {saved ? 'Memory added today' : 'Capsul a memory to grow!'}
         </span>
       </div>
@@ -308,7 +305,7 @@ function TreeSidebar({ tree, stats, saved }: { tree: TreeData | null; stats: Mem
   );
 }
 
-// ─── Mock prompts (TODO: supprimer et décommenter l'appel API) ────────────────
+// Mock prompts (TODO: supprimer et décommenter l'appel API)
 
 const MOCK_PROMPTS = [
   "What's something you're grateful for right now?",
@@ -330,7 +327,7 @@ async function fetchPrompt(): Promise<string> {
   return MOCK_PROMPTS[Math.floor(Math.random() * MOCK_PROMPTS.length)];
 }
 
-// ─── Mock past memory (TODO: supprimer et décommenter l'appel API) ────────────
+// Mock past memory (TODO: supprimer et décommenter l'appel API)
 
 const MOCK_PAST_MEMORY: PastMemory = {
   id: 'm1',
@@ -346,8 +343,6 @@ async function fetchPastMemory(): Promise<PastMemory | null> {
   //       return capsuls[0] ?? null;  // on prend le premier (le plus pertinent selon le backend)
   return MOCK_PAST_MEMORY;
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function TodayPage() {
   const [todayState, setTodayState] = useState<'prompt' | 'saved'>('prompt');
@@ -416,7 +411,7 @@ export function TodayPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-12">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 lg:gap-12 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 lg:gap-12 items-center">
         <div className="flex flex-col gap-6 lg:gap-8">
           {todayState === 'prompt' && (
             <>

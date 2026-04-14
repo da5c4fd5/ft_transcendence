@@ -3,13 +3,7 @@ import { Mail, Check, ArrowLeft } from 'lucide-preact';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Input } from '../../components/Input/Input';
 import { Button } from '../../components/Button/Button';
-import type { AuthPage } from './auth.types';
-
-interface ForgotPasswordPageProps {
-  onNavigate: (page: AuthPage) => void;
-}
-
-type ForgotStep = 'form' | 'check-email' | 'success';
+import type { ForgotPasswordPageProps, ForgotStep } from './auth.types';
 
 const SUBTITLES: Record<ForgotStep, string> = {
   'form':        'Reset your password',
