@@ -1,11 +1,13 @@
 import { jwt } from "@elysiajs/jwt";
 
-if (!process.env.JWT_SECRET) {
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
   throw new Error("JWT_SECRET must be defined");
 }
 
 export const jwtPlugin = jwt({
   name: "jwt",
-  secret: process.env.JWT_SECRET,
+  secret: jwtSecret,
   exp: "7d"
 });

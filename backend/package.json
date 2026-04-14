@@ -1,9 +1,10 @@
 {
-  "name": "transcendence-api",
+  "name": "capsul-api",
   "version": "0.1.0",
   "main": "./src/index.ts",
   "scripts": {
     "start": "bun src/index.ts",
+    "dev": "bun --hot src/index.ts",
     "db:generate": "bun --bun run prisma generate",
     "db:migrate": "bun --bun run prisma migrate dev",
     "db:migrate:prod": "bun --bun run prisma migrate deploy",

@@ -1,19 +1,26 @@
+import cors from "@elysiajs/cors";
+import swagger from "@elysiajs/swagger";
 import { Elysia } from "elysia";
-import { errorHandlerPlugin } from "./plugins/error-handler.plugin";
-import { enforceJsonPlugin } from "./plugins/enforce-json.plugin";
 import { auth } from "./modules/auth";
-import { users } from "./modules/users";
+import { contributionsController } from "./modules/contributions";
 import { friendsController } from "./modules/friends";
 import { memoriesController } from "./modules/memories";
-import { contributionsController } from "./modules/contributions";
-import swagger from "@elysiajs/swagger";
-import cors from "@elysiajs/cors";
+import { users } from "./modules/users";
+import { errorHandlerPlugin } from "./plugins/error-handler.plugin";
 
-const app = new Elysia({
-  serve: {
-    hostname: "transcen.dence.fr"
-  }
-})
+const hostname = process.env.HOST ?? "0.0.0.0";
+const port = Number(process.env.PORT ?? 4242);
+const tlsCertFile = process.env.TLS_CERT_FILE;
+const tlsKeyFile = process.env.TLS_KEY_FILE;
+const tls =
+  tlsCertFile && tlsKeyFile
+    ? {
+        cert: Bun.file(tlsCertFile),
+        key: Bun.file(tlsKeyFile)
+      }
+    : undefined;
+
+const app = new Elysia()
   .use(
     cors({
       methods: "GET, PUT, POST, PATCH, DELETE",
@@ -23,8 +30,8 @@ const app = new Elysia({
   )
   .onBeforeHandle(({ request, status }) => {
     if (["POST", "PUT", "PATCH"].includes(request.method)) {
-      const ct = request.headers.get("content-type") ?? "";
-      if (!ct.startsWith("application/json")) {
+      const contentType = request.headers.get("content-type") ?? "";
+      if (!contentType.startsWith("application/json")) {
         return status(415, { error: "Content-Type must be application/json" });
       }
     }
@@ -40,7 +47,7 @@ const app = new Elysia({
     swagger({
       path: "/docs",
       documentation: {
-        info: { title: "Transcendence API Docs", version: "0.0.1" },
+        info: { title: "Capsul API Docs", version: "0.0.1" },
         components: {
           securitySchemes: {
             bearerAuth: {
@@ -53,8 +60,11 @@ const app = new Elysia({
       }
     })
   )
-  .listen(3000);
+  .listen({
+    hostname,
+    port,
+    ...(tls ? { tls } : {})
+  });
 
-console.log(
-  `API running at http://${app.server?.hostname}:${app.server?.port}`
-);
+const protocol = tls ? "https" : "http";
+console.log(`API running at ${protocol}://${app.server?.hostname}:${app.server?.port}`);
