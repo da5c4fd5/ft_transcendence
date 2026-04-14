@@ -1,5 +1,5 @@
 {
-  "name": "Transcendence Frontend",
+  "name": "capsul-frontend",
   "version": "0.0.0",
   "dependencies": {
     "@preact/preset-vite": "^2.10.5",
@@ -11,10 +11,8 @@
   },
   "private": true,
   "scripts": {
-    "dev": "vite"
-  },
-  "devDependencies": {
-    "@types/node": "^25.5.2",
-    "@types/react": "^19.2.14"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   }
 }
