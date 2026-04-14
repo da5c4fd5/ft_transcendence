@@ -1,0 +1,32 @@
+services:
+  certificate:
+    environment:
+      PROD: "false"
+      TLS_MODE: selfsigned
+
+  backend:
+    command: sh -lc 'bun --bun run db:generate && bun --bun run db:migrate:prod && bun run dev'
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+      - ./backend/prisma.config.ts:/app/prisma.config.ts:ro
+      - ./backend/package.json:/app/package.json:ro
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    command: bun run dev -- --host 0.0.0.0 --port 6767
+    environment:
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-transcen.dence.fr,localhost,127.0.0.1}
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public:ro
+      - ./frontend/index.html:/app/index.html:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - ./frontend/package.json:/app/package.json:ro
+
+  nginx:
+    environment:
+      PROD: "false"
+      TLS_MODE: selfsigned
