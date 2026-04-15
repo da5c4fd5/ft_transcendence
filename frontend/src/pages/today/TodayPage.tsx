@@ -6,35 +6,25 @@ import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { SavedMemory, PastMemory } from './today.types';
 import type { TreeData } from '../tree/tree.types';
 import type { MemoryStats } from '../memories/memories.types';
+import type { Mood } from '../../components/MemoryModal/MemoryModal.types';
 import { api } from '../../services/api';
 
-// Mock data (TODO: supprimer quand le backend est prêt)
-
-const MOCK_TREE: TreeData = {
-  lifeForce: 10,
-  isDecreasing: false,
-};
-
-const MOCK_STATS: MemoryStats = {
-  totalCapsuls: 10,
-  shared: 2,
-  dayStreak: 1,
-  wordsWritten: 139,
-};
+const VALID_MOODS: Mood[] = ['Joyful', 'Excited', 'Peaceful', 'Nostalgic', 'Sad', 'Anxious'];
+function parseMood(mood: string | null | undefined): Mood {
+  if (mood && (VALID_MOODS as string[]).includes(mood)) return mood as Mood;
+  return 'Peaceful';
+}
 
 async function fetchTreeData(): Promise<TreeData> {
   try {
     const state = await api.users.getTree() as { lifeForce?: number; isDecreasing?: boolean } | null;
-    return {
-      lifeForce:   state?.lifeForce   ?? MOCK_TREE.lifeForce,
-      isDecreasing: state?.isDecreasing ?? MOCK_TREE.isDecreasing,
-    };
-  } catch { return MOCK_TREE; }
+    return { lifeForce: state?.lifeForce ?? 0, isDecreasing: state?.isDecreasing ?? false };
+  } catch { return { lifeForce: 0, isDecreasing: false }; }
 }
 
-async function fetchStats(): Promise<MemoryStats> {
-  try { return await api.users.getStats(); }
-  catch { return MOCK_STATS; }
+async function fetchStats(): Promise<MemoryStats | null> {
+  try { return await api.memories.getStats(); }
+  catch { return null; }
 }
 
 const MAX_CHARS = 180;
@@ -311,9 +301,7 @@ function TreeSidebar({ tree, stats, saved }: { tree: TreeData | null; stats: Mem
   );
 }
 
-// Mock prompts (TODO: supprimer et décommenter l'appel API)
-
-const MOCK_PROMPTS = [
+const FALLBACK_PROMPTS = [
   "What's something you're grateful for right now?",
   "What made you smile today?",
   "Describe a small moment that felt good.",
@@ -333,18 +321,8 @@ async function fetchPrompt(): Promise<string> {
     const prompts = await api.memories.getPrompts();
     if (prompts.length > 0) return prompts[Math.floor(Math.random() * prompts.length)];
   } catch { /* fallback to local list */ }
-  return MOCK_PROMPTS[Math.floor(Math.random() * MOCK_PROMPTS.length)];
+  return FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)];
 }
-
-// Mock past memory (TODO: supprimer et décommenter l'appel API)
-
-const MOCK_PAST_MEMORY: PastMemory = {
-  id: 'm1',
-  date: '2025-04-09',
-  content: 'Had a great walk in the park this morning. The weather was perfect and I felt completely at peace.',
-  media: null,
-  mood: 'Peaceful',
-};
 
 async function fetchPastMemory(): Promise<PastMemory | null> {
   try {
@@ -362,9 +340,9 @@ async function fetchPastMemory(): Promise<PastMemory | null> {
       date:    pick.date.split('T')[0],
       content: pick.content,
       media:   pick.media?.[0]?.url ?? null,
-      mood:    pick.mood ?? 'Peaceful',
+      mood:    parseMood(pick.mood),
     };
-  } catch { return MOCK_PAST_MEMORY; }
+  } catch { return null; }
 }
 
 export function TodayPage() {

@@ -40,6 +40,7 @@ export interface User {
   notificationSettings: NotificationSettings;
   treeState: unknown;
   lastActiveAt: string | null;
+  isAdmin: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -97,6 +98,19 @@ export interface Paginated<T> {
   total?: number;
 }
 
+export interface MemoryStats {
+  totalCapsuls: number;
+  shared: number;
+  dayStreak: number;
+  wordsWritten: number;
+}
+
+export interface AdminStats {
+  userCount: number;
+  memoryCount: number;
+  sessionCount: number;
+}
+
 // ─── Request payloads ─────────────────────────────────────────────────────────
 
 export interface SignupPayload {
@@ -141,6 +155,16 @@ export interface UpdateMemoryPayload {
 export interface CreateContributionPayload {
   content: string;
   guestName?: string;
+}
+
+export interface UpdateContributionPayload {
+  content: string;
+}
+
+export interface UpdateAdminUserPayload {
+  isAdmin?: boolean;
+  username?: string;
+  displayName?: string;
 }
 
 // ─── Base request ─────────────────────────────────────────────────────────────
@@ -199,14 +223,20 @@ export const api = {
       return data;
     },
 
-    async login(email: string, password: string): Promise<{ token: string }> {
-      const data = await request<{ token: string }>("POST", "/auth/login", { email, password });
+    async login(email: string, password: string): Promise<{ token: string } | { mfaRequired: true; mfaToken: string }> {
+      const data = await request<{ token: string } | { mfaRequired: true; mfaToken: string }>("POST", "/auth/login", { email, password });
+      if ("token" in data) setToken(data.token);
+      return data;
+    },
+
+    async mfa(mfaToken: string, code: string): Promise<{ token: string }> {
+      const data = await request<{ token: string }>("POST", "/auth/mfa", { mfaToken, code });
       setToken(data.token);
       return data;
     },
 
-    logout(): Promise<{ message: string }> {
-      return request<{ message: string }>("POST", "/auth/logout").finally(clearToken);
+    logout(): Promise<void> {
+      return request<void>("POST", "/auth/logout").finally(clearToken);
     },
 
     getSessions(): Promise<Session[]> {
@@ -253,8 +283,8 @@ export const api = {
       return request<unknown>("PATCH", "/users/me/tree", data);
     },
 
-    getStats(): Promise<{ totalCapsuls: number; shared: number; dayStreak: number; wordsWritten: number }> {
-      return request<{ totalCapsuls: number; shared: number; dayStreak: number; wordsWritten: number }>("GET", "/users/me/stats");
+    getAchievements(): Promise<string[]> {
+      return request<string[]>("GET", "/users/me/achievements");
     },
 
     search(q: string): Promise<User[]> {
@@ -314,6 +344,32 @@ export const api = {
     getPrompts(): Promise<string[]> {
       return request<string[]>("GET", "/memories/prompts");
     },
+
+    getStats(): Promise<MemoryStats> {
+      return request<MemoryStats>("GET", "/memories/stats");
+    },
+
+    getCapsuls(): Promise<Memory[]> {
+      return request<Memory[]>("GET", "/memories/capsuls");
+    },
+
+    search(params: {
+      mood?: string;
+      period?: "week" | "month" | "year";
+      after?: string;
+      before?: string;
+      sharedOnly?: boolean;
+      limit?: number;
+    }): Promise<Memory[]> {
+      const q = new URLSearchParams();
+      if (params.mood)       q.set("mood",       params.mood);
+      if (params.period)     q.set("period",     params.period);
+      if (params.after)      q.set("after",      params.after);
+      if (params.before)     q.set("before",     params.before);
+      if (params.sharedOnly) q.set("sharedOnly", "true");
+      if (params.limit)      q.set("limit",      String(params.limit));
+      return request<Memory[]>("GET", `/memories/search?${q.toString()}`);
+    },
   },
 
   contributions: {
@@ -325,8 +381,30 @@ export const api = {
       return request<Contribution>("POST", `/memories/${memoryId}/contributions/`, data);
     },
 
+    update(memoryId: string, id: string, data: UpdateContributionPayload): Promise<Contribution> {
+      return request<Contribution>("PATCH", `/memories/${memoryId}/contributions/${id}`, data);
+    },
+
     delete(memoryId: string, id: string): Promise<void> {
       return request<void>("DELETE", `/memories/${memoryId}/contributions/${id}`);
+    },
+  },
+
+  admin: {
+    getStats(): Promise<AdminStats> {
+      return request<AdminStats>("GET", "/admin/stats");
+    },
+
+    getUsers(page = 1, limit = 50): Promise<Paginated<User>> {
+      return request<Paginated<User>>("GET", `/admin/users?page=${page}&limit=${limit}`);
+    },
+
+    updateUser(id: string, data: UpdateAdminUserPayload): Promise<User> {
+      return request<User>("PATCH", `/admin/users/${id}`, data);
+    },
+
+    deleteUser(id: string): Promise<void> {
+      return request<void>("DELETE", `/admin/users/${id}`);
     },
   },
 };

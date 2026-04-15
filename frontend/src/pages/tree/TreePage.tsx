@@ -3,20 +3,7 @@ import { Zap, Sparkles, Sprout, ChevronRight, ChevronLeft } from 'lucide-preact'
 import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { TreeData, Achievement } from './tree.types';
 import type { MemoryStats } from '../memories/memories.types';
-
-// Mock data (TODO: supprimer quand le backend est prêt)
-
-const MOCK_TREE: TreeData = {
-  lifeForce: 0,
-  isDecreasing: false,
-};
-
-const MOCK_STATS: MemoryStats = {
-  totalCapsuls: 0,
-  shared: 0,
-  dayStreak: 0,
-  wordsWritten: 0,
-};
+import { api } from '../../services/api';
 
 const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: 'first_capsul',       emoji: '🌱', title: 'First Capsul',       description: '1 memory created',           unlocked: false },
@@ -28,19 +15,20 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
 ];
 
 async function fetchTreeData(): Promise<TreeData> {
-  // TODO: const res = await fetch('/api/tree', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_TREE;
+  try {
+    const state = await api.users.getTree() as { lifeForce?: number; isDecreasing?: boolean } | null;
+    return { lifeForce: state?.lifeForce ?? 0, isDecreasing: state?.isDecreasing ?? false };
+  } catch { return { lifeForce: 0, isDecreasing: false }; }
 }
 
-async function fetchStats(): Promise<MemoryStats> {
-  // TODO: const res = await fetch('/api/memories/stats', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_STATS;
+async function fetchStats(): Promise<MemoryStats | null> {
+  try { return await api.memories.getStats(); }
+  catch { return null; }
 }
 
 async function fetchUnlockedAchievements(): Promise<string[]> {
-  // TODO: const res = await fetch('/api/achievements', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  // Le backend renvoie un tableau d'IDs : ["first_capsul", "week_warrior"]
-  return [];
+  try { return await api.users.getAchievements(); }
+  catch { return []; }
 }
 
 const DEMO_STAGES: Array<{ health: number; name: string }> = [

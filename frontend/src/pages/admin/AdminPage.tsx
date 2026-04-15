@@ -1,41 +1,25 @@
-import { useState, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { Users, Sparkles, ShieldCheck, Trash2, Search, ChevronDown, TriangleAlert } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../../components/Avatar/Avatar';
 import type { AdminUser, AdminStats, AdminPageProps } from './admin.types';
+import { api } from '../../services/api';
+import type { User as ApiUser } from '../../services/api';
 
-// Mock data (TODO: a supprimer quand backend pret)
-
-const MOCK_STATS: AdminStats = {
-  totalUsers: 5,
-  totalMemories: 452,
-  totalAdmins: 1,
-};
-
-const MOCK_USERS: AdminUser[] = [
-  { id: 'u1', username: 'Alex Explorer', email: 'alex.explorer@example.com', avatarURL: null, isAdmin: true,  joinedDate: 'Jan 15, 2024', lastActive: 'Apr 7, 2024',  memoriesCount: 145, friendsCount: 12 },
-  { id: 'u2', username: 'Sam Sparks',    email: 'sam.sparks@example.com',    avatarURL: null, isAdmin: false, joinedDate: 'Feb 20, 2024', lastActive: 'Apr 6, 2024',  memoriesCount: 89,  friendsCount: 8  },
-  { id: 'u3', username: 'Jordan River',  email: 'jordan.river@example.com',  avatarURL: null, isAdmin: false, joinedDate: 'Mar 10, 2024', lastActive: 'Apr 5, 2024',  memoriesCount: 56,  friendsCount: 15 },
-  { id: 'u4', username: 'Riley Moon',    email: 'riley.moon@example.com',    avatarURL: null, isAdmin: false, joinedDate: 'Mar 25, 2024', lastActive: 'Apr 7, 2024',  memoriesCount: 34,  friendsCount: 6  },
-  { id: 'u5', username: 'Casey Blue',    email: 'casey.blue@example.com',    avatarURL: null, isAdmin: false, joinedDate: 'Jan 30, 2024', lastActive: 'Mar 20, 2024', memoriesCount: 128, friendsCount: 20 },
-];
-
-// TODO: uncomment and call in useEffect once backend is ready
-// async function fetchStats(): Promise<AdminStats> {
-//   const res = await fetch('/api/admin/stats');
-//   return res.json();
-// }
-// async function fetchUsers(): Promise<AdminUser[]> {
-//   const res = await fetch('/api/admin/users');
-//   return res.json();
-// }
-
-async function deleteUser(_id: string): Promise<void> {
-  // TODO: await fetch(`/api/admin/users/${_id}`, { method: 'DELETE' });
-}
-
-async function updateUserRole(_id: string, _isAdmin: boolean): Promise<void> {
-  // TODO: await fetch(`/api/admin/users/${_id}`, { method: 'PATCH', body: JSON.stringify({ isAdmin: _isAdmin }) });
+function apiUserToAdmin(u: ApiUser): AdminUser {
+  return {
+    id:           u.id,
+    username:     u.username,
+    email:        u.email,
+    avatarURL:    u.avatarUrl,
+    isAdmin:      u.isAdmin,
+    joinedDate:   new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    lastActive:   u.lastActiveAt
+      ? new Date(u.lastActiveAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '—',
+    memoriesCount: 0,
+    friendsCount:  0,
+  };
 }
 
 const modalOverlay = 'fixed inset-0 z-50 flex items-center justify-center px-4';
@@ -166,16 +150,33 @@ function RoleBadge({ isAdmin, onClick }: { isAdmin: boolean; onClick?: () => voi
 }
 
 export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGuestAnon }: AdminPageProps) {
-  const [stats]           = useState<AdminStats>(MOCK_STATS);
-  const [users, setUsers] = useState<AdminUser[]>(MOCK_USERS);
+  const [stats, setStats]   = useState<AdminStats | null>(null);
+  const [users, setUsers]   = useState<AdminUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [roleConfirmId, setRoleConfirmId]     = useState<string | null>(null);
   const [showDevTools, setShowDevTools]       = useState(false);
 
-  // TODO: replace with real API calls in useEffect
-  // void fetchStats;
-  // void fetchUsers;
+  useEffect(() => {
+    async function load() {
+      try {
+        const [apiStats, apiUsers] = await Promise.all([
+          api.admin.getStats(),
+          api.admin.getUsers(1, 100),
+        ]);
+        setStats({
+          totalUsers:    apiStats.userCount,
+          totalMemories: apiStats.memoryCount,
+          totalAdmins:   0, // computed from user list below
+        });
+        setUsers(apiUsers.items.map(apiUserToAdmin));
+      } catch { /* leave empty */ } finally {
+        setIsLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   const totalAdmins = useMemo(() => users.filter(u => u.isAdmin).length, [users]);
 
@@ -188,7 +189,7 @@ export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGues
   );
 
   const handleDeleteConfirm = async (id: string) => {
-    await deleteUser(id);
+    try { await api.admin.deleteUser(id); } catch { /* ignore */ }
     setUsers(prev => prev.filter(u => u.id !== id));
     setDeleteConfirmId(null);
   };
@@ -197,7 +198,7 @@ export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGues
     const user = users.find(u => u.id === id);
     if (!user) return;
     const newIsAdmin = !user.isAdmin;
-    await updateUserRole(id, newIsAdmin);
+    try { await api.admin.updateUser(id, { isAdmin: newIsAdmin }); } catch { /* ignore */ }
     setUsers(prev => prev.map(u => u.id === id ? { ...u, isAdmin: newIsAdmin } : u));
   };
 
@@ -215,9 +216,9 @@ export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGues
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard icon={<Users size={22} className="text-darkgrey" />}     value={stats.totalUsers}    label="Total Users"    color="bg-blue/40"   />
-        <StatCard icon={<Sparkles size={22} className="text-darkgrey" />}  value={stats.totalMemories} label="Total Memories" color="bg-yellow/60" />
-        <StatCard icon={<ShieldCheck size={22} className="text-darkgrey" />} value={totalAdmins}       label="Admins"         color="bg-purple/30" />
+        <StatCard icon={<Users size={22} className="text-darkgrey" />}     value={stats?.totalUsers ?? 0}    label="Total Users"    color="bg-blue/40"   />
+        <StatCard icon={<Sparkles size={22} className="text-darkgrey" />}  value={stats?.totalMemories ?? 0} label="Total Memories" color="bg-yellow/60" />
+        <StatCard icon={<ShieldCheck size={22} className="text-darkgrey" />} value={totalAdmins}             label="Admins"         color="bg-purple/30" />
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
@@ -257,7 +258,14 @@ export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGues
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
+              {isLoading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-sm text-mediumgrey animate-pulse">
+                    Loading users…
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filtered.map(u => (
                 <tr key={u.id} className="border-t border-black/5 hover:bg-verylightorange/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">

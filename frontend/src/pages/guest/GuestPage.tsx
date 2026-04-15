@@ -4,21 +4,21 @@ import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Avatar } from '../../components/Avatar/Avatar';
 import { Button } from '../../components/Button/Button';
 import type { FriendContribution, SharedMemory, GuestPageProps } from './guest.types';
+import { api } from '../../services/api';
+import type { Contribution as ApiContribution } from '../../services/api';
 
 export type { SharedMemory };
 
-// Mock (TODO: supprimer —> données réelles passées via props depuis GET /memories/:id + GET /memories/:id/contributions)
-export const MOCK_SHARED_MEMORY: SharedMemory = {
-  date: 'THURSDAY, APRIL 2, 2026',
-  content: 'Spent the whole evening laughing until our stomachs hurt. Sunsets with these two never get old. We talked about everything and nothing. I want to remember this feeling of complete peace.',
-  media: null,
-  ownerName: 'Alex',
-  friendContributions: [
-    { id: '1', guestName: 'Léa',           avatarURL: null, date: '02/04/2026', content: "This was such a perfect evening!! Look at this polaroid I took!", media: null },
-    { id: '2', guestName: 'Thomas',        avatarURL: null, date: '02/04/2026', content: "Next time I'm picking the restaurant though!", media: null },
-    { id: '3', guestName: 'Cloclolaloutre', avatarURL: null, date: '02/04/2026', content: 'Top top top', media: null },
-  ],
-};
+function apiContribToFriendContribution(c: ApiContribution, guestName: string, avatarURL: string | null): FriendContribution {
+  return {
+    id:        c.id,
+    guestName: c.guestName ?? guestName,
+    avatarURL,
+    date:      new Date(c.createdAt).toLocaleDateString('fr-FR'),
+    content:   c.content,
+    media:     null,
+  };
+}
 
 function JoinStep({ onJoin }: { onJoin: (username: string, avatarURL: string | null) => void }) {
   const [username, setUsername] = useState('');
@@ -124,23 +124,35 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
     reader.readAsDataURL(file);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!contributionContent.trim()) return;
-    const id = String(Date.now());
-    const newContrib: FriendContribution = {
-      id,
+    const optimisticId = String(Date.now());
+    const optimistic: FriendContribution = {
+      id: optimisticId,
       guestName,
       avatarURL: guestAvatarURL,
       date: new Date().toLocaleDateString('fr-FR'),
       content: contributionContent.trim(),
       media: contributionMedia,
     };
-    setContributions(prev => [...prev, newContrib]);
-    setMySessionIds(prev => new Set(prev).add(id));
+    setContributions(prev => [...prev, optimistic]);
+    setMySessionIds(prev => new Set(prev).add(optimisticId));
     setContributionContent('');
     setContributionMedia(null);
     setSent(true);
-    // TODO: POST /api/memories/:id/contributions { guestName, avatarURL, content, media }
+    try {
+      const saved = await api.contributions.create(memory.id, { content: optimistic.content, guestName });
+      // Replace optimistic entry with real one from server
+      setContributions(prev => prev.map(c =>
+        c.id === optimisticId ? apiContribToFriendContribution(saved, guestName, guestAvatarURL) : c
+      ));
+      setMySessionIds(prev => {
+        const next = new Set(prev);
+        next.delete(optimisticId);
+        next.add(saved.id);
+        return next;
+      });
+    } catch { /* keep optimistic */ }
   };
 
   const handleEditStart = (contrib: FriendContribution) => {
@@ -149,13 +161,15 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
     setEditMedia(contrib.media);
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     if (!editContent.trim() || !editingId) return;
     setContributions(prev => prev.map(c =>
       c.id === editingId ? { ...c, content: editContent.trim(), media: editMedia } : c
     ));
     setEditingId(null);
-    // TODO: PATCH /api/memories/:id/contributions/:contribution_id { content, media }
+    try {
+      await api.contributions.update(memory.id, editingId, { content: editContent.trim() });
+    } catch { /* optimistic update already applied */ }
   };
 
   const handleEditCancel = () => setEditingId(null);

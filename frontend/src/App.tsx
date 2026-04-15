@@ -12,7 +12,8 @@ import { MemoriesPage } from './pages/memories/MemoriesPage';
 import { TreePage } from './pages/tree/TreePage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { AdminPage } from './pages/admin/AdminPage';
-import { GuestPage, MOCK_SHARED_MEMORY } from './pages/guest/GuestPage';
+import { GuestPage } from './pages/guest/GuestPage';
+import type { SharedMemory } from './pages/guest/guest.types';
 import { api, getToken, clearToken } from './services/api';
 import type { User as ApiUser } from './services/api';
 import type { User as ProfileUser } from './pages/profile/profile.types';
@@ -23,7 +24,7 @@ function toProfileUser(u: ApiUser): ProfileUser {
     username:  u.username,
     email:     u.email,
     avatarURL: u.avatarUrl ?? null,
-    isAdmin:   false, // backend has no admin flag yet
+    isAdmin:   u.isAdmin,
   };
 }
 
@@ -35,7 +36,7 @@ const App = () => {
   const [currentPage, setCurrentPage]           = useState<Page>('today');
   const [isAdmin, setIsAdmin]                   = useState(false);
   // TODO: supprimer showGuestPreview et showGuestPreviewAnon quand le routing /shared/:token sera implémenté
-  const [showGuestPreview, setShowGuestPreview] = useState(false);
+  const [guestMemory, setGuestMemory] = useState<SharedMemory | null>(null);
   const [showGuestPreviewAnon, setShowGuestPreviewAnon] = useState(false);
 
   // Restore session from stored token on mount
@@ -66,7 +67,7 @@ const App = () => {
       ...currentUser,
       username:  updated.username,
       email:     updated.email,
-      avatarUrl: updated.avatarURL ?? undefined,
+      avatarUrl: updated.avatarURL ?? null,
     });
   };
 
@@ -88,20 +89,20 @@ const App = () => {
   };
 
   // TODO: supprimer ces deux blocs quand le routing /shared/:token sera implémenté
-  if (showGuestPreview) {
+  if (guestMemory) {
     return (
       <GuestPage
-        memory={MOCK_SHARED_MEMORY}
+        memory={guestMemory}
         currentUser={{ username: navUser.username, avatarURL: navUser.avatarURL ?? null }}
-        onBack={() => { setShowGuestPreview(false); setCurrentPage('today'); }}
-        onNavigateToWelcome={() => { setShowGuestPreview(false); handleLogout(); }}
+        onBack={() => { setGuestMemory(null); setCurrentPage('today'); }}
+        onNavigateToWelcome={() => { setGuestMemory(null); handleLogout(); }}
       />
     );
   }
   if (showGuestPreviewAnon) {
     return (
       <GuestPage
-        memory={MOCK_SHARED_MEMORY}
+        memory={{ id: '', date: '', content: '', media: null, ownerName: '', friendContributions: [] }}
         onBack={() => setShowGuestPreviewAnon(false)}
         onNavigateToWelcome={() => { setShowGuestPreviewAnon(false); handleLogout(); }}
       />
@@ -119,7 +120,7 @@ const App = () => {
 
       <main>
         {currentPage === 'today'    && <TodayPage />}
-        {currentPage === 'timeline' && <TimelinePage onNavigateToToday={() => setCurrentPage('today')} onPreviewGuest={() => setShowGuestPreview(true)} />}
+        {currentPage === 'timeline' && <TimelinePage onNavigateToToday={() => setCurrentPage('today')} onPreviewGuest={(mem) => setGuestMemory({ ...mem, ownerName: navUser.username })} />}
         {currentPage === 'memories' && <MemoriesPage />}
         {currentPage === 'tree'     && <TreePage />}
         {currentPage === 'profile'  && (
