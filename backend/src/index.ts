@@ -50,6 +50,7 @@ const app = new Elysia()
       path: "/docs",
       documentation: {
         info: { title: "Capsul API Docs", version: "0.0.1" },
+        servers: [{ url: "/api", description: "API server (proxied via Nginx)" }],
         components: {
           securitySchemes: {
             bearerAuth: {
