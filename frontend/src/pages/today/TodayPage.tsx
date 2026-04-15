@@ -361,10 +361,21 @@ export function TodayPage() {
 
   useEffect(() => {
     async function load() {
-      const [p, t, s] = await Promise.all([fetchPrompt(), fetchTreeData(), fetchStats()]);
+      const [p, t, s, todayMem] = await Promise.all([
+        fetchPrompt(), fetchTreeData(), fetchStats(),
+        api.memories.today().catch(() => null),
+      ]);
       setPrompt(p);
       setTreeData(t);
       setStats(s);
+      if (todayMem) {
+        setSavedMemory({
+          id:    todayMem.id,
+          content: todayMem.content,
+          media: todayMem.media?.[0]?.url ?? null,
+        });
+        setTodayState('saved');
+      }
     }
     load();
   }, []);
@@ -396,18 +407,17 @@ export function TodayPage() {
     if (!content.trim() || isSaving) return;
     setIsSaving(true);
     try {
-      const memory = await api.memories.create({
-        content,
-        date: new Date().toISOString().split('T')[0],
-      });
+      const memory = savedMemory?.id
+        ? await api.memories.update(savedMemory.id, { content })
+        : await api.memories.create({ content, date: new Date().toISOString().split('T')[0] });
       if (mediaFile) {
         await api.memories.uploadMedia(memory.id, mediaFile);
       }
-      setSavedMemory({ content, media });
+      setSavedMemory({ id: memory.id, content, media });
       setTodayState('saved');
     } catch {
       // fall back to local-only display so the user doesn't lose their entry
-      setSavedMemory({ content, media });
+      setSavedMemory(prev => ({ id: prev?.id ?? '', content, media }));
       setTodayState('saved');
     } finally {
       setIsSaving(false);
@@ -419,7 +429,6 @@ export function TodayPage() {
     setContent(savedMemory.content);
     setMedia(savedMemory.media);
     setMediaFile(null);
-    setSavedMemory(null);
     setTodayState('prompt');
   };
 

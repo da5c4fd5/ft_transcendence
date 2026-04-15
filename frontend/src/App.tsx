@@ -15,7 +15,7 @@ import { AdminPage } from './pages/admin/AdminPage';
 import { GuestPage } from './pages/guest/GuestPage';
 import type { SharedMemory } from './pages/guest/guest.types';
 import { api, getToken, clearToken } from './services/api';
-import type { User as ApiUser } from './services/api';
+import type { User as ApiUser, SharedMemoryResponse } from './services/api';
 import type { User as ProfileUser } from './pages/profile/profile.types';
 
 function toProfileUser(u: ApiUser): ProfileUser {
@@ -28,6 +28,24 @@ function toProfileUser(u: ApiUser): ProfileUser {
   };
 }
 
+function toSharedMemory(r: SharedMemoryResponse): SharedMemory {
+  return {
+    id:       r.id,
+    date:     r.date.split('T')[0],
+    content:  r.content,
+    media:    r.media[0]?.url ?? null,
+    ownerName: r.user.username,
+    friendContributions: r.contributions.map(c => ({
+      id:        c.id,
+      guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
+      avatarURL: null,
+      date:      new Date(c.createdAt).toLocaleDateString('en-GB'),
+      content:   c.content,
+      media:     null,
+    })),
+  };
+}
+
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPage, setAuthPage]               = useState<AuthPage>('welcome');
@@ -35,9 +53,20 @@ const App = () => {
 
   const [currentPage, setCurrentPage]           = useState<Page>('today');
   const [isAdmin, setIsAdmin]                   = useState(false);
-  // TODO: supprimer showGuestPreview et showGuestPreviewAnon quand le routing /shared/:token sera implémenté
   const [guestMemory, setGuestMemory] = useState<SharedMemory | null>(null);
   const [showGuestPreviewAnon, setShowGuestPreviewAnon] = useState(false);
+  // URL-based shared memory (from /shared/:token)
+  const [urlSharedMemory, setUrlSharedMemory] = useState<SharedMemory | null>(null);
+
+  // Resolve /shared/:token from the URL on mount
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/shared\/([A-Za-z0-9_-]+)$/);
+    if (!match) return;
+    const token = match[1];
+    api.shared.get(token)
+      .then(r => setUrlSharedMemory(toSharedMemory(r)))
+      .catch(() => { /* invalid/revoked link — stay on normal flow */ });
+  }, []);
 
   // Restore session from stored token on mount
   useEffect(() => {
@@ -71,6 +100,22 @@ const App = () => {
     });
   };
 
+  // URL-based share link (/shared/:token) — shown before auth so guests can access
+  if (urlSharedMemory) {
+    const backFromShare = () => {
+      setUrlSharedMemory(null);
+      window.history.pushState(null, '', '/');
+    };
+    return (
+      <GuestPage
+        memory={urlSharedMemory}
+        currentUser={currentUser ? { username: currentUser.username, avatarURL: currentUser.avatarUrl ?? null } : undefined}
+        onBack={backFromShare}
+        onNavigateToWelcome={!isAuthenticated ? () => { backFromShare(); setAuthPage('welcome'); } : undefined}
+      />
+    );
+  }
+
   if (!isAuthenticated) {
     if (authPage === 'welcome')          return <WelcomePage onNavigate={setAuthPage} />;
     if (authPage === 'login')            return <LoginPage onNavigate={setAuthPage} onLogin={handleLogin} />;
@@ -88,7 +133,7 @@ const App = () => {
     isAdmin:   isAdmin || profileUser.isAdmin,
   };
 
-  // TODO: supprimer ces deux blocs quand le routing /shared/:token sera implémenté
+  // In-app guest preview from Timeline (keeps old flow working)
   if (guestMemory) {
     return (
       <GuestPage

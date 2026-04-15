@@ -85,10 +85,28 @@ export interface Memory {
   date: string;
   mood: string | null;
   isOpen: boolean;
+  shareToken: string | null;
   createdAt: string;
   updatedAt: string;
   media?: Media[];
   contributions?: Contribution[];
+}
+
+export interface SharedMemoryContribution {
+  id: string;
+  guestName: string | null;
+  contributor: { username: string } | null;
+  content: string;
+  createdAt: string;
+}
+
+export interface SharedMemoryResponse {
+  id: string;
+  date: string;
+  content: string;
+  user: { username: string };
+  media: Media[];
+  contributions: SharedMemoryContribution[];
 }
 
 export interface Paginated<T> {
@@ -150,6 +168,7 @@ export interface CreateMemoryPayload {
 export interface UpdateMemoryPayload {
   content?: string;
   mood?: string;
+  isOpen?: boolean;
 }
 
 export interface CreateContributionPayload {
@@ -349,6 +368,10 @@ export const api = {
       return request<MemoryStats>("GET", "/memories/stats");
     },
 
+    today(): Promise<Memory> {
+      return request<Memory>("GET", "/memories/today");
+    },
+
     getCapsuls(): Promise<Memory[]> {
       return request<Memory[]>("GET", "/memories/capsuls");
     },
@@ -405,6 +428,12 @@ export const api = {
 
     deleteUser(id: string): Promise<void> {
       return request<void>("DELETE", `/admin/users/${id}`);
+    },
+  },
+
+  shared: {
+    get(token: string): Promise<SharedMemoryResponse> {
+      return request<SharedMemoryResponse>("GET", `/memories/shared/${token}`);
     },
   },
 };

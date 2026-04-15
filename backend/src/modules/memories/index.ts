@@ -18,6 +18,17 @@ export const memories = new Elysia({
       description: "Return a list of writing prompt suggestions. Public."
     }
   })
+  .get(
+    "/shared/:token",
+    ({ params }) => MemoriesService.findByShareToken(params.token),
+    {
+      detail: {
+        security: [],
+        description:
+          "Return a shared memory by its share token. Public — no authentication required. Returns 403 if the memory is not open."
+      }
+    }
+  )
   .guard(
     {
       beforeHandle: ({ user, status }) => {
@@ -26,6 +37,15 @@ export const memories = new Elysia({
     },
     (app) =>
       app
+        // ── Today ─────────────────────────────────────────────────────
+        .get("/today", ({ user }) => MemoriesService.today(user!.id), {
+          response: { 200: t.Any(), 404: t.Any() },
+          detail: {
+            description:
+              "Return the authenticated user's memory for today, if one exists. 404 if none."
+          }
+        })
+
         // ── Collection ────────────────────────────────────────────────
         .get(
           "/",

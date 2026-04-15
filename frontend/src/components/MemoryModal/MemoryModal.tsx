@@ -3,6 +3,7 @@ import { X, Users, Lock, Link2, Copy, Heart, Eye } from 'lucide-preact';
 import { Button } from '../Button/Button';
 import { Avatar } from '../Avatar/Avatar';
 import type { Mood, MemoryModalProps } from './MemoryModal.types';
+import { api } from '../../services/api';
 
 export const MOOD_EMOJI: Record<Mood, string> = {
   Joyful:    '😊',
@@ -22,25 +23,35 @@ function formatFullDate(dateStr: string): string {
 
 export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: MemoryModalProps) {
   const [isOpen, setIsOpen] = useState(entry.isOpen);
-  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`; // TODO: remplacer avec l'URL fournie par le backend
+  const [shareUrl, setShareUrl] = useState<string | null>(entry.shareUrl);
   const [shareStep, setShareStep] = useState<'idle' | 'confirming'>('idle');
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const moodEmoji = MOOD_EMOJI[entry.mood];
 
-  const handleShare = () => {
-    setIsOpen(true);
-    setShareStep('confirming');
-    // TODO: POST /api/memories/:id/share
+  const handleShare = async () => {
+    if (!entry.id) return;
+    try {
+      const updated = await api.memories.update(entry.id, { isOpen: true });
+      const token = updated.shareToken;
+      const url = token ? `${window.location.origin}/shared/${token}` : null;
+      setIsOpen(true);
+      setShareUrl(url);
+      setShareStep('confirming');
+    } catch { /* ignore — UI stays in current state */ }
   };
 
-  const handleMakePrivate = () => {
-    setIsOpen(false);
-    // TODO: PATCH /api/memories/:id { isOpen: false }
+  const handleMakePrivate = async () => {
+    if (!entry.id) return;
+    try {
+      await api.memories.update(entry.id, { isOpen: false });
+      setIsOpen(false);
+    } catch { /* ignore */ }
   };
 
   const handleCopy = async () => {
+    if (shareUrl === null) return;
     await navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

@@ -9,7 +9,8 @@ export const MemoriesModel = {
   }),
   updateBody: t.Object({
     content: t.Optional(t.String({ minLength: 1, maxLength: 2000 })),
-    mood: t.Optional(t.String({ maxLength: 32 }))
+    mood: t.Optional(t.String({ maxLength: 32 })),
+    isOpen: t.Optional(t.Boolean())
   }),
   mediaBody: t.Object({ file: t.File({ type: "image/*" }) }),
 

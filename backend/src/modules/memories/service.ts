@@ -29,13 +29,24 @@ export abstract class MemoriesService {
   }
 
   static async create(userId: string, data: MemoriesModel["createBody"]) {
+    const date = data.date ? new Date(data.date) : new Date();
+    date.setHours(0, 0, 0, 0);
+    const nextDay = new Date(date);
+    nextDay.setDate(date.getDate() + 1);
+
+    const existing = await db.memory.findFirst({
+      where: { userId, date: { gte: date, lt: nextDay } }
+    });
+    if (existing) throw status(409, { message: "You already have a memory for today" });
+
     return db.memory.create({
       data: {
         userId,
         content: data.content,
         isOpen: data.isOpen ?? false,
-        date: data.date ? new Date(data.date) : new Date(),
-        mood: data.mood
+        date,
+        mood: data.mood,
+        ...(data.isOpen ? { shareToken: crypto.randomUUID() } : {})
       }
     });
   }
@@ -48,7 +59,48 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
-    return db.memory.update({ where: { id }, data });
+
+    // Generate a share token when opening for the first time
+    const shareToken =
+      data.isOpen === true && !memory.shareToken
+        ? crypto.randomUUID()
+        : undefined;
+
+    return db.memory.update({
+      where: { id },
+      data: { ...data, ...(shareToken ? { shareToken } : {}) }
+    });
+  }
+
+  static async today(userId: string) {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    const nextDay = new Date(date);
+    nextDay.setDate(date.getDate() + 1);
+
+    const memory = await db.memory.findFirst({
+      where: { userId, date: { gte: date, lt: nextDay } },
+      include: { media: true }
+    });
+    if (!memory) throw status(404, { message: "No memory for today" });
+    return memory;
+  }
+
+  static async findByShareToken(token: string) {
+    const memory = await db.memory.findUnique({
+      where: { shareToken: token },
+      include: {
+        media: true,
+        contributions: {
+          orderBy: { createdAt: "asc" },
+          include: { contributor: { select: { username: true } } }
+        },
+        user: { select: { username: true } }
+      }
+    });
+    if (!memory) throw status(404, { message: "Memory not found" });
+    if (!memory.isOpen) throw status(403, { message: "This memory is not shared" });
+    return memory;
   }
 
   static async delete(id: string, userId: string) {

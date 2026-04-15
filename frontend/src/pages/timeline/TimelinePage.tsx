@@ -25,7 +25,7 @@ function apiMemoryToDetails(m: ApiMemory, contributions: ApiContribution[]): Mem
     content: m.content,
     media:   m.media?.[0]?.url ?? null,
     isOpen:  m.isOpen,
-    shareUrl: null,
+    shareUrl: m.shareToken ? `${window.location.origin}/shared/${m.shareToken}` : null,
     friendContributions: contributions.map(c => ({
       id:        c.id,
       guestName: c.guestName ?? 'Anonymous',
