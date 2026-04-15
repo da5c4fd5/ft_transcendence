@@ -4,6 +4,46 @@ import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
 import type { Mood, MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
 import type { TimeCapsule, MemoryCard, MoodFilter, PeriodFilter, CollectionFilters } from './memories.types';
+import { api } from '../../services/api';
+import type { Memory as ApiMemory, Contribution as ApiContribution } from '../../services/api';
+
+const VALID_MOODS: Mood[] = ['Joyful', 'Excited', 'Peaceful', 'Nostalgic', 'Sad', 'Anxious'];
+
+function parseMood(mood: string | null | undefined): Mood {
+  if (mood && (VALID_MOODS as string[]).includes(mood)) return mood as Mood;
+  return 'Peaceful';
+}
+
+function apiMemoryToCard(m: ApiMemory): MemoryCard {
+  return {
+    id:      m.id,
+    date:    m.date.split('T')[0],
+    content: m.content,
+    media:   m.media?.[0]?.url ?? null,
+    mood:    parseMood(m.mood),
+    isOpen:  m.isOpen,
+  };
+}
+
+function apiMemoryToDetails(m: ApiMemory, contributions: ApiContribution[]): MemoryDetails {
+  return {
+    id:      m.id,
+    date:    m.date.split('T')[0],
+    mood:    parseMood(m.mood),
+    content: m.content,
+    media:   m.media?.[0]?.url ?? null,
+    isOpen:  m.isOpen,
+    shareUrl: null,
+    friendContributions: contributions.map(c => ({
+      id:        c.id,
+      guestName: c.guestName ?? 'Anonymous',
+      avatarURL: null,
+      date:      new Date(c.createdAt).toLocaleDateString('en-GB'),
+      content:   c.content,
+      media:     null,
+    })),
+  };
+}
 
 const PAGE_SIZE = 9;
 const ALL_MOODS: Mood[] = ['Joyful', 'Excited', 'Peaceful', 'Nostalgic', 'Sad', 'Anxious'];
@@ -93,31 +133,51 @@ const MOCK_COLLECTION: MemoryCard[] = [
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 async function fetchTimeCapsules(): Promise<TimeCapsule[]> {
-  // TODO: const res = await fetch('/api/memories/capsuls', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_CAPSULES;
+  try {
+    const { items } = await api.memories.list(1, 100);
+    // Pick up to 3 oldest memories as "time capsules"
+    const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
+    return sorted.slice(0, 3).map(m => ({
+      id:      m.id,
+      date:    m.date.split('T')[0],
+      content: m.content,
+      media:   m.media?.[0]?.url ?? null,
+      mood:    parseMood(m.mood),
+    }));
+  } catch { return MOCK_CAPSULES; }
 }
 
 async function fetchCollection(): Promise<MemoryCard[]> {
-  // TODO: const res = await fetch('/api/memories', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  // Filtrage avancé : GET /api/memories/search?mood=...&period=...&sharedOnly=...&limit=...
-  await sleep(400);
-  return MOCK_COLLECTION;
+  try {
+    const { items } = await api.memories.list(1, 100);
+    return items.map(apiMemoryToCard);
+  } catch {
+    await sleep(400);
+    return MOCK_COLLECTION;
+  }
 }
 
 async function fetchMemoryDetails(id: string): Promise<MemoryDetails> {
-  // TODO: const res = await fetch(`/api/memories/${id}`, { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  // Les contributions sont incluses dans la réponse via GET /api/memories/:id/contributions
-  const card = MOCK_COLLECTION.find(c => c.id === id);
-  const capsule = MOCK_CAPSULES.find(c => c.id === id);
-  return {
-    date: card?.date ?? capsule?.date ?? new Date().toISOString().split('T')[0],
-    mood: card?.mood ?? capsule?.mood ?? 'Peaceful',
-    content: card?.content ?? capsule?.content ?? '',
-    media: card?.media ?? capsule?.media ?? null,
-    isOpen: card?.isOpen ?? false,
-    shareUrl: null,
-    friendContributions: [],
-  };
+  try {
+    const [memory, contributions] = await Promise.all([
+      api.memories.get(id),
+      api.contributions.list(id),
+    ]);
+    return apiMemoryToDetails(memory, contributions);
+  } catch {
+    const card    = MOCK_COLLECTION.find(c => c.id === id);
+    const capsule = MOCK_CAPSULES.find(c => c.id === id);
+    return {
+      id,
+      date:    card?.date ?? capsule?.date ?? new Date().toISOString().split('T')[0],
+      mood:    card?.mood ?? capsule?.mood ?? 'Peaceful',
+      content: card?.content ?? capsule?.content ?? '',
+      media:   card?.media  ?? capsule?.media  ?? null,
+      isOpen:  card?.isOpen ?? false,
+      shareUrl: null,
+      friendContributions: [],
+    };
+  }
 }
 
 function TimeCapsuleCard({ capsule, onClick }: { capsule: TimeCapsule; onClick: () => void }) {
@@ -502,8 +562,11 @@ export function MemoriesPage() {
         <MemoryModal
           entry={selectedEntry}
           onClose={() => setSelectedEntry(null)}
-          onDelete={() => {
-            // TODO: DELETE /api/memories/:id
+          onDelete={async () => {
+            if (selectedEntry.id) {
+              try { await api.memories.delete(selectedEntry.id); } catch { /* ignore */ }
+              setAllCards(prev => prev.filter(c => c.id !== selectedEntry.id));
+            }
             setSelectedEntry(null);
           }}
         />

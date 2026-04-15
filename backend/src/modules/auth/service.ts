@@ -8,7 +8,8 @@ type TokenSigner = (payload: { sub: string; jti: string }) => Promise<string>;
 export abstract class Auth {
   static async logIn(
     { email, password }: AuthModel["logInBody"],
-    signToken: TokenSigner
+    signToken: TokenSigner,
+    userAgent?: string
   ) {
     const DUMMY_HASH =
       "$argon2id$v=19$m=65536,t=2,p=1$JgB5ZgIdHXxaGkpjo1AtlSUMzI921hJg1R9fczMtElU$l0S6Tmhcddlt2/q/UUV6B2inpLhld7ukux6SdepG7rg";
@@ -22,14 +23,15 @@ export abstract class Auth {
         error: "Invalid email or password"
       } satisfies AuthModel["logInInvalid"]);
 
-    const session = await db.session.create({ data: { userId: user.id } });
+    const session = await db.session.create({ data: { userId: user.id, userAgent: userAgent ?? null } });
     const token = await signToken({ sub: user.id, jti: session.id });
     return { token } satisfies AuthModel["logInResponse"];
   }
 
   static async signUp(
     { email, username, password }: AuthModel["signUpBody"],
-    signToken: TokenSigner
+    signToken: TokenSigner,
+    userAgent?: string
   ) {
     const passwordHash = await Bun.password.hash(password);
     try {
@@ -45,16 +47,19 @@ export abstract class Auth {
       console.error(err);
       throw status("Internal Server Error", {});
     }
-    return await this.logIn({ email, password }, signToken);
+    return await this.logIn({ email, password }, signToken, userAgent);
   }
 
-  static async listSessions(userId: string) {
-    const sessions = await db.session.findMany({
-      where: { userId },
-      omit: { userId: true }
-    });
-
-    return sessions;
+  static async listSessions(userId: string, currentSessionId: string) {
+    const sessions = await db.session.findMany({ where: { userId } });
+    return sessions
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map(s => ({
+        id:          s.id,
+        userAgent:   s.userAgent ?? 'Unknown',
+        connectedAt: s.createdAt.toISOString(),
+        isCurrent:   s.id === currentSessionId,
+      }));
   }
 
   static async revokeSession(sessionId: string) {

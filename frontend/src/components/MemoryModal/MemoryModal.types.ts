@@ -10,6 +10,7 @@ export interface FriendContribution {
 }
 
 export interface MemoryDetails {
+  id?: string;
   date: string;
   mood: Mood;
   content: string;

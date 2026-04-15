@@ -4,22 +4,39 @@ import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Input } from '../../components/Input/Input';
 import { Button } from '../../components/Button/Button';
 import type { RegisterPageProps } from './auth.types';
+import { api, ApiError } from '../../services/api';
 
 export function RegisterPage({ onNavigate, onLogin }: RegisterPageProps) {
 
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string }>({});
+  const [errors, setErrors]     = useState<{ username?: string; email?: string; password?: string }>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: Event) => {
+  const handleSubmit = async (e: Event) => {
     e.preventDefault();
     const newErrors: typeof errors = {};
     if (username.trim().length < 2) newErrors.username = 'Please enter your username.';
     if (!email.includes('@')) newErrors.email = 'Please enter a valid email address.';
     if (password.length < 8) newErrors.password = 'Password must be at least 8 characters.';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    onLogin();
+
+    setIsLoading(true);
+    setApiError(null);
+    try {
+      await api.auth.signup(email, password, username.trim());
+      onLogin();
+    } catch (err) {
+      setApiError(
+        err instanceof ApiError && err.status === 409
+          ? 'Email already registered.'
+          : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -59,8 +76,12 @@ export function RegisterPage({ onNavigate, onLogin }: RegisterPageProps) {
           icon={<Lock size={16} />}
         />
 
-        <Button type="submit" variant="primary" fullWidth>
-          Create Account
+        {apiError && (
+          <p className="text-sm text-pink text-center font-medium">{apiError}</p>
+        )}
+
+        <Button type="submit" variant="primary" fullWidth disabled={isLoading}>
+          {isLoading ? 'Creating account…' : 'Create Account'}
         </Button>
 
         <p className="text-center text-sm text-darkgrey">

@@ -4,21 +4,38 @@ import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Input } from '../../components/Input/Input';
 import { Button } from '../../components/Button/Button';
 import type { LoginPageProps } from './auth.types';
+import { api, ApiError } from '../../services/api';
 
 export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors]     = useState<{ email?: string; password?: string }>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: Event) => {
+  const handleSubmit = async (e: Event) => {
     e.preventDefault();
     const newErrors: typeof errors = {};
     if (!email.includes('@')) newErrors.email = 'Please enter a valid email address.';
     if (password.length < 6) newErrors.password = 'Password must be at least 6 characters.';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    onLogin();
+
+    setIsLoading(true);
+    setApiError(null);
+    try {
+      await api.auth.login(email, password);
+      onLogin();
+    } catch (err) {
+      setApiError(
+        err instanceof ApiError && err.status === 401
+          ? 'Invalid email or password.'
+          : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -69,8 +86,12 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
           </button>
         </div>
 
-        <Button type="submit" variant="primary" fullWidth>
-          Log In
+        {apiError && (
+          <p className="text-sm text-pink text-center font-medium">{apiError}</p>
+        )}
+
+        <Button type="submit" variant="primary" fullWidth disabled={isLoading}>
+          {isLoading ? 'Logging in…' : 'Log In'}
         </Button>
 
         <p className="text-center text-sm text-darkgrey">

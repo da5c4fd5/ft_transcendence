@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'preact/hooks';
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Button } from '../../components/Button/Button';
@@ -6,6 +6,35 @@ import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
 import type { Mood, DaySummary } from './timeline.types';
 import type { MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
+import { api } from '../../services/api';
+import type { Memory as ApiMemory, Contribution as ApiContribution } from '../../services/api';
+
+const VALID_MOODS: Mood[] = ['Joyful', 'Excited', 'Peaceful', 'Nostalgic', 'Sad', 'Anxious'];
+
+function parseMood(mood: string | null | undefined): Mood {
+  if (mood && (VALID_MOODS as string[]).includes(mood)) return mood as Mood;
+  return 'Peaceful';
+}
+
+function apiMemoryToDetails(m: ApiMemory, contributions: ApiContribution[]): MemoryDetails {
+  return {
+    id:      m.id,
+    date:    m.date.split('T')[0],
+    mood:    parseMood(m.mood),
+    content: m.content,
+    media:   m.media?.[0]?.url ?? null,
+    isOpen:  m.isOpen,
+    shareUrl: null,
+    friendContributions: contributions.map(c => ({
+      id:        c.id,
+      guestName: c.guestName ?? 'Anonymous',
+      avatarURL: null,
+      date:      new Date(c.createdAt).toLocaleDateString('en-GB'),
+      content:   c.content,
+      media:     null,
+    })),
+  };
+}
 
 const MOOD_CONFIG: Record<Mood, { cellColor: string }> = {
   Joyful:    { cellColor: 'bg-yellow'  },
@@ -95,19 +124,17 @@ const MOCK_ENTRIES: MemoryDetails[] = [
 ];
 
 
-async function fetchSummaries(year: number): Promise<DaySummary[]> {
-  // TODO: const res = await fetch(`/api/timeline?year=${year}`, { headers: { Authorization: `Bearer ${token}` } }); return res.json();
+// ─── legacy mock helpers (used as fallback if API fails) ─────────────────────
+
+function mockSummaries(year: number): DaySummary[] {
   return MOCK_SUMMARIES.filter(e => e.date.startsWith(String(year)));
 }
 
-async function fetchEntry(date: string): Promise<MemoryDetails | null> {
-  // TODO: const res = await fetch(`/api/entries/${date}`, { headers: { Authorization: `Bearer ${token}` } }); return res.json();
+function mockEntry(date: string): MemoryDetails | null {
   return MOCK_ENTRIES.find(e => e.date === date) ?? null;
 }
 
-
-async function fetchYearsWithEntries(): Promise<number[]> {
-  // TODO: const res = await fetch('/api/timeline/years', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
+function mockYears(): number[] {
   const years = [...new Set(MOCK_SUMMARIES.map(e => parseInt(e.date.split('-')[0])))];
   return years.sort((a, b) => a - b);
 }
@@ -287,30 +314,73 @@ function MoodBreakdown({ summaries }: { summaries: DaySummary[] }) {
 
 export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigateToToday?: () => void; onPreviewGuest?: () => void }) {
   const currentYear = new Date().getFullYear();
-  const [years, setYears] = useState<number[]>([]);
-  const [year, setYear] = useState(currentYear);
-  const [summaries, setSummaries] = useState<DaySummary[]>([]);
+  const [years, setYears]               = useState<number[]>([]);
+  const [year, setYear]                 = useState(currentYear);
+  const [summaries, setSummaries]       = useState<DaySummary[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MemoryDetails | null>(null);
+  // Maps date string (YYYY-MM-DD) → { id, mood }, for calendar rendering + full entry lookup
+  const dateMap = useRef<Map<string, { id: string; mood: Mood }>>(new Map());
 
   useEffect(() => {
     async function init() {
-      const availableYears = await fetchYearsWithEntries();
-      setYears(availableYears);
-      if (availableYears.length === 0) return;
-      setYear(availableYears[availableYears.length - 1]);
+      try {
+        const entries = await api.memories.calendar();
+        // Build date → { id, mood } map and derive available years
+        const map = new Map<string, { id: string; mood: Mood }>();
+        for (const m of entries) {
+          map.set(m.date, { id: m.id, mood: parseMood(m.mood) });
+        }
+        dateMap.current = map;
+
+        const yearSet = new Set<number>();
+        for (const date of map.keys()) {
+          yearSet.add(parseInt(date.split('-')[0]));
+        }
+        const availableYears = [...yearSet].sort((a, b) => a - b);
+        setYears(availableYears.length > 0 ? availableYears : mockYears());
+        if (availableYears.length > 0) {
+          setYear(availableYears[availableYears.length - 1]);
+        }
+      } catch {
+        const fallbackYears = mockYears();
+        setYears(fallbackYears);
+        if (fallbackYears.length > 0) setYear(fallbackYears[fallbackYears.length - 1]);
+      }
     }
     init();
   }, []);
 
   useEffect(() => {
     if (years.length === 0) return;
-    fetchSummaries(year).then(setSummaries);
+    // Build summaries for the selected year from the date map
+    const entries: DaySummary[] = [];
+    for (const [date, { mood }] of dateMap.current) {
+      if (date.startsWith(String(year))) {
+        entries.push({ date, mood });
+      }
+    }
+    if (entries.length > 0) {
+      setSummaries(entries);
+    } else {
+      setSummaries(mockSummaries(year));
+    }
   }, [year, years]);
 
-  const handleDayClick = async (date: string) => {
-    const entry = await fetchEntry(date);
-    if (entry) setSelectedEntry(entry);
-  };
+  const handleDayClick = useCallback(async (date: string) => {
+    const entry = dateMap.current.get(date);
+    if (entry) {
+      try {
+        const [memory, contributions] = await Promise.all([
+          api.memories.get(entry.id),
+          api.contributions.list(entry.id),
+        ]);
+        setSelectedEntry(apiMemoryToDetails(memory, contributions));
+        return;
+      } catch { /* fallback below */ }
+    }
+    const mock = mockEntry(date);
+    if (mock) setSelectedEntry(mock);
+  }, []);
 
   const hasAnyEntry = years.length > 0;
   const yearIndex   = years.indexOf(year);
@@ -371,8 +441,11 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
         <MemoryModal
           entry={selectedEntry}
           onClose={() => setSelectedEntry(null)}
-          onDelete={() => {
-            // TODO: DELETE /api/entries/:date
+          onDelete={async () => {
+            if (selectedEntry.id) {
+              try { await api.memories.delete(selectedEntry.id); } catch { /* ignore */ }
+              dateMap.current.delete(selectedEntry.date);
+            }
             setSummaries(prev => prev.filter(s => s.date !== selectedEntry.date));
             setSelectedEntry(null);
           }}

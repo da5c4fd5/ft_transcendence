@@ -105,4 +105,43 @@ export abstract class UsersService {
     });
     return treeState;
   }
+
+  static async getStats(userId: string) {
+    const memories = await db.memory.findMany({
+      where: { userId },
+      select: { content: true, date: true, isOpen: true },
+      orderBy: { date: "desc" },
+    });
+    const totalCapsuls = memories.length;
+    const shared = memories.filter(m => m.isOpen).length;
+    const wordsWritten = memories.reduce(
+      (acc, m) => acc + m.content.trim().split(/\s+/).filter(Boolean).length,
+      0
+    );
+    const dateSet = new Set(memories.map(m => m.date.toISOString().split("T")[0]));
+    let dayStreak = 0;
+    const cur = new Date();
+    cur.setHours(0, 0, 0, 0);
+    while (dateSet.has(cur.toISOString().split("T")[0])) {
+      dayStreak++;
+      cur.setDate(cur.getDate() - 1);
+    }
+    return { totalCapsuls, shared, dayStreak, wordsWritten };
+  }
+
+  static async search(query: string, excludeUserId: string) {
+    const q = query.trim();
+    if (q.length < 2) return [];
+    return db.user.findMany({
+      where: {
+        id: { not: excludeUserId },
+        OR: [
+          { username:    { contains: q, mode: "insensitive" } },
+          { displayName: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      omit: { passwordHash: true },
+      take: 10,
+    });
+  }
 }

@@ -6,6 +6,7 @@ import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { SavedMemory, PastMemory } from './today.types';
 import type { TreeData } from '../tree/tree.types';
 import type { MemoryStats } from '../memories/memories.types';
+import { api } from '../../services/api';
 
 // Mock data (TODO: supprimer quand le backend est prêt)
 
@@ -22,13 +23,18 @@ const MOCK_STATS: MemoryStats = {
 };
 
 async function fetchTreeData(): Promise<TreeData> {
-  // TODO: const res = await fetch('/api/tree', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_TREE;
+  try {
+    const state = await api.users.getTree() as { lifeForce?: number; isDecreasing?: boolean } | null;
+    return {
+      lifeForce:   state?.lifeForce   ?? MOCK_TREE.lifeForce,
+      isDecreasing: state?.isDecreasing ?? MOCK_TREE.isDecreasing,
+    };
+  } catch { return MOCK_TREE; }
 }
 
 async function fetchStats(): Promise<MemoryStats> {
-  // TODO: const res = await fetch('/api/memories/stats', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_STATS;
+  try { return await api.users.getStats(); }
+  catch { return MOCK_STATS; }
 }
 
 const MAX_CHARS = 180;
@@ -161,7 +167,7 @@ function EntryCard({
 
         <div className="flex-1" />
 
-        <Button variant="primary" size="sm" disabled={!hasContent} onClick={onCapsul}>
+        <Button variant="primary" size="sm" disabled={!hasContent} onClick={onCapsul} type="button">
           Capsul it!
         </Button>
       </div>
@@ -323,7 +329,10 @@ const MOCK_PROMPTS = [
 ];
 
 async function fetchPrompt(): Promise<string> {
-  // TODO: const res = await fetch('/api/prompt', { headers: { Authorization: `Bearer ${token}` } }); return (await res.json()).prompt;
+  try {
+    const prompts = await api.memories.getPrompts();
+    if (prompts.length > 0) return prompts[Math.floor(Math.random() * prompts.length)];
+  } catch { /* fallback to local list */ }
   return MOCK_PROMPTS[Math.floor(Math.random() * MOCK_PROMPTS.length)];
 }
 
@@ -338,21 +347,37 @@ const MOCK_PAST_MEMORY: PastMemory = {
 };
 
 async function fetchPastMemory(): Promise<PastMemory | null> {
-  // TODO: const res = await fetch('/api/memories/capsuls', { headers: { Authorization: `Bearer ${token}` } });
-  //       const capsuls = await res.json();
-  //       return capsuls[0] ?? null;  // on prend le premier (le plus pertinent selon le backend)
-  return MOCK_PAST_MEMORY;
+  try {
+    const { items } = await api.memories.list(1, 50);
+    const today = new Date();
+    const candidates = items.filter(m => {
+      const d = new Date(m.date);
+      return d.getFullYear() < today.getFullYear() ||
+        (d.getFullYear() === today.getFullYear() && d.getMonth() < today.getMonth());
+    });
+    if (candidates.length === 0) return null;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    return {
+      id:      pick.id,
+      date:    pick.date.split('T')[0],
+      content: pick.content,
+      media:   pick.media?.[0]?.url ?? null,
+      mood:    pick.mood ?? 'Peaceful',
+    };
+  } catch { return MOCK_PAST_MEMORY; }
 }
 
 export function TodayPage() {
   const [todayState, setTodayState] = useState<'prompt' | 'saved'>('prompt');
-  const [content, setContent] = useState('');
-  const [media, setMedia] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState<string | null>(null);
-  const [savedMemory, setSavedMemory] = useState<SavedMemory | null>(null);
-  const [pastMemory, setPastMemory] = useState<PastMemory | null>(null);
-  const [treeData, setTreeData] = useState<TreeData | null>(null);
-  const [stats, setStats] = useState<MemoryStats | null>(null);
+  const [content, setContent]       = useState('');
+  const [media, setMedia]           = useState<string | null>(null);
+  const [mediaFile, setMediaFile]   = useState<File | null>(null);
+  const [isSaving, setIsSaving]     = useState(false);
+  const [prompt, setPrompt]         = useState<string | null>(null);
+  const [savedMemory, setSavedMemory]   = useState<SavedMemory | null>(null);
+  const [pastMemory, setPastMemory]     = useState<PastMemory | null>(null);
+  const [treeData, setTreeData]         = useState<TreeData | null>(null);
+  const [stats, setStats]               = useState<MemoryStats | null>(null);
 
   const dateStr = getTodayString();
 
@@ -383,23 +408,39 @@ export function TodayPage() {
   const handleMediaChange = (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    setMediaFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => setMedia(ev.target?.result as string);
     reader.readAsDataURL(file);
-    // TODO: après upload réel : POST /api/memories/:id/media { image: base64 }
   };
 
-  const handleCapsul = () => {
-    if (!content.trim()) return;
-    // TODO: POST /api/memories { content } puis POST /api/memories/:id/media si media
-    setSavedMemory({ content, media });
-    setTodayState('saved');
+  const handleCapsul = async () => {
+    if (!content.trim() || isSaving) return;
+    setIsSaving(true);
+    try {
+      const memory = await api.memories.create({
+        content,
+        date: new Date().toISOString().split('T')[0],
+      });
+      if (mediaFile) {
+        await api.memories.uploadMedia(memory.id, mediaFile);
+      }
+      setSavedMemory({ content, media });
+      setTodayState('saved');
+    } catch {
+      // fall back to local-only display so the user doesn't lose their entry
+      setSavedMemory({ content, media });
+      setTodayState('saved');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEdit = () => {
     if (!savedMemory) return;
     setContent(savedMemory.content);
     setMedia(savedMemory.media);
+    setMediaFile(null);
     setSavedMemory(null);
     setTodayState('prompt');
   };
@@ -407,6 +448,7 @@ export function TodayPage() {
   const handleCancel = () => {
     setContent('');
     setMedia(null);
+    setMediaFile(null);
   };
 
   return (

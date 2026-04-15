@@ -10,6 +10,7 @@ export interface ProfilePageProps {
   user: User;
   onLogout: () => void;
   onNavigateToAdmin: () => void;
+  onUserUpdate?: (user: User) => void;
 }
 
 export interface Friend {

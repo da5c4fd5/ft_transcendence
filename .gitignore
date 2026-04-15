@@ -1,4 +1,5 @@
 .env
 
+node_modules/
 docker/secrets/*
 !docker/secrets/.gitignore

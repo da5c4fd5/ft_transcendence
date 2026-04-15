@@ -88,9 +88,13 @@ export abstract class MemoriesService {
   static async getLifeCalendar(userId: string) {
     const memories = await db.memory.findMany({
       where: { userId },
-      select: { date: true },
+      select: { id: true, date: true, mood: true },
       orderBy: { date: "asc" }
     });
-    return memories.map((m) => m.date);
+    return memories.map(m => ({
+      date: m.date.toISOString().split("T")[0],
+      id:   m.id,
+      mood: m.mood ?? null,
+    }));
   }
 }

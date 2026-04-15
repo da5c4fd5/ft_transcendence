@@ -9,8 +9,9 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
   .use(authPlugin)
   .post(
     "/signup",
-    async ({ body, jwt, cookie: { session } }) => {
-      const response = await Auth.signUp(body, (payload) => jwt.sign(payload));
+    async ({ body, jwt, cookie: { session }, request }) => {
+      const ua = request.headers.get("user-agent") ?? undefined;
+      const response = await Auth.signUp(body, (payload) => jwt.sign(payload), ua);
       session!.value = response.token;
       return response;
     },
@@ -24,8 +25,9 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
   )
   .post(
     "/login",
-    async ({ body, jwt, cookie: { session } }) => {
-      const response = await Auth.logIn(body, (payload) => jwt.sign(payload));
+    async ({ body, jwt, cookie: { session }, request }) => {
+      const ua = request.headers.get("user-agent") ?? undefined;
+      const response = await Auth.logIn(body, (payload) => jwt.sign(payload), ua);
       session!.value = response.token;
       return response;
     },
@@ -51,5 +53,5 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
             200: AuthModel.revokeSessionResponse
           }
         })
-        .get("/sessions", ({ user }) => Auth.listSessions(user!.sub))
+        .get("/sessions", ({ user }) => Auth.listSessions(user!.sub, user!.jti))
   );

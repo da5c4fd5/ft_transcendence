@@ -3,7 +3,7 @@ import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashbo
 import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
-import { MOCK_FRIENDS, MOCK_SESSIONS } from './profile.mocks';
+import { api, ApiError } from '../../services/api';
 
 const cardBase   = 'bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm';
 const inputBase  = 'w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey';
@@ -55,24 +55,60 @@ function AvatarDisplay({ avatarURL, className }: { avatarURL: string | null; cla
   );
 }
 
-function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void }) {
+function ProfileCard({ user, onLogout, onUserUpdate }: {
+  user: UserType;
+  onLogout: () => void;
+  onUserUpdate?: (user: UserType) => void;
+}) {
   const [isEditing, setIsEditing]       = useState(false);
   const [editUsername, setEditUsername] = useState(user.username);
   const [editEmail, setEditEmail]       = useState(user.email);
   const [currentPw, setCurrentPw]       = useState('');
   const [error, setError]               = useState<string | null>(null);
+  const [isSaving, setIsSaving]         = useState(false);
+  const [avatarURL, setAvatarURL]       = useState(user.avatarURL);
+  const fileRef                         = useRef<HTMLInputElement>(null);
 
-  const emailChanged = editEmail !== user.email;
+  const emailChanged    = editEmail !== user.email;
+  const usernameChanged = editUsername !== user.username;
 
-  const handleSave = () => {
+  const handleAvatarChange = async (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    try {
+      const updated = await api.users.uploadAvatar(file);
+      setAvatarURL(updated.avatarUrl ?? null);
+      onUserUpdate?.({ ...user, avatarURL: updated.avatarUrl ?? null });
+    } catch {
+      setError('Failed to upload avatar.');
+    }
+  };
+
+  const handleSave = async () => {
     if (emailChanged && !currentPw.trim()) {
       setError('Please enter your current password to confirm the email change.');
       return;
     }
-    // TODO: PATCH /api/users/me { username, email, currentPassword? }
-    setIsEditing(false);
+    setIsSaving(true);
     setError(null);
-    setCurrentPw('');
+    try {
+      let updatedUser = user;
+      if (usernameChanged) {
+        const u = await api.users.updateMe({ username: editUsername });
+        updatedUser = { ...updatedUser, username: u.username };
+      }
+      if (emailChanged) {
+        const u = await api.users.updateEmail(currentPw, editEmail);
+        updatedUser = { ...updatedUser, email: u.email };
+      }
+      onUserUpdate?.({ ...updatedUser, avatarURL });
+      setIsEditing(false);
+      setCurrentPw('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save changes.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -90,14 +126,16 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
         className={cn(cardBase, 'items-center')}
       >
         <div className="relative w-fit">
-          <AvatarDisplay avatarURL={user.avatarURL} className="w-20 h-20" />
+          <AvatarDisplay avatarURL={avatarURL} className="w-20 h-20" />
           <button
             type="button"
+            onClick={() => fileRef.current?.click()}
             aria-label="Change profile picture"
             className="absolute -bottom-1 -right-1 w-7 h-7 bg-darkgrey rounded-full flex items-center justify-center p-0 leading-none hover:bg-darkgrey/80 transition-colors"
           >
             <Camera size={13} className="text-white shrink-0" />
           </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
         </div>
 
         <div className="w-full flex flex-col gap-3">
@@ -127,9 +165,9 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
                 value={currentPw}
                 onChange={(v) => { setCurrentPw(v); setError(null); }}
               />
-              {error && <p className="text-xs text-pink px-1">{error}</p>}
             </div>
           )}
+          {error && <p className="text-xs text-pink px-1">{error}</p>}
         </div>
 
         <div className="flex gap-3 w-full">
@@ -142,9 +180,10 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
           </button>
           <button
             type="submit"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors"
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-60"
           >
-            <Check size={14} /> Save
+            <Check size={14} /> {isSaving ? 'Saving…' : 'Save'}
           </button>
         </div>
 
@@ -157,7 +196,7 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
 
   return (
     <div className={cn(cardBase, 'items-center p-8 gap-5')}>
-      <AvatarDisplay avatarURL={user.avatarURL} className="w-24 h-24" />
+      <AvatarDisplay avatarURL={avatarURL} className="w-24 h-24" />
 
       <div className="text-center">
         <h2 className="text-xl font-black text-darkgrey">{user.username}</h2>
@@ -179,36 +218,72 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
   );
 }
 
-function FriendsCard({ friends }: { friends: Friend[] }) {
-  const [input, setInput]         = useState('');
-  const [pingedIds, setPingedIds] = useState<Set<string>>(new Set());
+// ─── FriendsCard ─────────────────────────────────────────────────────────────
 
-  // Store timer IDs so we can cancel them if the component unmounts.
+function FriendsCard({ currentUserId }: { currentUserId: string }) {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [input, setInput]     = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
+  const [pingedIds, setPingedIds] = useState<Set<string>>(new Set());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    return () => { timersRef.current.forEach(clearTimeout); };
-  }, []);
+    api.friends.list().then(async (friendships) => {
+      const accepted = friendships.filter(f => f.status === 'ACCEPTED');
+      const users = await Promise.all(
+        accepted.map(f => {
+          const otherId = f.requesterId === currentUserId ? f.recipientId : f.requesterId;
+          return api.users.getUser(otherId).then(u => ({
+            id:        u.id,
+            username:  u.username,
+            avatarURL: u.avatarUrl ?? null,
+            online:    false, // no realtime presence in API
+            _friendId: f.id,
+          }));
+        }),
+      );
+      setFriends(users);
+    }).catch(() => { /* leave empty */ });
 
-  const handleAdd = () => {
-    if (!input.trim()) return;
-    // TODO: GET /api/users/search?q={input} then PUT /api/friends/:id
+    return () => { timersRef.current.forEach(clearTimeout); };
+  }, [currentUserId]);
+
+  const handleAdd = async () => {
+    const q = input.trim();
+    if (q.length < 2) return;
+    setAddError(null);
+    try {
+      const results = await api.users.search(q);
+      if (results.length === 0) { setAddError('User not found'); return; }
+      const target = results[0];
+      await api.friends.add(target.id);
+      setFriends(prev => [...prev, {
+        id:        target.id,
+        username:  target.username,
+        avatarURL: target.avatarUrl ?? null,
+        online:    false,
+        _friendId: '',
+      }]);
+    } catch { setAddError('Could not add user'); }
     setInput('');
+  };
+
+  const handleRemove = async (id: string) => {
+    try {
+      await api.friends.remove(id);
+      setFriends(prev => prev.filter(f => f.id !== id));
+    } catch { /* ignore */ }
   };
 
   const handlePing = async (id: string) => {
     if (pingedIds.has(id)) return;
-    try {
-      // TODO: POST /api/friends/:id/ping
-      setPingedIds(prev => new Set(prev).add(id));
-      const timer = setTimeout(() => {
-        setPingedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-        timersRef.current.delete(id);
-      }, 3000);
-      timersRef.current.set(id, timer);
-    } catch {
-      // TODO: show error toast
-    }
+    // TODO: POST /friends/:id/ping — not yet in backend
+    setPingedIds(prev => new Set(prev).add(id));
+    const timer = setTimeout(() => {
+      setPingedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      timersRef.current.delete(id);
+    }, 3000);
+    timersRef.current.set(id, timer);
   };
 
   return (
@@ -226,9 +301,9 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder="Add friend by username..."
+          placeholder="Add friend by username…"
           value={input}
-          onInput={(e) => setInput((e.target as HTMLInputElement).value)}
+          onInput={(e) => { setAddError(null); setInput((e.target as HTMLInputElement).value); }}
           onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
           className="flex-1 px-4 py-2.5 rounded-full bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey placeholder:text-mediumgrey"
         />
@@ -240,11 +315,12 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
           Add
         </button>
       </div>
+      {addError && <p className="text-xs text-pink font-semibold px-1">{addError}</p>}
 
       <div className="flex flex-col gap-2">
         {friends.map(f => {
           const pinged = pingedIds.has(f.id);
-          const pingLabel = !f.online ? `${f.username} is offline` : pinged ? 'Ping sent!' : 'Remind to create a memory';
+          const pingLabel = pinged ? 'Ping sent!' : 'Remind to create a memory';
           return (
             <div key={f.id} className="flex items-center gap-3 p-3 rounded-2xl border border-black/5">
               {f.avatarURL ? (
@@ -257,29 +333,33 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-darkgrey">{f.username}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className={cn('w-2 h-2 rounded-full shrink-0', f.online ? 'bg-blue' : 'bg-mediumgrey')} />
-                  <span className={cn('text-xs font-medium', f.online ? 'text-blue' : 'text-mediumgrey')}>
-                    {f.online ? 'Online' : 'Offline'}
-                  </span>
+                  <span className="w-2 h-2 rounded-full shrink-0 bg-mediumgrey" />
+                  <span className="text-xs font-medium text-mediumgrey">Offline</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => handlePing(f.id)}
-                disabled={!f.online || pinged}
+                disabled={pinged}
                 aria-label={pingLabel}
                 title={pingLabel}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0',
                   pinged
                     ? 'bg-blue/20 text-blue cursor-default'
-                    : f.online
-                      ? 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey'
-                      : 'bg-verylightorange text-mediumgrey/40 cursor-not-allowed',
+                    : 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey',
                 )}
               >
                 {pinged ? <BellRing size={13} /> : <Bell size={13} />}
                 {pinged ? 'Pinged!' : 'Ping'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemove(f.id)}
+                aria-label={`Remove ${f.username}`}
+                className="text-xs font-semibold text-mediumgrey hover:text-pink transition-colors px-2 py-1"
+              >
+                <X size={13} />
               </button>
             </div>
           );
@@ -289,9 +369,11 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
   );
 }
 
-function getSessionIcon(userAgent: string) {
-  const ua = userAgent.toLowerCase();
-  if (ua.includes('iphone') || ua.includes('android') || ua.includes('mobile'))
+// ─── SessionsCard ─────────────────────────────────────────────────────────────
+
+function getSessionIcon(hint: string) {
+  const ua = hint.toLowerCase();
+  if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone'))
     return <Smartphone size={16} className="text-mediumgrey" />;
   if (ua.includes('safari') || ua.includes('chrome') || ua.includes('firefox'))
     return <Monitor size={16} className="text-mediumgrey" />;
@@ -305,18 +387,22 @@ function formatSessionDate(iso: string): string {
     + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-function SessionsCard({ sessions }: { sessions: Session[] }) {
-  const [list, setList]           = useState<Session[]>(sessions);
+function SessionsCard() {
+  const [list, setList]           = useState<Session[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.auth.getSessions().then(sessions => {
+      setList(sessions);
+    }).catch(() => { /* leave empty */ });
+  }, []);
 
   const handleRevoke = async (id: string) => {
     try {
-      // TODO: DELETE /api/users/me/sessions/:id
+      // Only the current session can be revoked via logout; individual revocation not supported
       setList(prev => prev.filter(s => s.id !== id));
       setConfirmId(null);
-    } catch {
-      // TODO: show error toast
-    }
+    } catch { /* ignore */ }
   };
 
   return (
@@ -371,7 +457,7 @@ function SessionsCard({ sessions }: { sessions: Session[] }) {
                 <button
                   type="button"
                   onClick={() => setConfirmId(s.id)}
-                  aria-label={`Revoke session: ${s.userAgent}`}
+                  aria-label={`Revoke session`}
                   className="text-xs font-semibold text-pink hover:text-pink/70 transition-colors shrink-0 px-2 py-1"
                 >
                   Revoke
@@ -380,25 +466,45 @@ function SessionsCard({ sessions }: { sessions: Session[] }) {
             )}
           </div>
         ))}
+        {list.length === 0 && (
+          <p className="text-sm text-mediumgrey text-center py-4">No active sessions found.</p>
+        )}
       </div>
     </div>
   );
 }
+
+// ─── PasswordCard ─────────────────────────────────────────────────────────────
 
 function PasswordCard() {
   const [isOpen, setIsOpen]       = useState(false);
   const [pwCurrent, setPwCurrent] = useState('');
   const [pwNew, setPwNew]         = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
+  const [error, setError]         = useState<string | null>(null);
+  const [isSaving, setIsSaving]   = useState(false);
+  const [success, setSuccess]     = useState(false);
 
   const handleCancel = () => {
     setIsOpen(false);
     setPwCurrent(''); setPwNew(''); setPwConfirm('');
+    setError(null); setSuccess(false);
   };
 
-  const handleChange = () => {
-    // TODO: PATCH /api/users/me/password { currentPassword, newPassword }
-    handleCancel();
+  const handleChange = async () => {
+    if (pwNew !== pwConfirm) { setError('Passwords do not match.'); return; }
+    if (pwNew.length < 8)    { setError('New password must be at least 8 characters.'); return; }
+    setIsSaving(true);
+    setError(null);
+    try {
+      await api.users.updatePassword(pwCurrent, pwNew);
+      setSuccess(true);
+      setTimeout(handleCancel, 1500);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to change password.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -425,11 +531,14 @@ function PasswordCard() {
           <PasswordInput placeholder="Current password" value={pwCurrent} onChange={setPwCurrent} />
           <PasswordInput placeholder="New password"     value={pwNew}     onChange={setPwNew}     />
           <PasswordInput placeholder="Confirm password" value={pwConfirm} onChange={setPwConfirm} />
+          {error   && <p className="text-xs text-pink px-1">{error}</p>}
+          {success && <p className="text-xs text-blue px-1 font-semibold">Password changed!</p>}
           <button
             type="submit"
-            className="w-full py-3 rounded-full bg-yellow text-darkgrey font-bold text-sm hover:bg-yellow/80 transition-colors mt-1"
+            disabled={isSaving}
+            className="w-full py-3 rounded-full bg-yellow text-darkgrey font-bold text-sm hover:bg-yellow/80 transition-colors mt-1 disabled:opacity-60"
           >
-            Change Password
+            {isSaving ? 'Saving…' : 'Change Password'}
           </button>
         </form>
       )}
@@ -437,11 +546,13 @@ function PasswordCard() {
   );
 }
 
-export function ProfilePage({ user, onLogout, onNavigateToAdmin }: ProfilePageProps) {
+// ─── ProfilePage ──────────────────────────────────────────────────────────────
+
+export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }: ProfilePageProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
 
-      <ProfileCard user={user} onLogout={onLogout} />
+      <ProfileCard user={user} onLogout={onLogout} onUserUpdate={onUserUpdate} />
 
       {user.isAdmin && (
         <button
@@ -459,9 +570,9 @@ export function ProfilePage({ user, onLogout, onNavigateToAdmin }: ProfilePagePr
         </button>
       )}
 
-      <FriendsCard friends={MOCK_FRIENDS} />
+      <FriendsCard currentUserId={user.id} />
       <PasswordCard />
-      <SessionsCard sessions={MOCK_SESSIONS} />
+      <SessionsCard />
 
     </div>
   );
