@@ -60,10 +60,10 @@ const App = () => {
 
   // Resolve /shared/:token from the URL on mount
   useEffect(() => {
-    const match = window.location.pathname.match(/^\/shared\/([A-Za-z0-9_-]+)$/);
+    const match = window.location.pathname.match(/^\/shared\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)$/);
     if (!match) return;
-    const token = match[1];
-    api.shared.get(token)
+    const [, memoryId, shareToken] = match;
+    api.shared.get(memoryId, shareToken)
       .then(r => setUrlSharedMemory(toSharedMemory(r)))
       .catch(() => { /* invalid/revoked link — stay on normal flow */ });
   }, []);

@@ -1,4 +1,5 @@
 import { status } from "elysia";
+import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../db";
 import type { MemoriesModel } from "./model";
 
@@ -46,7 +47,7 @@ export abstract class MemoriesService {
         isOpen: data.isOpen ?? false,
         date,
         mood: data.mood,
-        ...(data.isOpen ? { shareToken: crypto.randomUUID() } : {})
+        ...(data.isOpen ? { shareToken: createId() } : {})
       }
     });
   }
@@ -63,7 +64,7 @@ export abstract class MemoriesService {
     // Generate a share token when opening for the first time
     const shareToken =
       data.isOpen === true && !memory.shareToken
-        ? crypto.randomUUID()
+        ? createId()
         : undefined;
 
     return db.memory.update({
@@ -86,9 +87,9 @@ export abstract class MemoriesService {
     return memory;
   }
 
-  static async findByShareToken(token: string) {
+  static async findByShareToken(memoryId: string, shareToken: string) {
     const memory = await db.memory.findUnique({
-      where: { shareToken: token },
+      where: { id: memoryId },
       include: {
         media: true,
         contributions: {
@@ -98,7 +99,8 @@ export abstract class MemoriesService {
         user: { select: { username: true } }
       }
     });
-    if (!memory) throw status(404, { message: "Memory not found" });
+    if (!memory || memory.shareToken !== shareToken)
+      throw status(404, { message: "Memory not found" });
     if (!memory.isOpen) throw status(403, { message: "This memory is not shared" });
     return memory;
   }

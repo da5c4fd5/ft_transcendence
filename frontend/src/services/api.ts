@@ -432,8 +432,8 @@ export const api = {
   },
 
   shared: {
-    get(token: string): Promise<SharedMemoryResponse> {
-      return request<SharedMemoryResponse>("GET", `/memories/shared/${token}`);
+    get(memoryId: string, shareToken: string): Promise<SharedMemoryResponse> {
+      return request<SharedMemoryResponse>("GET", `/memories/shared/${memoryId}/${shareToken}`);
     },
   },
 };

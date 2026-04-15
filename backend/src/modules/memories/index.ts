@@ -19,13 +19,13 @@ export const memories = new Elysia({
     }
   })
   .get(
-    "/shared/:token",
-    ({ params }) => MemoriesService.findByShareToken(params.token),
+    "/shared/:memoryId/:shareToken",
+    ({ params }) => MemoriesService.findByShareToken(params.memoryId, params.shareToken),
     {
       detail: {
         security: [],
         description:
-          "Return a shared memory by its share token. Public — no authentication required. Returns 403 if the memory is not open."
+          "Return a shared memory by its ID and share token. Public — no authentication required. Returns 404 if not found or token mismatch, 403 if not open."
       }
     }
   )

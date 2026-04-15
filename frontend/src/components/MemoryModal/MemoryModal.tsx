@@ -35,7 +35,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
     try {
       const updated = await api.memories.update(entry.id, { isOpen: true });
       const token = updated.shareToken;
-      const url = token ? `${window.location.origin}/shared/${token}` : null;
+      const url = token ? `${window.location.origin}/shared/${updated.id}/${token}` : null;
       setIsOpen(true);
       setShareUrl(url);
       setShareStep('confirming');
