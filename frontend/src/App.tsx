@@ -1,4 +1,3 @@
-/** @jsxImportSource preact */
 import { useState } from 'preact/hooks';
 import { Navbar } from './components/Navbar/Navbar';
 import type { Page } from './components/Navbar/Navbar.types';
@@ -13,39 +12,22 @@ import { MemoriesPage } from './pages/memories/MemoriesPage';
 import { TreePage } from './pages/tree/TreePage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { AdminPage } from './pages/admin/AdminPage';
-import { GuestPage, MOCK_SHARED_MEMORY } from './pages/guest/GuestPage';
+import { GuestPage } from './pages/guest/GuestPage';
+import { MOCK_SHARED_MEMORY } from './pages/guest/guest.mocks';
+import { MOCK_USER, MOCK_REGULAR_USER } from './pages/profile/profile.mocks';
 
-// TODO: Utilisateurs de test (à remplacer par les données de l'API plus tard)
-const ADMIN_USER = { username: 'Alex Explorer', isAdmin: true };
-const REGULAR_USER = { username: 'Sam Sparks', isAdmin: false };
-
-// ---------------------------------------------------------------------------
-// Utilisateurs de test (à remplacer par les données de l'API plus tard)
-// ---------------------------------------------------------------------------
-const ADMIN_USER = { name: 'Alex Explorer', isAdmin: true };
-const REGULAR_USER = { name: 'Sam Sparks', isAdmin: false };
-
-// ---------------------------------------------------------------------------
-// App — routeur racine
-// ---------------------------------------------------------------------------
-// Architecture simple sans librairie de routing :
-//   - Si non connecté → pages auth (pas de Navbar)
-//   - Si connecté    → app principale avec Navbar
-//
-// Le state "authPage" contrôle quelle page auth est affichée.
-// Le state "isAuthenticated" bascule entre auth et app.
-// ---------------------------------------------------------------------------
+// TODO: replace with real authenticated user from API
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPage, setAuthPage] = useState<AuthPage>('welcome');
 
   const [currentPage, setCurrentPage] = useState<Page>('today');
   const [isAdmin, setIsAdmin] = useState(true);
-  // TODO: supprimer showGuestPreview et showGuestPreviewAnon quand le routing /shared/:token sera implémenté
+  // TODO: remove showGuestPreview / showGuestPreviewAnon once /shared/:token routing is implemented
   const [showGuestPreview, setShowGuestPreview] = useState(false);
   const [showGuestPreviewAnon, setShowGuestPreviewAnon] = useState(false);
 
-  const user = isAdmin ? ADMIN_USER : REGULAR_USER;
+  const user = isAdmin ? MOCK_USER : MOCK_REGULAR_USER;
 
   if (!isAuthenticated) {
     if (authPage === 'welcome') {
@@ -62,12 +44,12 @@ const App = () => {
     }
   }
 
-  // TODO: supprimer ces deux blocs quand le routing /shared/:token sera implémenté
+  // TODO: remove once /shared/:token routing is implemented
   if (showGuestPreview) {
     return (
       <GuestPage
         memory={MOCK_SHARED_MEMORY}
-        currentUser={{ username: user.username, avatarURL: null }}
+        currentUser={{ username: user.username, avatarURL: user.avatarURL }}
         onBack={() => { setShowGuestPreview(false); setCurrentPage('today'); }}
         onNavigateToWelcome={() => { setShowGuestPreview(false); setIsAuthenticated(false); setAuthPage('welcome'); }}
       />

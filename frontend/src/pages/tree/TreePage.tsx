@@ -1,23 +1,12 @@
 import { useState, useEffect } from 'preact/hooks';
 import { Zap, Sparkles, Sprout, ChevronRight, ChevronLeft } from 'lucide-preact';
+import { clsx as cn } from 'clsx';
 import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { TreeData, Achievement } from './tree.types';
 import type { MemoryStats } from '../memories/memories.types';
+import { fetchTreeData, fetchStats, fetchUnlockedAchievements } from './tree.mocks';
 
-// Mock data (TODO: supprimer quand le backend est prêt)
-
-const MOCK_TREE: TreeData = {
-  lifeForce: 0,
-  isDecreasing: false,
-};
-
-const MOCK_STATS: MemoryStats = {
-  totalCapsuls: 0,
-  shared: 0,
-  dayStreak: 0,
-  wordsWritten: 0,
-};
-
+// Static achievement definitions — backend only returns unlocked IDs
 const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: 'first_capsul',       emoji: '🌱', title: 'First Capsul',       description: '1 memory created',           unlocked: false },
   { id: 'week_warrior',       emoji: '🔥', title: 'Week Warrior',       description: '7 day streak',              unlocked: false },
@@ -27,21 +16,6 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: 'consistency_king',   emoji: '💪', title: 'Consistency King',   description: '30 day streak',             unlocked: false },
 ];
 
-async function fetchTreeData(): Promise<TreeData> {
-  // TODO: const res = await fetch('/api/tree', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_TREE;
-}
-
-async function fetchStats(): Promise<MemoryStats> {
-  // TODO: const res = await fetch('/api/memories/stats', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  return MOCK_STATS;
-}
-
-async function fetchUnlockedAchievements(): Promise<string[]> {
-  // TODO: const res = await fetch('/api/achievements', { headers: { Authorization: `Bearer ${token}` } }); return res.json();
-  // Le backend renvoie un tableau d'IDs : ["first_capsul", "week_warrior"]
-  return [];
-}
 
 const DEMO_STAGES: Array<{ health: number; name: string }> = [
   { health:  5, name: 'Stage 1 — Dormant Seed'   },
@@ -134,12 +108,10 @@ function DemoBar({ stageIndex, onPrev, onNext, isDecreasing, onToggleDecreasing 
       <button
         type="button"
         onClick={onToggleDecreasing}
-        className={[
+        className={cn(
           'w-full rounded-2xl px-4 py-2 text-xs font-bold transition-colors',
-          isDecreasing
-            ? 'bg-blue/60 text-darkgrey'
-            : 'bg-white/40 text-mediumgrey hover:bg-white/60',
-        ].join(' ')}
+          isDecreasing ? 'bg-blue/60 text-darkgrey' : 'bg-white/40 text-mediumgrey hover:bg-white/60',
+        )}
       >
         {isDecreasing ? '😢 Decreasing (on)' : '😢 Simulate decreasing'}
       </button>
@@ -163,7 +135,7 @@ export function TreePage() {
       ]);
       setTree(t);
       setStats(s);
-      // Mapper les IDs débloqués sur la liste statique
+      // Merge unlocked IDs from backend onto the static list
       setAchievements(ALL_ACHIEVEMENTS.map(a => ({ ...a, unlocked: unlockedIds.includes(a.id) })));
     }
     load();

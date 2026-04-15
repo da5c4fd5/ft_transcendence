@@ -4,6 +4,7 @@ import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
 import { MOCK_FRIENDS, MOCK_SESSIONS } from './profile.mocks';
+import { formatSessionDateTime } from '../../lib/date';
 
 const cardBase   = 'bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm';
 const inputBase  = 'w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey';
@@ -298,12 +299,7 @@ function getSessionIcon(userAgent: string) {
   return <Globe size={16} className="text-mediumgrey" />;
 }
 
-function formatSessionDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    + ' · '
-    + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
+
 
 function SessionsCard({ sessions }: { sessions: Session[] }) {
   const [list, setList]           = useState<Session[]>(sessions);
@@ -347,7 +343,7 @@ function SessionsCard({ sessions }: { sessions: Session[] }) {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-mediumgrey mt-0.5">{formatSessionDate(s.connectedAt)}</p>
+              <p className="text-xs text-mediumgrey mt-0.5">{formatSessionDateTime(s.connectedAt)}</p>
             </div>
             {!s.isCurrent && (
               confirmId === s.id ? (

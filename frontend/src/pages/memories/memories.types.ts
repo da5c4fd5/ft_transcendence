@@ -1,9 +1,9 @@
 import type { Mood } from '../../components/MemoryModal/MemoryModal.types';
 
-// TODO: Réponse de GET /memories/capsuls -> 3 souvenirs sélectionnés par le backend
+// Response from GET /memories/capsuls — 3 memories selected by the backend
 export interface TimeCapsule {
   id: string;
-  date: string;          // ISO "2025-04-09" -> pour calculer le label côté front
+  date: string;       // ISO "2025-04-09" — label computed client-side
   content: string;
   media: string | null;
   mood: Mood;

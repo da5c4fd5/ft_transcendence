@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
+import { Sparkles, Heart } from 'lucide-preact';
 import type { TreeVisualProps, StageData } from './TreeVisual.types';
 
 function getStageData(health: number): StageData {
@@ -228,23 +229,32 @@ function StageTree({ s, isPetting, isDecreasing }: { s: StageData; isPetting: bo
   );
 }
 
+// ─── Particle data ────────────────────────────────────────────────────────────
+
+/** 6 ambient leaves — each with a unique arcing trajectory */
 const LEAVES = [
-  { anim: 'tree-leaf-l', delay: '0s',    left: '48%', top: '45%' },
-  { anim: 'tree-leaf-r', delay: '1s',    left: '52%', top: '40%' },
-  { anim: 'tree-leaf-l', delay: '2s',    left: '45%', top: '50%' },
-  { anim: 'tree-leaf-r', delay: '3s',    left: '55%', top: '42%' },
+  { anim: 'tree-leaf-1', delay: '0s',    left: '47%', top: '38%' },
+  { anim: 'tree-leaf-2', delay: '1.1s',  left: '54%', top: '34%' },
+  { anim: 'tree-leaf-3', delay: '2.0s',  left: '51%', top: '42%' },
+  { anim: 'tree-leaf-4', delay: '3.2s',  left: '44%', top: '40%' },
+  { anim: 'tree-leaf-5', delay: '0.6s',  left: '56%', top: '36%' },
+  { anim: 'tree-leaf-6', delay: '1.8s',  left: '49%', top: '44%' },
 ];
 
+/** Sparkles at diagonal positions, matching reference layout */
 const SPARKLES = [
-  { delay: '0s',    left: '20%', top: '20%' },
-  { delay: '0.7s',  left: '75%', top: '30%' },
-  { delay: '1.4s',  left: '50%', top: '15%' },
+  { delay: '0s',   left: '18%', top: '20%' },
+  { delay: '0.7s', left: '76%', top: '30%' },
+  { delay: '1.4s', left: '50%', top: '10%' },
 ];
 
+/** 5 hearts — all burst from center, each with a unique x-drift via keyframe */
 const HEARTS = [
-  { delay: '0s',    left: '45%' },
-  { delay: '0.15s', left: '55%' },
-  { delay: '0.3s',  left: '50%' },
+  { anim: 'tree-heart-1', delay: '0s',    left: '50%' },
+  { anim: 'tree-heart-2', delay: '0.12s', left: '50%' },
+  { anim: 'tree-heart-3', delay: '0.06s', left: '50%' },
+  { anim: 'tree-heart-4', delay: '0.20s', left: '50%' },
+  { anim: 'tree-heart-5', delay: '0.28s', left: '50%' },
 ];
 
 const PET_LEAVES = [
@@ -263,11 +273,24 @@ const PET_FRUITS = [
 
 const SIZE_PX = { small: 110, medium: 160, large: 220 };
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface HeartBurst { id: number; x: number; y: number }
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function TreeVisual({ health, size = 'medium', showDetails = false, isDecreasing = false }: TreeVisualProps) {
   const [isPetting,   setIsPetting]   = useState(false);
-  const [showHearts,  setShowHearts]  = useState(false);
+  const [showLeaves,  setShowLeaves]  = useState(false);
+  const [leavesKey,   setLeavesKey]   = useState(0);
   const [showThanks,  setShowThanks]  = useState(false);
-  const [petKey,      setPetKey]      = useState(0);
+  const [petCount,    setPetCount]    = useState(0);
+  const [bursts,      setBursts]      = useState<HeartBurst[]>([]);
+
+  const burstId    = useRef(0);
+  const buttonRef  = useRef<HTMLButtonElement>(null);
+  const leavesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const thanksTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const s      = getStageData(health);
   const svgPx  = SIZE_PX[size];
@@ -275,12 +298,28 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
   const handlePet = () => {
     if (isPetting) return;
     setIsPetting(true);
-    setShowHearts(true);
-    setShowThanks(true);
-    setPetKey(k => k + 1);
+    setPetCount(c => c + 1);
     setTimeout(() => setIsPetting(false), 600);
-    setTimeout(() => setShowHearts(false), 2600);
-    setTimeout(() => setShowThanks(false), 2500);
+
+    // Spawn an independent heart burst at the tree's current screen position.
+    // Each burst lives 4 s and is removed individually — previous bursts are unaffected.
+    const rect = buttonRef.current?.getBoundingClientRect();
+    const x = rect ? rect.left + rect.width  * 0.5 : window.innerWidth  * 0.5;
+    const y = rect ? rect.top  + rect.height * 0.35 : window.innerHeight * 0.5;
+    const id = ++burstId.current;
+    setBursts(prev => [...prev, { id, x, y }]);
+    setTimeout(() => setBursts(prev => prev.filter(b => b.id !== id)), 4000);
+
+    // Leaves / fruits — fall near the tree, reset on each pet is fine
+    setShowLeaves(true);
+    setLeavesKey(k => k + 1);
+    if (leavesTimer.current) clearTimeout(leavesTimer.current);
+    leavesTimer.current = setTimeout(() => setShowLeaves(false), 2800);
+
+    // "Thanks" text — extends on each pet
+    setShowThanks(true);
+    if (thanksTimer.current) clearTimeout(thanksTimer.current);
+    thanksTimer.current = setTimeout(() => setShowThanks(false), 3600);
   };
 
   return (
@@ -288,12 +327,15 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
 
       <div className="relative flex items-center justify-center" style={{ width: svgPx, height: svgPx }}>
 
+        {/* Ambient glow halo */}
         <div
-          className="absolute inset-0 rounded-full blur-3xl opacity-30 pointer-events-none"
+          className="absolute inset-0 rounded-full blur-3xl opacity-30 pointer-events-none transition-colors duration-1000"
           style={{ backgroundColor: s.color }}
         />
 
+        {/* Tree (interactive) */}
         <button
+          ref={buttonRef}
           type="button"
           onClick={handlePet}
           className="relative z-10 w-full h-full cursor-pointer hover:scale-105 transition-transform active:scale-95"
@@ -303,11 +345,12 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
             {/* Ground */}
             <ellipse cx="100" cy="180" rx="45" ry="12" fill="#EAE0D5" />
             <ellipse cx="100" cy="180" rx="35" ry="8"  fill="#D6C5B3" />
-            {/* Tree */}
+            {/* Tree stages */}
             <StageTree s={s} isPetting={isPetting} isDecreasing={isDecreasing} />
           </svg>
         </button>
 
+        {/* Ambient floating leaves (health ≥ 51) */}
         {health >= 51 && LEAVES.map((l, i) => (
           <div
             key={i}
@@ -322,36 +365,24 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
           />
         ))}
 
+        {/* Scintillating sparkles (health ≥ 76) */}
         {health >= 76 && SPARKLES.map((sp, i) => (
           <div
             key={i}
-            className="absolute pointer-events-none text-lg"
+            className="absolute pointer-events-none"
             style={{
               left: sp.left, top: sp.top,
+              color: s.accent,
               animation: `tree-sparkle 2s ease-in-out ${sp.delay} infinite`,
             }}
           >
-            ✨
+            <Sparkles size={18} />
           </div>
         ))}
 
-        {showHearts && (
-          <div key={petKey} className="contents">
-            {HEARTS.map((h, i) => (
-              <div
-                key={i}
-                className="absolute pointer-events-none text-3xl z-20"
-                style={{
-                  left: h.left,
-                  top: '15%',
-                  animation: `tree-heart 1.4s ease-out ${h.delay} forwards`,
-                }}
-              >
-                💗
-              </div>
-            ))}
-
-            {/* Falling leaves (stage 3+) */}
+        {/* Leaves + fruits burst — absolute, near the tree, resets on each pet */}
+        {showLeaves && (
+          <div key={leavesKey} className="contents">
             {s.stage >= 3 && PET_LEAVES.map((l, i) => (
               <div
                 key={`l${i}`}
@@ -364,8 +395,6 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
                 </svg>
               </div>
             ))}
-
-            {/* Falling fruits (stage 7+) */}
             {s.stage >= 7 && PET_FRUITS.map((f, i) => (
               <div
                 key={`f${i}`}
@@ -389,6 +418,29 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
         )}
       </div>
 
+      {/* Hearts — position: fixed so they escape the container and travel to viewport top.
+          Each burst is independent: rapid clicks accumulate bursts instead of resetting them. */}
+      {bursts.map(burst => (
+        <div key={burst.id} className="contents">
+          {HEARTS.map((h, i) => (
+            <div
+              key={i}
+              className="pointer-events-none"
+              style={{
+                position: 'fixed',
+                left: burst.x,
+                top:  burst.y,
+                zIndex: 9999,
+                color: '#FF6B9D',
+                animation: `${h.anim} 3s ease-out ${h.delay} forwards`,
+              }}
+            >
+              <Heart size={22} fill="#FF6B9D" />
+            </div>
+          ))}
+        </div>
+      ))}
+
       {showDetails && (
         <div className="flex flex-col items-center gap-3 w-full max-w-xs">
 
@@ -398,9 +450,14 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
           </div>
 
           {showThanks ? (
-            <span className="text-xs font-semibold text-pink">*happy tree* 💗</span>
+            <span className="text-xs font-semibold text-pink">
+              Petted {petCount} {petCount === 1 ? 'time' : 'times'} 💗
+            </span>
           ) : (
-            <span className="text-xs text-mediumgrey">✨ Click to pet your tree!</span>
+            <span className="text-xs text-mediumgrey flex items-center gap-1">
+              <Sparkles size={12} style={{ color: s.accent }} />
+              Click to pet your tree!
+            </span>
           )}
 
           <div className="w-full bg-white/50 backdrop-blur-sm rounded-2xl px-4 py-4 shadow-sm">

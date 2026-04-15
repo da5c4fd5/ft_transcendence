@@ -4,15 +4,23 @@ import type { User, Friend, Session } from './profile.types';
 
 export const MOCK_USER: User = {
   id:        'u1',
-  username:  'Alex Explorer',
-  email:     'alex.explorer@example.com',
+  username:  'Louis delapierre',
+  email:     'louis.delapierre@example.com',
   avatarURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
   isAdmin:   true,
 };
 
+export const MOCK_REGULAR_USER: User = {
+  id:        'u2',
+  username:  'Sam Pique',
+  email:     'sam.pique@example.com',
+  avatarURL: null,
+  isAdmin:   false,
+};
+
 export const MOCK_FRIENDS: Friend[] = [
-  { id: 'f1', username: 'Sam Sparks',   avatarURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&crop=face', online: true  },
-  { id: 'f2', username: 'Jordan River', avatarURL: null, online: false },
+  { id: 'f1', username: 'Sam Pique',   avatarURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&crop=face', online: true  },
+  { id: 'f2', username: 'Sasha Touille', avatarURL: null, online: false },
 ];
 
 export const MOCK_SESSIONS: Session[] = [

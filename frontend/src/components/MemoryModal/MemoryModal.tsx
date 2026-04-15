@@ -3,6 +3,7 @@ import { X, Users, Lock, Link2, Copy, Heart, Eye } from 'lucide-preact';
 import { Button } from '../Button/Button';
 import { Avatar } from '../Avatar/Avatar';
 import type { Mood, MemoryModalProps } from './MemoryModal.types';
+import { getFormattedDate } from '../../lib/date';
 
 export const MOOD_EMOJI: Record<Mood, string> = {
   Joyful:    '😊',
@@ -12,13 +13,6 @@ export const MOOD_EMOJI: Record<Mood, string> = {
   Sad:       '😢',
   Anxious:   '😰',
 };
-
-function formatFullDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-  }).toUpperCase();
-}
 
 export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: MemoryModalProps) {
   const [isOpen, setIsOpen] = useState(entry.isOpen);
@@ -61,7 +55,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
               </div>
               <div>
                 <p className="text-xs font-bold text-darkgrey tracking-widest leading-tight">
-                  {formatFullDate(entry.date)}
+                  {getFormattedDate(entry.date, { format: 'full' })}
                 </p>
                 <p className="text-xs text-mediumgrey mt-0.5">Mood: {entry.mood}</p>
               </div>

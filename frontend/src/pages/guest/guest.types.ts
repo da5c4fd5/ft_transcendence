@@ -9,9 +9,14 @@ export interface SharedMemory {
   friendContributions: FriendContribution[];
 }
 
+export interface GuestUser {
+  username: string;
+  avatarURL: string | null;
+}
+
 export interface GuestPageProps {
   memory: SharedMemory;
   onBack: () => void;
   onNavigateToWelcome?: () => void;
-  currentUser?: { username: string; avatarURL: string | null };
+  currentUser?: GuestUser;
 }

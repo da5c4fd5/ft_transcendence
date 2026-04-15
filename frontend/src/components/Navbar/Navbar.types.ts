@@ -2,7 +2,7 @@ export type Page = 'today' | 'timeline' | 'memories' | 'tree' | 'profile' | 'adm
 
 export interface NavUser {
   username: string;
-  avatarURL?: string;
+  avatarURL?: string | null;
   isAdmin?: boolean;
 }
 
