@@ -34,7 +34,7 @@ if [ ! -f "${cert_dir}/fullchain.pem" ] || [ ! -f "${cert_dir}/privkey.pem" ]; t
 	touch "${cert_dir}/.selfsigned"
 fi
 
-envsubst '${DOMAIN}' \
+envsubst '${DOMAIN} ${HTTPS_PORT}' \
 		< /etc/nginx/templates/capsul.conf.template \
 	> /etc/nginx/conf.d/default.conf
 
