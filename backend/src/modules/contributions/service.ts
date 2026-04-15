@@ -9,7 +9,7 @@ export abstract class ContributionsService {
     return db.contribution.findMany({
       where: { memoryId },
       orderBy: { createdAt: "asc" },
-      include: { contributor: { omit: { passwordHash: true } } }
+      include: { contributor: { omit: { passwordHash: true, mfaSecret: true, mfaPendingSecret: true } } }
     });
   }
 
@@ -34,6 +34,18 @@ export abstract class ContributionsService {
     });
   }
 
+  static async edit(
+    id: string,
+    requesterId: string,
+    data: ContributionsModel["editBody"]
+  ) {
+    const contribution = await db.contribution.findUnique({ where: { id } });
+    if (!contribution) throw status(404, { message: "Contribution not found" });
+    if (contribution.contributorId !== requesterId)
+      throw status(403, { message: "Forbidden" });
+    return db.contribution.update({ where: { id }, data });
+  }
+
   static async remove(id: string, requesterId: string) {
     const contribution = await db.contribution.findUnique({
       where: { id },
@@ -44,6 +56,6 @@ export abstract class ContributionsService {
     const isContributor = contribution.contributorId === requesterId;
     if (!isOwner && !isContributor) throw status(403, { message: "Forbidden" });
     await db.contribution.delete({ where: { id } });
-    return { message: "Deleted" };
+    return status(204);
   }
 }

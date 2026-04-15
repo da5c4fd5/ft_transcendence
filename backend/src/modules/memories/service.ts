@@ -56,7 +56,7 @@ export abstract class MemoriesService {
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
     await db.memory.delete({ where: { id } });
-    return { message: "Deleted" };
+    return status(204);
   }
 
   static async attachMedia(id: string, userId: string, file: File) {
@@ -96,5 +96,104 @@ export abstract class MemoriesService {
       id:   m.id,
       mood: m.mood ?? null,
     }));
+  }
+
+  static async search(userId: string, query: MemoriesModel["searchQuery"]) {
+    let dateFilter: { gte?: Date; lte?: Date } | undefined;
+
+    if (query.period && !query.after && !query.before) {
+      const now = new Date();
+      const gte = new Date(now);
+      if (query.period === "week") gte.setDate(now.getDate() - 7);
+      else if (query.period === "month") gte.setMonth(now.getMonth() - 1);
+      else gte.setFullYear(now.getFullYear() - 1);
+      dateFilter = { gte };
+    } else if (query.after || query.before) {
+      dateFilter = {
+        gte: query.after ? new Date(query.after) : undefined,
+        lte: query.before ? new Date(query.before) : undefined
+      };
+    }
+
+    return db.memory.findMany({
+      where: {
+        userId,
+        ...(query.mood ? { mood: query.mood } : {}),
+        ...(query.sharedOnly ? { isOpen: true } : {}),
+        ...(dateFilter ? { date: dateFilter } : {})
+      },
+      orderBy: { date: "desc" },
+      take: query.limit ?? 20,
+      include: { media: true }
+    });
+  }
+
+  static async getStats(userId: string) {
+    const [totalCapsuls, shared, memories] = await Promise.all([
+      db.memory.count({ where: { userId } }),
+      db.memory.count({ where: { userId, isOpen: true } }),
+      db.memory.findMany({
+        where: { userId },
+        select: { date: true, content: true },
+        orderBy: { date: "desc" }
+      })
+    ]);
+
+    // Consecutive-day streak counting back from today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const memDates = new Set(
+      memories.map((m) => m.date.toISOString().split("T")[0])
+    );
+    let dayStreak = 0;
+    const cursor = new Date(today);
+    while (memDates.has(cursor.toISOString().split("T")[0])) {
+      dayStreak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    const wordsWritten = memories.reduce(
+      (sum, m) =>
+        sum + m.content.trim().split(/\s+/).filter(Boolean).length,
+      0
+    );
+
+    return { totalCapsuls, shared, dayStreak, wordsWritten };
+  }
+
+  /** Return 3 memories spread across the user's history for the capsule view. */
+  static async getCapsuls(userId: string) {
+    const total = await db.memory.count({ where: { userId } });
+    if (total === 0) return [];
+
+    const include = { media: true } as const;
+    const picks = await Promise.all([
+      db.memory.findFirst({
+        where: { userId },
+        orderBy: { date: "asc" },
+        include
+      }),
+      db.memory.findFirst({
+        where: { userId },
+        orderBy: { date: "desc" },
+        include
+      }),
+      total > 2
+        ? db.memory.findFirst({
+            where: { userId },
+            orderBy: { date: "asc" },
+            skip: Math.floor(total / 2),
+            include
+          })
+        : Promise.resolve(null)
+    ]);
+
+    // Deduplicate and return up to 3
+    const seen = new Set<string>();
+    return picks.filter((m): m is NonNullable<typeof m> => {
+      if (!m || seen.has(m.id)) return false;
+      seen.add(m.id);
+      return true;
+    });
   }
 }

@@ -34,13 +34,17 @@ model User {
   passwordHash         String
   username             String    @unique
   displayName          String?
-  bio                  String?   @db.VarChar(280)
   avatarUrl            String?
   /// JSON blob: { emailDigest, pushEnabled, reminderTime }
   notificationSettings Json      @default("{}")
   /// JSON blob for the gamification tree state
   treeState            Json      @default("{}")
   lastActiveAt         DateTime?
+  isAdmin              Boolean   @default(false)
+  /// Encrypted TOTP secret (AES-256-GCM). Null = MFA not enabled.
+  mfaSecret            String?   @db.Text
+  /// Encrypted TOTP secret during the setup flow. Cleared once verify completes.
+  mfaPendingSecret     String?   @db.Text
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

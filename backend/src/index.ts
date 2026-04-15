@@ -1,12 +1,13 @@
 import cors from "@elysiajs/cors";
 import swagger from "@elysiajs/swagger";
 import { Elysia } from "elysia";
-import { auth } from "./modules/auth";
-import { contributionsController } from "./modules/contributions";
-import { friendsController } from "./modules/friends";
-import { memoriesController } from "./modules/memories";
-import { users } from "./modules/users";
 import { errorHandlerPlugin } from "./plugins/error-handler.plugin";
+import { auth } from "./modules/auth";
+import { users } from "./modules/users";
+import { friends } from "./modules/friends";
+import { memories } from "./modules/memories";
+import { contributions } from "./modules/contributions";
+import { admin } from "./modules/admin";
 
 const hostname = process.env.HOST ?? "0.0.0.0";
 const port = Number(process.env.PORT ?? 4242);
@@ -39,9 +40,10 @@ const app = new Elysia()
   .use(errorHandlerPlugin)
   .use(auth)
   .use(users)
-  .use(friendsController)
-  .use(memoriesController)
-  .use(contributionsController)
+  .use(friends)
+  .use(memories)
+  .use(contributions)
+  .use(admin)
   .get("/", () => ({ status: "ok" }), { detail: { hide: true } })
   .use(
     swagger({

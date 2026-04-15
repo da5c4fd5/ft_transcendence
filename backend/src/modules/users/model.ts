@@ -33,7 +33,32 @@ export const UsersModel = {
   }),
 
   avatarBody: t.Object({ file: t.File({ type: "image/*" }) }),
-  treeBody: t.Any()
+  treeBody: t.Any(),
+
+  // ── MFA ──────────────────────────────────────────────────────────
+  mfaSetupResponse: t.Object({
+    secret: t.String({
+      description: "Base32 TOTP secret — store in the authenticator app."
+    }),
+    qrCode: t.String({
+      description: "data:image/png;base64,… QR-code image for the TOTP URI."
+    })
+  }),
+  mfaVerifyBody: t.Object({
+    code: t.String({
+      minLength: 6,
+      maxLength: 6,
+      description: "6-digit TOTP code from the authenticator app"
+    })
+  }),
+  mfaDisableBody: t.Object({
+    password: t.String({ description: "Current account password" }),
+    code: t.String({
+      minLength: 6,
+      maxLength: 6,
+      description: "Current TOTP code from the authenticator app"
+    })
+  })
 } as const;
 
 export type UsersModel = {
