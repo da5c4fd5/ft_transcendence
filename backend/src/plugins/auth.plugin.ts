@@ -30,11 +30,10 @@ export const authPlugin = new Elysia({ name: "auth-plugin" })
 
     return {
       user: {
-        sub: payload.sub,
+        id: userRecord.id,
         email: userRecord.email,
-        iat: payload.iat ?? 0,
-        exp: payload.exp ?? 0,
-        jti: payload.jti
-      } satisfies AuthModel["tokenPayload"]
+        isAdmin: userRecord.isAdmin,
+        sessionId: session.id
+      } satisfies AuthModel["userPayload"]
     };
   });
