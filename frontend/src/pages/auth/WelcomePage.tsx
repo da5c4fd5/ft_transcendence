@@ -1,7 +1,7 @@
 import { Clock, Sparkles, Sprout, Heart } from 'lucide-preact';
+import { useLocation } from 'wouter';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Button } from '../../components/Button/Button';
-import type { WelcomePageProps } from './auth.types';
 
 function FeatureCard({
   icon,
@@ -25,7 +25,8 @@ function FeatureCard({
   );
 }
 
-export function WelcomePage({ onNavigate }: WelcomePageProps) {
+export function WelcomePage() {
+  const [, navigate] = useLocation();
   return (
     <div className="min-h-screen bg-blue flex flex-col items-center justify-center px-6 py-12 gap-8">
 
@@ -36,10 +37,10 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
       />
 
       <div className="flex items-center gap-3">
-        <Button variant="white" size="md" onClick={() => onNavigate('register')}>
+        <Button variant="white" size="md" onClick={() => navigate('/signup')}>
           Start Your Journey
         </Button>
-        <Button variant="outline" size="md" className="text-white" onClick={() => onNavigate('login')}>
+        <Button variant="outline" size="md" className="text-white" onClick={() => navigate('/login')}>
           Log In
         </Button>
       </div>

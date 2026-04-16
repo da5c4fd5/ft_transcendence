@@ -101,15 +101,26 @@ export abstract class Auth {
     return { token } satisfies AuthModel["signUpResponse"];
   }
 
-  static async listSessions(userId: string) {
-    return db.session.findMany({
+  static async listSessions(userId: string, currentSessionId: string) {
+    const sessions = await db.session.findMany({
       where: { userId },
-      omit: { userId: true }
+      orderBy: { createdAt: 'desc' },
     });
+    return sessions.map(s => ({
+      id: s.id,
+      userAgent: s.userAgent ?? 'Unknown device',
+      connectedAt: s.createdAt.toISOString(),
+      isCurrent: s.id === currentSessionId,
+    }));
   }
 
   static async revokeSession(sessionId: string) {
     await db.session.delete({ where: { id: sessionId } });
     return status(204);
+  }
+
+  static async revokeOtherSession(sessionId: string, userId: string) {
+    await db.session.deleteMany({ where: { id: sessionId, userId } });
+    return new Response(null, { status: 204 });
   }
 }

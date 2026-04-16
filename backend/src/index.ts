@@ -26,7 +26,10 @@ const app = new Elysia()
     cors({
       methods: "GET, PUT, POST, PATCH, DELETE",
       allowedHeaders: ["Authorization", "Content-Type"],
-      origin: "transcen.dence.fr"
+      origin:
+        process.env.PROD === "true"
+          ? "transcen.dence.fr"
+          : ["transcen.dence.fr", "localhost:6767", "127.0.0.1:6767"]
     })
   )
   .onBeforeHandle(({ request, status }) => {

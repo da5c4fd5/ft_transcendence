@@ -6,7 +6,7 @@ import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { SavedMemory, PastMemory } from './today.types';
 import type { TreeData } from '../tree/tree.types';
 import type { MemoryStats } from '../memories/memories.types';
-import { fetchTreeData, fetchStats, fetchPrompt, fetchPastMemory } from './today.mocks';
+import { api } from '../../lib/api';
 import { getRelativeLabel, getFormattedDate } from '../../lib/date';
 
 const MAX_CHARS = 180;
@@ -260,36 +260,87 @@ function TreeSidebar({ tree, stats, saved }: { tree: TreeData | null; stats: Mem
 }
 
 
+type RawMemory = {
+  id: string;
+  date: string;
+  content: string;
+  mood: string | null;
+  media: { url: string }[];
+};
+
+function pickPrompt(prompts: string[]): string {
+  return prompts[Math.floor(Math.random() * prompts.length)] ?? '';
+}
+
+function toPastMemory(raw: RawMemory): PastMemory {
+  return {
+    id: raw.id,
+    date: raw.date.slice(0, 10),
+    content: raw.content,
+    media: raw.media[0]?.url ?? null,
+    mood: (raw.mood ?? 'Neutral') as PastMemory['mood'],
+  };
+}
+
 export function TodayPage() {
   const [todayState, setTodayState] = useState<'prompt' | 'saved'>('prompt');
   const [content, setContent] = useState('');
   const [media, setMedia] = useState<string | null>(null);
+  const [prompts, setPrompts] = useState<string[]>([]);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [savedMemory, setSavedMemory] = useState<SavedMemory | null>(null);
-  const [pastMemory, setPastMemory] = useState<PastMemory | null>(null);
+  const [capsuls, setCapsuls] = useState<PastMemory[]>([]);
+  const [capsulIdx, setCapsulIdx] = useState(0);
   const [treeData, setTreeData] = useState<TreeData | null>(null);
   const [stats, setStats] = useState<MemoryStats | null>(null);
+  const [saving, setSaving] = useState(false);
+  const mediaFileRef = useRef<File | null>(null);
 
   const dateStr = getTodayString();
 
   useEffect(() => {
     async function load() {
-      const [p, t, s] = await Promise.all([fetchPrompt(), fetchTreeData(), fetchStats()]);
-      setPrompt(p);
-      setTreeData(t);
-      setStats(s);
+      const [ps, tree, st, todayMem] = await Promise.all([
+        api.get<string[]>('/memories/prompts').catch(() => [] as string[]),
+        api.get<TreeData | null>('/users/me/tree').catch(() => null),
+        api.get<MemoryStats>('/memories/stats').catch(() => null),
+        api.get<RawMemory>('/memories/today').catch((err: { status?: number }) =>
+          err?.status === 404 ? null : null
+        ),
+      ]);
+
+      setPrompts(ps);
+      setPrompt(pickPrompt(ps));
+      setTreeData(tree ?? { lifeForce: 0, isDecreasing: false });
+      setStats(st);
+
+      if (todayMem) {
+        setSavedMemory({ content: todayMem.content, media: todayMem.media[0]?.url ?? null });
+        setTodayState('saved');
+        loadCapsuls();
+      }
     }
     load();
   }, []);
 
+  const loadCapsuls = async () => {
+    const raw = await api.get<RawMemory[]>('/memories/capsuls').catch(() => [] as RawMemory[]);
+    const mapped = raw.map(toPastMemory);
+    // shuffle so it feels fresh each time
+    mapped.sort(() => Math.random() - 0.5);
+    setCapsuls(mapped);
+    setCapsulIdx(0);
+  };
+
   useEffect(() => {
-    if (todayState !== 'saved') return;
-    fetchPastMemory().then(setPastMemory);
+    if (todayState === 'saved' && capsuls.length === 0) loadCapsuls();
   }, [todayState]);
 
-  const handleRefreshPastMemory = async () => {
-    const m = await fetchPastMemory();
-    setPastMemory(m);
+  const pastMemory = capsuls[capsulIdx] ?? null;
+
+  const handleRefreshPastMemory = () => {
+    if (capsuls.length < 2) return;
+    setCapsulIdx(prev => (prev + 1) % capsuls.length);
   };
 
   const handleContentChange = (v: string) => {
@@ -299,23 +350,43 @@ export function TodayPage() {
   const handleMediaChange = (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    mediaFileRef.current = file;
     const reader = new FileReader();
     reader.onload = (ev) => setMedia(ev.target?.result as string);
     reader.readAsDataURL(file);
-    // TODO: après upload réel : POST /api/memories/:id/media { image: base64 }
   };
 
-  const handleCapsul = () => {
-    if (!content.trim()) return;
-    // TODO: POST /api/memories { content } puis POST /api/memories/:id/media si media
-    setSavedMemory({ content, media });
-    setTodayState('saved');
+  const handleCapsul = async () => {
+    if (!content.trim() || saving) return;
+    setSaving(true);
+    try {
+      const mem = await api.post<RawMemory>('/memories', { content });
+      if (mediaFileRef.current) {
+        const form = new FormData();
+        form.append('file', mediaFileRef.current);
+        await api.upload(`/memories/${mem.id}/media`, form).catch(() => {});
+      }
+      const [newTree, newStats] = await Promise.all([
+        api.get<TreeData | null>('/users/me/tree').catch(() => null),
+        api.get<MemoryStats>('/memories/stats').catch(() => null),
+      ]);
+      setTreeData(newTree ?? { lifeForce: 0, isDecreasing: false });
+      setStats(newStats);
+      setSavedMemory({ content, media });
+      setTodayState('saved');
+      loadCapsuls();
+    } catch {
+      // noop — e.g. 409 if memory already exists
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEdit = () => {
     if (!savedMemory) return;
     setContent(savedMemory.content);
     setMedia(savedMemory.media);
+    mediaFileRef.current = null;
     setSavedMemory(null);
     setTodayState('prompt');
   };
@@ -323,6 +394,18 @@ export function TodayPage() {
   const handleCancel = () => {
     setContent('');
     setMedia(null);
+    mediaFileRef.current = null;
+  };
+
+  const handleRefreshPrompt = async () => {
+    setPrompt(null);
+    if (prompts.length > 1) {
+      setPrompt(pickPrompt(prompts));
+    } else {
+      const ps = await api.get<string[]>('/memories/prompts').catch(() => prompts);
+      setPrompts(ps);
+      setPrompt(pickPrompt(ps));
+    }
   };
 
   return (
@@ -334,11 +417,7 @@ export function TodayPage() {
               <PromptCard
                 prompt={prompt ?? ''}
                 isLoading={prompt === null}
-                onRefresh={async () => {
-                  setPrompt(null);
-                  const p = await fetchPrompt();
-                  setPrompt(p);
-                }}
+                onRefresh={handleRefreshPrompt}
               />
               <EntryCard
                 dateStr={dateStr}
@@ -346,7 +425,7 @@ export function TodayPage() {
                 media={media}
                 onContentChange={handleContentChange}
                 onMediaChange={handleMediaChange}
-                onMediaRemove={() => setMedia(null)}
+                onMediaRemove={() => { setMedia(null); mediaFileRef.current = null; }}
                 onCapsul={handleCapsul}
                 onCancel={handleCancel}
               />

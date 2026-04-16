@@ -2,6 +2,7 @@ export type { FriendContribution } from '../../components/MemoryModal/MemoryModa
 import type { FriendContribution } from '../../components/MemoryModal/MemoryModal.types';
 
 export interface SharedMemory {
+  id?: string;
   date: string;
   content: string;
   media: string | null;
@@ -11,7 +12,7 @@ export interface SharedMemory {
 
 export interface GuestUser {
   username: string;
-  avatarURL: string | null;
+  avatarUrl: string | null;
 }
 
 export interface GuestPageProps {

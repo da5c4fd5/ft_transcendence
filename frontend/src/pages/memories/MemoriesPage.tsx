@@ -4,8 +4,47 @@ import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
 import type { Mood, MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
 import type { TimeCapsule, MemoryCard, MoodFilter, PeriodFilter, CollectionFilters } from './memories.types';
-import { fetchTimeCapsules, fetchCollection, fetchMemoryDetails } from './memories.mocks';
+import { api } from '../../lib/api';
 import { getRelativeLabel, getFormattedDate } from '../../lib/date';
+
+type RawMemory = {
+  id: string;
+  date: string;
+  content: string;
+  mood: string | null;
+  isOpen: boolean;
+  shareToken: string | null;
+  media: { url: string }[];
+};
+
+type RawContribution = {
+  id: string;
+  content: string;
+  guestName: string | null;
+  createdAt: string;
+  contributor: { username: string; avatarUrl: string | null } | null;
+};
+
+function rawToCard(m: RawMemory): MemoryCard {
+  return {
+    id: m.id,
+    date: m.date.slice(0, 10),
+    content: m.content,
+    media: m.media[0]?.url ?? null,
+    mood: (m.mood ?? 'Peaceful') as Mood,
+    isOpen: m.isOpen,
+  };
+}
+
+function rawToCapsule(m: RawMemory): TimeCapsule {
+  return {
+    id: m.id,
+    date: m.date.slice(0, 10),
+    content: m.content,
+    media: m.media[0]?.url ?? null,
+    mood: (m.mood ?? 'Peaceful') as Mood,
+  };
+}
 
 const PAGE_SIZE = 9;
 const ALL_MOODS: Mood[] = ['Joyful', 'Excited', 'Peaceful', 'Nostalgic', 'Sad', 'Anxious'];
@@ -199,46 +238,43 @@ function FilterPanel({ filters, onChange }: {
 
 export function MemoriesPage() {
   const [capsules, setCapsules]           = useState<TimeCapsule[]>([]);
-  const [allCards, setAllCards]           = useState<MemoryCard[]>([]);
+  const [fetchedCards, setFetchedCards]   = useState<MemoryCard[]>([]);
   const [isLoading, setIsLoading]         = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [filters, setFilters]             = useState<CollectionFilters>(EMPTY_FILTERS);
   const [showFilters, setShowFilters]     = useState(false);
   const [visibleCount, setVisibleCount]   = useState(PAGE_SIZE);
   const [selectedEntry, setSelectedEntry] = useState<MemoryDetails | null>(null);
+  const [selectedId, setSelectedId]       = useState<string | null>(null);
   const sentinelRef                       = useRef<HTMLDivElement>(null);
 
+  const loadCollection = async (f: CollectionFilters) => {
+    setIsLoading(true);
+    const params: Record<string, string | number | boolean | undefined | null> = { limit: 100 };
+    if (f.mood !== 'all') params.mood = f.mood;
+    if (f.period !== 'all' && f.period !== 'custom') params.period = f.period;
+    if (f.period === 'custom' && f.dateFrom) params.after = f.dateFrom;
+    if (f.period === 'custom' && f.dateTo)   params.before = f.dateTo;
+    if (f.sharedOnly) params.sharedOnly = true;
+    try {
+      const raw = await api.get<RawMemory[]>('/memories/search', params);
+      setFetchedCards(raw.map(rawToCard));
+    } catch { /* ignore */ } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchTimeCapsules().then(setCapsules);
-    fetchCollection().then(cards => { setAllCards(cards); setIsLoading(false); });
+    api.get<RawMemory[]>('/memories/capsuls').then(r => setCapsules(r.map(rawToCapsule))).catch(() => {});
+    loadCollection(EMPTY_FILTERS);
   }, []);
 
-  // TODO: déplacer le filtrage côté serveur (GET /api/memories/search?...) quand le backend est prêt
+  // Text search applied client-side (no backend search param)
   const filtered = useMemo(() => {
-    const now = new Date();
-    return allCards.filter(card => {
-      if (filters.search.trim() && !card.content.toLowerCase().includes(filters.search.toLowerCase())) return false;
-      if (filters.mood !== 'all' && card.mood !== filters.mood) return false;
-      if (filters.sharedOnly && !card.isOpen) return false;
-      if (filters.period !== 'all') {
-        const cardDate = new Date(card.date);
-        if (filters.period === 'week') {
-          const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
-          if (cardDate < weekAgo) return false;
-        } else if (filters.period === 'month') {
-          const monthAgo = new Date(now); monthAgo.setMonth(now.getMonth() - 1);
-          if (cardDate < monthAgo) return false;
-        } else if (filters.period === 'year') {
-          const yearAgo = new Date(now); yearAgo.setFullYear(now.getFullYear() - 1);
-          if (cardDate < yearAgo) return false;
-        } else if (filters.period === 'custom') {
-          if (filters.dateFrom && new Date(card.date) < new Date(filters.dateFrom)) return false;
-          if (filters.dateTo   && new Date(card.date) > new Date(filters.dateTo))   return false;
-        }
-      }
-      return true;
-    });
-  }, [allCards, filters]);
+    if (!filters.search.trim()) return fetchedCards;
+    const q = filters.search.toLowerCase();
+    return fetchedCards.filter(c => c.content.toLowerCase().includes(q));
+  }, [fetchedCards, filters.search]);
 
   const visibleItems = filtered.slice(0, visibleCount);
   const hasMore      = visibleCount < filtered.length;
@@ -250,10 +286,10 @@ export function MemoriesPage() {
       ([entry]) => {
         if (entry.isIntersecting && !isLoadingMore) {
           setIsLoadingMore(true);
-          sleep(800).then(() => {
+          setTimeout(() => {
             setVisibleCount(n => n + PAGE_SIZE);
             setIsLoadingMore(false);
-          });
+          }, 300);
         }
       },
       { rootMargin: '200px' },
@@ -263,13 +299,53 @@ export function MemoriesPage() {
   }, [hasMore, isLoadingMore]);
 
   const handleFiltersChange = (f: CollectionFilters) => {
+    const serverChanged =
+      f.mood !== filters.mood || f.period !== filters.period ||
+      f.sharedOnly !== filters.sharedOnly ||
+      f.dateFrom !== filters.dateFrom || f.dateTo !== filters.dateTo;
     setFilters(f);
     setVisibleCount(PAGE_SIZE);
+    if (serverChanged) loadCollection(f);
   };
 
   const handleCardClick = async (id: string) => {
-    const details = await fetchMemoryDetails(id);
-    setSelectedEntry(details);
+    try {
+      const [mem, contribs] = await Promise.all([
+        api.get<RawMemory>(`/memories/${id}`),
+        api.get<RawContribution[]>(`/memories/${id}/contributions`),
+      ]);
+      setSelectedId(id);
+      setSelectedEntry({
+        date:    mem.date.slice(0, 10),
+        mood:    (mem.mood ?? 'Peaceful') as Mood,
+        content: mem.content,
+        media:   mem.media[0]?.url ?? null,
+        isOpen:  mem.isOpen,
+        shareUrl: mem.shareToken
+          ? `https://transcen.dence.fr/shared/${mem.id}/${mem.shareToken}`
+          : null,
+        friendContributions: contribs.map(c => ({
+          id:        c.id,
+          guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
+          avatarURL: c.contributor?.avatarUrl ?? null,
+          date:      c.createdAt.slice(0, 10),
+          content:   c.content,
+          media:     null,
+        })),
+      });
+    } catch { /* ignore */ }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedId) return;
+    try {
+      await api.delete(`/memories/${selectedId}`);
+      setFetchedCards(prev => prev.filter(c => c.id !== selectedId));
+      setCapsules(prev => prev.filter(c => c.id !== selectedId));
+    } catch { /* ignore */ } finally {
+      setSelectedEntry(null);
+      setSelectedId(null);
+    }
   };
 
   const hasActiveFilters =
@@ -412,18 +488,11 @@ export function MemoriesPage() {
       {selectedEntry && (
         <MemoryModal
           entry={selectedEntry}
-          onClose={() => setSelectedEntry(null)}
-          onDelete={() => {
-            // TODO: DELETE /api/memories/:id
-            setSelectedEntry(null);
-          }}
+          onClose={() => { setSelectedEntry(null); setSelectedId(null); }}
+          onDelete={handleDelete}
         />
       )}
 
     </div>
   );
 }
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-

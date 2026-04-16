@@ -4,7 +4,7 @@ import { clsx as cn } from 'clsx';
 import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { TreeData, Achievement } from './tree.types';
 import type { MemoryStats } from '../memories/memories.types';
-import { fetchTreeData, fetchStats, fetchUnlockedAchievements } from './tree.mocks';
+import { api } from '../../lib/api';
 
 // Static achievement definitions — backend only returns unlocked IDs
 const ALL_ACHIEVEMENTS: Achievement[] = [
@@ -129,13 +129,12 @@ export function TreePage() {
   useEffect(() => {
     async function load() {
       const [t, s, unlockedIds] = await Promise.all([
-        fetchTreeData(),
-        fetchStats(),
-        fetchUnlockedAchievements(),
+        api.get<TreeData | null>('/users/me/tree').catch(() => null),
+        api.get<MemoryStats>('/memories/stats').catch(() => null),
+        api.get<string[]>('/users/me/achievements').catch(() => [] as string[]),
       ]);
-      setTree(t);
+      setTree(t ?? { lifeForce: 0, isDecreasing: false });
       setStats(s);
-      // Merge unlocked IDs from backend onto the static list
       setAchievements(ALL_ACHIEVEMENTS.map(a => ({ ...a, unlocked: unlockedIds.includes(a.id) })));
     }
     load();

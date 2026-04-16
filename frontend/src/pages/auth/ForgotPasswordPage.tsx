@@ -1,9 +1,11 @@
 import { useState } from 'preact/hooks';
 import { Mail, Check, ArrowLeft } from 'lucide-preact';
+import { useLocation } from 'wouter';
+import { api } from '../../lib/api';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Input } from '../../components/Input/Input';
 import { Button } from '../../components/Button/Button';
-import type { ForgotPasswordPageProps, ForgotStep } from './auth.types';
+import type { ForgotStep } from './auth.types';
 
 const SUBTITLES: Record<ForgotStep, string> = {
   'form':        'Reset your password',
@@ -11,16 +13,23 @@ const SUBTITLES: Record<ForgotStep, string> = {
   'success':     'All set!',
 };
 
-export function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
+export function ForgotPasswordPage() {
+  const [, navigate] = useLocation();
 
-  const [step, setStep] = useState<ForgotStep>('form');
-  const [email, setEmail] = useState('');
+  const [step, setStep]         = useState<ForgotStep>('form');
+  const [email, setEmail]       = useState('');
   const [emailError, setEmailError] = useState('');
+  const [loading, setLoading]   = useState(false);
 
-  const handleSendLink = (e: Event) => {
+  const handleSendLink = async (e: Event) => {
     e.preventDefault();
     if (!email.includes('@')) { setEmailError('Please enter a valid email address.'); return; }
     setEmailError('');
+    setLoading(true);
+    try {
+      await api.post('/auth/forgot-password', { email });
+    } catch { /* always show check-email — backend never reveals if email exists */ }
+    setLoading(false);
     setStep('check-email');
   };
 
@@ -48,8 +57,8 @@ export function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
               error={emailError}
               icon={<Mail size={16} />}
             />
-            <Button type="submit" variant="primary" fullWidth>
-              Send Reset Link
+            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+              {loading ? 'Sending…' : 'Send Reset Link'}
             </Button>
           </form>
         )}
@@ -91,7 +100,7 @@ export function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
                 Your password has been successfully reset. You can now log in with your new password.
               </p>
             </div>
-            <Button variant="primary" fullWidth onClick={() => onNavigate('login')}>
+            <Button variant="primary" fullWidth onClick={() => navigate('/login')}>
               Go to Login
             </Button>
           </div>
@@ -99,7 +108,7 @@ export function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
       </div>
 
       <button
-        onClick={() => onNavigate('login')}
+        onClick={() => navigate('/login')}
         className="flex items-center gap-1.5 text-white/70 text-sm hover:text-white transition-colors"
       >
         <ArrowLeft size={16} />

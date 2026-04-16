@@ -43,7 +43,9 @@ type AchievementStats = {
 
 export abstract class UsersService {
   static async findById(id: string) {
-    return db.user.findUniqueOrThrow({ where: { id }, omit: USER_OMIT });
+    const user = await db.user.findUniqueOrThrow({ where: { id } });
+    const { passwordHash, mfaSecret, mfaPendingSecret, ...rest } = user;
+    return { ...rest, hasMfa: !!mfaSecret };
   }
 
   static async findByUsername(username: string) {

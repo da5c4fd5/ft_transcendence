@@ -4,6 +4,7 @@ import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Avatar } from '../../components/Avatar/Avatar';
 import { Button } from '../../components/Button/Button';
 import type { FriendContribution, SharedMemory, GuestPageProps } from './guest.types';
+import { api } from '../../lib/api';
 import { getTodayDateStr } from '../../lib/date';
 
 
@@ -111,11 +112,11 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
     reader.readAsDataURL(file);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!contributionContent.trim()) return;
-    const id = String(Date.now());
+    const tempId = String(Date.now());
     const newContrib: FriendContribution = {
-      id,
+      id: tempId,
       guestName,
       avatarURL: guestAvatarURL,
       date: getTodayDateStr(),
@@ -123,11 +124,16 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
       media: contributionMedia,
     };
     setContributions(prev => [...prev, newContrib]);
-    setMySessionIds(prev => new Set(prev).add(id));
+    setMySessionIds(prev => new Set(prev).add(tempId));
     setContributionContent('');
     setContributionMedia(null);
     setSent(true);
-    // TODO: POST /api/memories/:id/contributions { guestName, avatarURL, content, media }
+    if (memory.id) {
+      api.post(`/memories/${memory.id}/contributions`, {
+        content: newContrib.content,
+        ...(isLoggedIn ? {} : { guestName }),
+      }).catch(() => {});
+    }
   };
 
   const handleEditStart = (contrib: FriendContribution) => {
@@ -141,8 +147,10 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
     setContributions(prev => prev.map(c =>
       c.id === editingId ? { ...c, content: editContent.trim(), media: editMedia } : c
     ));
+    if (memory.id) {
+      api.patch(`/memories/${memory.id}/contributions/${editingId}`, { content: editContent.trim() }).catch(() => {});
+    }
     setEditingId(null);
-    // TODO: PATCH /api/memories/:id/contributions/:contribution_id { content, media }
   };
 
   const handleEditCancel = () => setEditingId(null);
@@ -326,7 +334,7 @@ export function GuestPage({ memory, onBack, onNavigateToWelcome, currentUser }: 
   const isLoggedIn = !!currentUser;
   const [step, setStep] = useState<'join' | 'memory'>(isLoggedIn ? 'memory' : 'join');
   const [guestName, setGuestName]         = useState(currentUser?.username ?? '');
-  const [guestAvatarURL, setGuestAvatarURL] = useState<string | null>(currentUser?.avatarURL ?? null);
+  const [guestAvatarURL, setGuestAvatarURL] = useState<string | null>(currentUser?.avatarUrl ?? null);
 
   const handleJoin = (username: string, avatarURL: string | null) => {
     setGuestName(username);

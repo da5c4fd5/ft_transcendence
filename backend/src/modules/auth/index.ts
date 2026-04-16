@@ -99,4 +99,12 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
             description: "List all active sessions for the current user."
           }
         })
+        .delete(
+          "/sessions/:id",
+          ({ user, params }) => Auth.revokeOtherSession(params.id, user!.id),
+          {
+            response: { 204: t.Any(), 401: t.Any() },
+            detail: { description: "Revoke a specific session (cannot revoke your current session — use POST /auth/logout for that)." }
+          }
+        )
   );

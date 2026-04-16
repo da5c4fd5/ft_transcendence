@@ -6,8 +6,12 @@ import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
 import type { Mood, DaySummary } from './timeline.types';
 import type { MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
-import { fetchSummaries, fetchEntry, fetchYearsWithEntries } from './timeline.mocks';
+import { api } from '../../lib/api';
 import { getFormattedDate, getTodayDateStr } from '../../lib/date';
+
+type RawCalendarDay = { date: string; id: string; mood: string | null };
+type RawMemory = { id: string; date: string; content: string; mood: string | null; isOpen: boolean; shareToken: string | null; media: { url: string }[] };
+type RawContribution = { id: string; content: string; guestName: string | null; createdAt: string; contributor: { username: string; avatarUrl: string | null } | null };
 
 const MOOD_CONFIG: Record<Mood, { cellColor: string }> = {
   Joyful:    { cellColor: 'bg-yellow'  },
@@ -228,27 +232,53 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
   const currentYear = new Date().getFullYear();
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState(currentYear);
+  const [allRaw, setAllRaw] = useState<RawCalendarDay[]>([]);
   const [summaries, setSummaries] = useState<DaySummary[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MemoryDetails | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function init() {
-      const availableYears = await fetchYearsWithEntries();
-      setYears(availableYears);
-      if (availableYears.length === 0) return;
-      setYear(availableYears[availableYears.length - 1]);
-    }
-    init();
+    api.get<RawCalendarDay[]>('/memories/calendar').then(raw => {
+      setAllRaw(raw);
+      const ys = [...new Set(raw.map(d => parseInt(d.date.slice(0, 4))))].sort((a, b) => a - b);
+      setYears(ys);
+      if (ys.length > 0) setYear(ys[ys.length - 1]);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (years.length === 0) return;
-    fetchSummaries(year).then(setSummaries);
-  }, [year, years]);
+    const forYear = allRaw.filter(d => d.date.startsWith(String(year)));
+    setSummaries(forYear.map(d => ({ date: d.date, mood: (d.mood ?? 'Peaceful') as Mood })));
+  }, [year, allRaw]);
 
   const handleDayClick = async (date: string) => {
-    const entry = await fetchEntry(date);
-    if (entry) setSelectedEntry(entry);
+    const raw = allRaw.find(d => d.date === date);
+    if (!raw) return;
+    try {
+      const [mem, contribs] = await Promise.all([
+        api.get<RawMemory>(`/memories/${raw.id}`),
+        api.get<RawContribution[]>(`/memories/${raw.id}/contributions`),
+      ]);
+      setSelectedId(raw.id);
+      setSelectedEntry({
+        date:    mem.date.slice(0, 10),
+        mood:    (mem.mood ?? 'Peaceful') as Mood,
+        content: mem.content,
+        media:   mem.media[0]?.url ?? null,
+        isOpen:  mem.isOpen,
+        shareUrl: mem.shareToken
+          ? `https://transcen.dence.fr/shared/${mem.id}/${mem.shareToken}`
+          : null,
+        friendContributions: contribs.map(c => ({
+          id:        c.id,
+          guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
+          avatarURL: c.contributor?.avatarUrl ?? null,
+          date:      c.createdAt.slice(0, 10),
+          content:   c.content,
+          media:     null,
+        })),
+      });
+    } catch { /* ignore */ }
   };
 
   const hasAnyEntry = years.length > 0;
@@ -309,11 +339,16 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
       {selectedEntry && (
         <MemoryModal
           entry={selectedEntry}
-          onClose={() => setSelectedEntry(null)}
-          onDelete={() => {
-            // TODO: DELETE /api/entries/:date
-            setSummaries(prev => prev.filter(s => s.date !== selectedEntry.date));
-            setSelectedEntry(null);
+          onClose={() => { setSelectedEntry(null); setSelectedId(null); }}
+          onDelete={async () => {
+            if (!selectedId) return;
+            try {
+              await api.delete(`/memories/${selectedId}`);
+              setAllRaw(prev => prev.filter(d => d.id !== selectedId));
+            } catch { /* ignore */ } finally {
+              setSelectedEntry(null);
+              setSelectedId(null);
+            }
           }}
           onPreviewGuest={() => { setSelectedEntry(null); onPreviewGuest?.(); }}
         />

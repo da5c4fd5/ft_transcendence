@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
-import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff } from 'lucide-preact';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Copy, CheckCheck } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
-import { MOCK_FRIENDS, MOCK_SESSIONS } from './profile.mocks';
 import { formatSessionDateTime } from '../../lib/date';
+import { api } from '../../lib/api';
+import type { ApiError } from '../../lib/api';
 
 const cardBase   = 'bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm';
 const inputBase  = 'w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey';
@@ -39,11 +40,11 @@ function PasswordInput({ placeholder, value, onChange }: {
   );
 }
 
-function AvatarDisplay({ avatarURL, className }: { avatarURL: string | null; className: string }) {
-  if (avatarURL) {
+function AvatarDisplay({ avatarUrl, className }: { avatarUrl: string | null; className: string }) {
+  if (avatarUrl) {
     return (
       <img
-        src={avatarURL}
+        src={avatarUrl}
         alt="Profile picture"
         className={cn('rounded-full object-cover', className)}
       />
@@ -56,24 +57,59 @@ function AvatarDisplay({ avatarURL, className }: { avatarURL: string | null; cla
   );
 }
 
-function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void }) {
+function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogout: () => void; onUserUpdate: (u: UserType) => void }) {
   const [isEditing, setIsEditing]       = useState(false);
   const [editUsername, setEditUsername] = useState(user.username);
   const [editEmail, setEditEmail]       = useState(user.email);
   const [currentPw, setCurrentPw]       = useState('');
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile]     = useState<File | null>(null);
   const [error, setError]               = useState<string | null>(null);
+  const [saving, setSaving]             = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const emailChanged = editEmail !== user.email;
+  const emailChanged    = editEmail !== user.email;
+  const usernameChanged = editUsername !== user.username;
 
-  const handleSave = () => {
+  const handleAvatarChange = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setAvatarPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
     if (emailChanged && !currentPw.trim()) {
       setError('Please enter your current password to confirm the email change.');
       return;
     }
-    // TODO: PATCH /api/users/me { username, email, currentPassword? }
-    setIsEditing(false);
+    setSaving(true);
     setError(null);
-    setCurrentPw('');
+    try {
+      if (usernameChanged) {
+        await api.patch('/users/me', { username: editUsername });
+      }
+      if (emailChanged) {
+        await api.patch('/users/me/email', { email: editEmail, password: currentPw });
+      }
+      if (avatarFile) {
+        const form = new FormData();
+        form.append('file', avatarFile);
+        await api.upload('/users/me/avatar', form);
+      }
+      const updated = await api.get<UserType>('/users/me');
+      onUserUpdate(updated);
+      setIsEditing(false);
+      setAvatarPreview(null);
+      setAvatarFile(null);
+      setCurrentPw('');
+    } catch (err) {
+      setError((err as ApiError).message ?? 'Failed to save changes.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -81,6 +117,8 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
     setEditUsername(user.username);
     setEditEmail(user.email);
     setCurrentPw('');
+    setAvatarPreview(null);
+    setAvatarFile(null);
     setError(null);
   };
 
@@ -91,14 +129,16 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
         className={cn(cardBase, 'items-center')}
       >
         <div className="relative w-fit">
-          <AvatarDisplay avatarURL={user.avatarURL} className="w-20 h-20" />
+          <AvatarDisplay avatarUrl={avatarPreview ?? user.avatarUrl} className="w-20 h-20" />
           <button
             type="button"
             aria-label="Change profile picture"
+            onClick={() => fileRef.current?.click()}
             className="absolute -bottom-1 -right-1 w-7 h-7 bg-darkgrey rounded-full flex items-center justify-center p-0 leading-none hover:bg-darkgrey/80 transition-colors"
           >
             <Camera size={13} className="text-white shrink-0" />
           </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
         </div>
 
         <div className="w-full flex flex-col gap-3">
@@ -128,24 +168,27 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
                 value={currentPw}
                 onChange={(v) => { setCurrentPw(v); setError(null); }}
               />
-              {error && <p className="text-xs text-pink px-1">{error}</p>}
             </div>
           )}
+
+          {error && <p className="text-xs text-pink px-1">{error}</p>}
         </div>
 
         <div className="flex gap-3 w-full">
           <button
             type="button"
             onClick={handleCancel}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors"
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors disabled:opacity-50"
           >
             <X size={14} /> Cancel
           </button>
           <button
             type="submit"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors"
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
           >
-            <Check size={14} /> Save
+            <Check size={14} /> {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
 
@@ -158,7 +201,7 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
 
   return (
     <div className={cn(cardBase, 'items-center p-8 gap-5')}>
-      <AvatarDisplay avatarURL={user.avatarURL} className="w-24 h-24" />
+      <AvatarDisplay avatarUrl={user.avatarUrl} className="w-24 h-24" />
 
       <div className="text-center">
         <h2 className="text-xl font-black text-darkgrey">{user.username}</h2>
@@ -180,36 +223,59 @@ function ProfileCard({ user, onLogout }: { user: UserType; onLogout: () => void 
   );
 }
 
-function FriendsCard({ friends }: { friends: Friend[] }) {
+type RawFriendUser = { id: string; username: string; avatarUrl: string | null };
+type RawFriend = { id: string; requesterId: string; recipientId: string; requester: RawFriendUser; recipient: RawFriendUser };
+
+function FriendsCard({ userId }: { userId: string }) {
+  const [friends, setFriends]     = useState<Friend[]>([]);
   const [input, setInput]         = useState('');
+  const [addError, setAddError]   = useState<string | null>(null);
+  const [adding, setAdding]       = useState(false);
   const [pingedIds, setPingedIds] = useState<Set<string>>(new Set());
 
-  // Store timer IDs so we can cancel them if the component unmounts.
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
+    api.get<RawFriend[]>('/friends').then(raw => {
+      setFriends(raw.map(f => {
+        const other = f.requesterId === userId ? f.recipient : f.requester;
+        return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: false };
+      }));
+    }).catch(() => {});
     return () => { timersRef.current.forEach(clearTimeout); };
-  }, []);
+  }, [userId]);
 
-  const handleAdd = () => {
-    if (!input.trim()) return;
-    // TODO: GET /api/users/search?q={input} then PUT /api/friends/:id
-    setInput('');
+  const handleAdd = async () => {
+    const q = input.trim();
+    if (!q) return;
+    setAddError(null);
+    setAdding(true);
+    try {
+      const results = await api.get<RawFriendUser[]>('/users/search', { q });
+      if (!results.length) { setAddError('No user found with that username.'); return; }
+      await api.put(`/friends/${results[0].id}`);
+      // Refresh list
+      const raw = await api.get<RawFriend[]>('/friends');
+      setFriends(raw.map(f => {
+        const other = f.requesterId === userId ? f.recipient : f.requester;
+        return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: false };
+      }));
+      setInput('');
+    } catch (err) {
+      setAddError((err as ApiError).message ?? 'Failed to add friend.');
+    } finally {
+      setAdding(false);
+    }
   };
 
   const handlePing = async (id: string) => {
     if (pingedIds.has(id)) return;
-    try {
-      // TODO: POST /api/friends/:id/ping
-      setPingedIds(prev => new Set(prev).add(id));
-      const timer = setTimeout(() => {
-        setPingedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-        timersRef.current.delete(id);
-      }, 3000);
-      timersRef.current.set(id, timer);
-    } catch {
-      // TODO: show error toast
-    }
+    setPingedIds(prev => new Set(prev).add(id));
+    const timer = setTimeout(() => {
+      setPingedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      timersRef.current.delete(id);
+    }, 3000);
+    timersRef.current.set(id, timer);
   };
 
   return (
@@ -224,22 +290,26 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
         </span>
       </div>
 
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Add friend by username..."
-          value={input}
-          onInput={(e) => setInput((e.target as HTMLInputElement).value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
-          className="flex-1 px-4 py-2.5 rounded-full bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey placeholder:text-mediumgrey"
-        />
-        <button
-          type="button"
-          onClick={handleAdd}
-          className="px-5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors"
-        >
-          Add
-        </button>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Add friend by username..."
+            value={input}
+            onInput={(e) => { setInput((e.target as HTMLInputElement).value); setAddError(null); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+            className="flex-1 px-4 py-2.5 rounded-full bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey placeholder:text-mediumgrey"
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={adding || !input.trim()}
+            className="px-5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
+          >
+            {adding ? '…' : 'Add'}
+          </button>
+        </div>
+        {addError && <p className="text-xs text-pink px-2">{addError}</p>}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -248,8 +318,8 @@ function FriendsCard({ friends }: { friends: Friend[] }) {
           const pingLabel = !f.online ? `${f.username} is offline` : pinged ? 'Ping sent!' : 'Remind to create a memory';
           return (
             <div key={f.id} className="flex items-center gap-3 p-3 rounded-2xl border border-black/5">
-              {f.avatarURL ? (
-                <img src={f.avatarURL} alt={f.username} className={avatarBase} />
+              {f.avatarUrl ? (
+                <img src={f.avatarUrl} alt={f.username} className={avatarBase} />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-yellow/60 flex items-center justify-center shrink-0">
                   <User size={18} className="text-darkgrey" />
@@ -299,19 +369,21 @@ function getSessionIcon(userAgent: string) {
   return <Globe size={16} className="text-mediumgrey" />;
 }
 
-
-
-function SessionsCard({ sessions }: { sessions: Session[] }) {
-  const [list, setList]           = useState<Session[]>(sessions);
+function SessionsCard() {
+  const [list, setList]           = useState<Session[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<Session[]>('/auth/sessions').then(setList).catch(() => {});
+  }, []);
 
   const handleRevoke = async (id: string) => {
     try {
-      // TODO: DELETE /api/users/me/sessions/:id
+      await api.delete(`/auth/sessions/${id}`);
       setList(prev => prev.filter(s => s.id !== id));
       setConfirmId(null);
     } catch {
-      // TODO: show error toast
+      // ignore
     }
   };
 
@@ -386,15 +458,36 @@ function PasswordCard() {
   const [pwCurrent, setPwCurrent] = useState('');
   const [pwNew, setPwNew]         = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
+  const [error, setError]         = useState<string | null>(null);
+  const [success, setSuccess]     = useState(false);
+  const [saving, setSaving]       = useState(false);
 
   const handleCancel = () => {
     setIsOpen(false);
     setPwCurrent(''); setPwNew(''); setPwConfirm('');
+    setError(null); setSuccess(false);
   };
 
-  const handleChange = () => {
-    // TODO: PATCH /api/users/me/password { currentPassword, newPassword }
-    handleCancel();
+  const handleChange = async () => {
+    if (pwNew !== pwConfirm) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (pwNew.length < 8) {
+      setError('New password must be at least 8 characters.');
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await api.patch('/users/me/password', { currentPassword: pwCurrent, newPassword: pwNew });
+      setSuccess(true);
+      setPwCurrent(''); setPwNew(''); setPwConfirm('');
+    } catch (err) {
+      setError((err as ApiError).message ?? 'Failed to change password.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -406,7 +499,7 @@ function PasswordCard() {
         </div>
         <button
           type="button"
-          onClick={isOpen ? handleCancel : () => setIsOpen(true)}
+          onClick={isOpen ? handleCancel : () => { setIsOpen(true); setSuccess(false); }}
           className={ghostBtn}
         >
           {isOpen ? <><X size={12} /> Cancel</> : <><Pencil size={12} /> Change Password</>}
@@ -418,14 +511,19 @@ function PasswordCard() {
           onSubmit={(e) => { e.preventDefault(); handleChange(); }}
           className="flex flex-col gap-3"
         >
-          <PasswordInput placeholder="Current password" value={pwCurrent} onChange={setPwCurrent} />
-          <PasswordInput placeholder="New password"     value={pwNew}     onChange={setPwNew}     />
-          <PasswordInput placeholder="Confirm password" value={pwConfirm} onChange={setPwConfirm} />
+          {success && (
+            <p className="text-sm text-blue text-center py-1 font-semibold">Password updated successfully!</p>
+          )}
+          <PasswordInput placeholder="Current password" value={pwCurrent} onChange={(v) => { setPwCurrent(v); setError(null); }} />
+          <PasswordInput placeholder="New password"     value={pwNew}     onChange={(v) => { setPwNew(v); setError(null); }} />
+          <PasswordInput placeholder="Confirm password" value={pwConfirm} onChange={(v) => { setPwConfirm(v); setError(null); }} />
+          {error && <p className="text-xs text-pink px-1">{error}</p>}
           <button
             type="submit"
-            className="w-full py-3 rounded-full bg-yellow text-darkgrey font-bold text-sm hover:bg-yellow/80 transition-colors mt-1"
+            disabled={saving || !pwCurrent || !pwNew || !pwConfirm}
+            className="w-full py-3 rounded-full bg-yellow text-darkgrey font-bold text-sm hover:bg-yellow/80 transition-colors mt-1 disabled:opacity-50"
           >
-            Change Password
+            {saving ? 'Saving…' : 'Change Password'}
           </button>
         </form>
       )}
@@ -433,11 +531,224 @@ function PasswordCard() {
   );
 }
 
-export function ProfilePage({ user, onLogout, onNavigateToAdmin }: ProfilePageProps) {
+type MfaStatus = 'idle' | 'loading-setup' | 'setup' | 'verifying' | 'active' | 'disabling' | 'loading-disable';
+
+function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
+  const [status, setStatus]         = useState<MfaStatus>(initialHasMfa ? 'active' : 'idle');
+  const [qrCode, setQrCode]         = useState<string | null>(null);
+  const [secret, setSecret]         = useState<string | null>(null);
+  const [totpCode, setTotpCode]     = useState('');
+  const [password, setPassword]     = useState('');
+  const [disableCode, setDisableCode] = useState('');
+  const [error, setError]           = useState<string | null>(null);
+  const [copied, setCopied]         = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleStartSetup = async () => {
+    setError(null);
+    setStatus('loading-setup');
+    try {
+      const res = await api.post<{ secret: string; qrCode: string }>('/users/me/mfa');
+      setQrCode(res.qrCode);
+      setSecret(res.secret);
+      setTotpCode('');
+      setStatus('setup');
+    } catch (err) {
+      setError((err as ApiError).message ?? 'Failed to start MFA setup.');
+      setStatus('idle');
+    }
+  };
+
+  const handleVerify = async (e: Event) => {
+    e.preventDefault();
+    if (totpCode.length < 6) { setError('Enter the 6-digit code from your app.'); return; }
+    setError(null);
+    setStatus('verifying');
+    try {
+      await api.post('/users/me/mfa/verify', { code: totpCode });
+      setStatus('active');
+      setQrCode(null); setSecret(null); setTotpCode('');
+    } catch (err) {
+      const apiErr = err as ApiError;
+      setError(apiErr.status === 422 ? 'Invalid code — try again.' : (apiErr.message ?? 'Verification failed.'));
+      setStatus('setup');
+    }
+  };
+
+  const handleDisable = async (e: Event) => {
+    e.preventDefault();
+    if (!password.trim()) { setError('Please enter your password.'); return; }
+    if (disableCode.length < 6) { setError('Enter the 6-digit code from your app.'); return; }
+    setError(null);
+    setStatus('loading-disable');
+    try {
+      await api.delete('/users/me/mfa', { password, code: disableCode });
+      setStatus('idle');
+      setPassword(''); setDisableCode('');
+    } catch (err) {
+      const apiErr = err as ApiError;
+      setError(apiErr.status === 401 ? 'Wrong password.' : apiErr.status === 422 ? 'Invalid code.' : (apiErr.message ?? 'Failed to disable MFA.'));
+      setStatus('disabling');
+    }
+  };
+
+  const handleCopy = useCallback(() => {
+    if (!secret) return;
+    navigator.clipboard.writeText(secret);
+    setCopied(true);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 2000);
+  }, [secret]);
+
+  const totpInput = (value: string, onChange: (v: string) => void, placeholder = '000000') => (
+    <input
+      type="text"
+      inputMode="numeric"
+      maxLength={6}
+      placeholder={placeholder}
+      value={value}
+      onInput={(e) => { setError(null); onChange((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6)); }}
+      className={cn(inputBase, 'tracking-[0.4em] text-center font-mono placeholder:tracking-normal placeholder:text-mediumgrey')}
+    />
+  );
+
+  return (
+    <div className={cardBase}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield size={18} className={cn(status === 'active' ? 'text-blue' : 'text-pink')} />
+          <h2 className="text-lg font-black text-darkgrey">Two-Factor Authentication</h2>
+        </div>
+        {status === 'active' && (
+          <span className="flex items-center gap-1 text-[10px] font-bold text-blue bg-blue/10 rounded-full px-2.5 py-1">
+            <ShieldCheck size={11} /> ENABLED
+          </span>
+        )}
+      </div>
+
+      {/* ─── Idle: MFA disabled ─── */}
+      {(status === 'idle' || status === 'loading-setup') && (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-mediumgrey leading-relaxed">
+            Add an extra layer of security. Once enabled, you'll need a code from your authenticator app each time you log in.
+          </p>
+          {error && <p className="text-xs text-pink">{error}</p>}
+          <button
+            type="button"
+            onClick={handleStartSetup}
+            disabled={status === 'loading-setup'}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue/10 text-pink text-sm font-bold hover:bg-blue/20 transition-colors w-fit disabled:opacity-50"
+          >
+            <Shield size={14} />
+            {status === 'loading-setup' ? 'Loading…' : 'Enable 2FA'}
+          </button>
+        </div>
+      )}
+
+      {/* ─── Setup: scan QR + enter code ─── */}
+      {(status === 'setup' || status === 'verifying') && qrCode && (
+        <form onSubmit={handleVerify} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-bold text-darkgrey">1. Scan with your authenticator app</p>
+            <div className="flex justify-center">
+              <img src={qrCode} alt="MFA QR Code" className="w-36 h-36 rounded-2xl border border-black/5" />
+            </div>
+          </div>
+
+          {secret && (
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-semibold text-mediumgrey">Or enter the secret manually:</p>
+              <div className="flex items-center gap-2 bg-verylightorange rounded-2xl px-3 py-2">
+                <code className="flex-1 text-xs font-mono text-darkgrey break-all">{secret}</code>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  aria-label="Copy secret"
+                  className="text-mediumgrey hover:text-darkgrey transition-colors shrink-0"
+                >
+                  {copied ? <CheckCheck size={14} className="text-blue" /> : <Copy size={14} />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-bold text-darkgrey">2. Enter the 6-digit code</p>
+            {totpInput(totpCode, setTotpCode)}
+          </div>
+
+          {error && <p className="text-xs text-pink">{error}</p>}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => { setStatus('idle'); setQrCode(null); setSecret(null); setTotpCode(''); setError(null); }}
+              className="flex-1 py-2.5 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={status === 'verifying'}
+              className="flex-1 py-2.5 rounded-full bg-blue text-white text-sm font-bold hover:bg-blue/80 transition-colors disabled:opacity-50"
+            >
+              {status === 'verifying' ? 'Verifying…' : 'Enable 2FA'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ─── Active: MFA enabled ─── */}
+      {status === 'active' && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 bg-blue/5 rounded-2xl px-4 py-3">
+            <ShieldCheck size={15} className="text-blue shrink-0" />
+            <p className="text-sm text-blue font-medium">Your account is protected with 2FA.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setStatus('disabling'); setError(null); }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-pink/30 text-pink text-sm font-semibold hover:bg-verylightpink/30 transition-colors w-fit"
+          >
+            <ShieldOff size={14} /> Disable 2FA
+          </button>
+        </div>
+      )}
+
+      {/* ─── Disabling: confirm with password + TOTP ─── */}
+      {(status === 'disabling' || status === 'loading-disable') && (
+        <form onSubmit={handleDisable} className="flex flex-col gap-3">
+          <p className="text-sm text-mediumgrey">To disable 2FA, confirm your identity:</p>
+          <PasswordInput placeholder="Current password" value={password} onChange={(v) => { setPassword(v); setError(null); }} />
+          {totpInput(disableCode, setDisableCode, 'Authenticator code')}
+          {error && <p className="text-xs text-pink">{error}</p>}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => { setStatus('active'); setPassword(''); setDisableCode(''); setError(null); }}
+              className="flex-1 py-2.5 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={status === 'loading-disable'}
+              className="flex-1 py-2.5 rounded-full bg-pink text-white text-sm font-bold hover:bg-pink/80 transition-colors disabled:opacity-50"
+            >
+              {status === 'loading-disable' ? 'Disabling…' : 'Disable 2FA'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }: ProfilePageProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
 
-      <ProfileCard user={user} onLogout={onLogout} />
+      <ProfileCard user={user} onLogout={onLogout} onUserUpdate={onUserUpdate} />
 
       {user.isAdmin && (
         <button
@@ -455,9 +766,10 @@ export function ProfilePage({ user, onLogout, onNavigateToAdmin }: ProfilePagePr
         </button>
       )}
 
-      <FriendsCard friends={MOCK_FRIENDS} />
+      <FriendsCard userId={user.id} />
       <PasswordCard />
-      <SessionsCard sessions={MOCK_SESSIONS} />
+      <MfaCard initialHasMfa={user.hasMfa ?? false} />
+      <SessionsCard />
 
     </div>
   );

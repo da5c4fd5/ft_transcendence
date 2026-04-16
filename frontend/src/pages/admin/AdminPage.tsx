@@ -1,16 +1,21 @@
-import { useState, useMemo } from 'preact/hooks';
+import { useState, useMemo, useEffect } from 'preact/hooks';
 import { Users, Sparkles, ShieldCheck, Trash2, Search, ChevronDown, TriangleAlert } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../../components/Avatar/Avatar';
 import type { AdminUser, AdminStats, AdminPageProps } from './admin.types';
-import { MOCK_STATS, MOCK_USERS } from './admin.mocks';
+import { api } from '../../lib/api';
 
-async function deleteUser(_id: string): Promise<void> {
-  // TODO: await fetch(`/api/admin/users/${_id}`, { method: 'DELETE' });
-}
+type RawAdminStats = { userCount: number; memoryCount: number; sessionCount: number };
+type RawAdminUser  = { id: string; username: string; email: string; avatarUrl: string | null; isAdmin: boolean; createdAt: string; updatedAt: string };
 
-async function updateUserRole(_id: string, _isAdmin: boolean): Promise<void> {
-  // TODO: await fetch(`/api/admin/users/${_id}`, { method: 'PATCH', body: JSON.stringify({ isAdmin: _isAdmin }) });
+function rawToAdminUser(u: RawAdminUser): AdminUser {
+  const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return {
+    id: u.id, username: u.username, email: u.email,
+    avatarURL: u.avatarUrl, isAdmin: u.isAdmin,
+    joinedDate: fmt(u.createdAt), lastActive: fmt(u.updatedAt),
+    memoriesCount: 0, friendsCount: 0,
+  };
 }
 
 const modalOverlay = 'fixed inset-0 z-50 flex items-center justify-center px-4';
@@ -141,16 +146,21 @@ function RoleBadge({ isAdmin, onClick }: { isAdmin: boolean; onClick?: () => voi
 }
 
 export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGuestAnon }: AdminPageProps) {
-  const [stats]           = useState<AdminStats>(MOCK_STATS);
-  const [users, setUsers] = useState<AdminUser[]>(MOCK_USERS);
+  const [stats, setStats]   = useState<AdminStats>({ totalUsers: 0, totalMemories: 0, totalAdmins: 0 });
+  const [users, setUsers]   = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [roleConfirmId, setRoleConfirmId]     = useState<string | null>(null);
   const [showDevTools, setShowDevTools]       = useState(false);
 
-  // TODO: replace with real API calls in useEffect
-  // void fetchStats;
-  // void fetchUsers;
+  useEffect(() => {
+    api.get<RawAdminStats>('/admin/stats').then(s => setStats({
+      totalUsers: s.userCount, totalMemories: s.memoryCount, totalAdmins: 0,
+    })).catch(() => {});
+    api.get<{ items: RawAdminUser[]; total: number }>('/admin/users', { page: 1, limit: 100 })
+      .then(r => setUsers(r.items.map(rawToAdminUser)))
+      .catch(() => {});
+  }, []);
 
   const totalAdmins = useMemo(() => users.filter(u => u.isAdmin).length, [users]);
 
@@ -163,17 +173,22 @@ export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGues
   );
 
   const handleDeleteConfirm = async (id: string) => {
-    await deleteUser(id);
-    setUsers(prev => prev.filter(u => u.id !== id));
-    setDeleteConfirmId(null);
+    try {
+      await api.delete(`/admin/users/${id}`);
+      setUsers(prev => prev.filter(u => u.id !== id));
+    } catch { /* ignore */ } finally {
+      setDeleteConfirmId(null);
+    }
   };
 
   const handleToggleRole = async (id: string) => {
     const user = users.find(u => u.id === id);
     if (!user) return;
     const newIsAdmin = !user.isAdmin;
-    await updateUserRole(id, newIsAdmin);
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, isAdmin: newIsAdmin } : u));
+    try {
+      await api.patch(`/admin/users/${id}`, { isAdmin: newIsAdmin });
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, isAdmin: newIsAdmin } : u));
+    } catch { /* ignore */ }
   };
 
   return (
