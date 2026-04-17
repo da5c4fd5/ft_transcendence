@@ -20,5 +20,4 @@ export interface AdminPageProps {
   currentUserId: string;
   isAdmin: boolean;
   onToggleAdmin?: () => void;
-  onPreviewGuestAnon: () => void;
 }

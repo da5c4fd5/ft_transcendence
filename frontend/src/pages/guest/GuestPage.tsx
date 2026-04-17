@@ -147,7 +147,7 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
     setContributions(prev => prev.map(c =>
       c.id === editingId ? { ...c, content: editContent.trim(), media: editMedia } : c
     ));
-    if (memory.id) {
+    if (isLoggedIn && memory.id) {
       api.patch(`/memories/${memory.id}/contributions/${editingId}`, { content: editContent.trim() }).catch(() => {});
     }
     setEditingId(null);

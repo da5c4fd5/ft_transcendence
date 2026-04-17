@@ -1,9 +1,10 @@
 import { useState } from 'preact/hooks';
-import { X, Users, Lock, Link2, Copy, Heart, Eye } from 'lucide-preact';
+import { X, Users, Lock, Link2, Copy, Heart } from 'lucide-preact';
 import { Button } from '../Button/Button';
 import { Avatar } from '../Avatar/Avatar';
 import type { Mood, MemoryModalProps } from './MemoryModal.types';
 import { getFormattedDate } from '../../lib/date';
+import { api } from '../../lib/api';
 
 export const MOOD_EMOJI: Record<Mood, string> = {
   Joyful:    '😊',
@@ -14,27 +15,35 @@ export const MOOD_EMOJI: Record<Mood, string> = {
   Anxious:   '😰',
 };
 
-export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: MemoryModalProps) {
-  const [isOpen, setIsOpen] = useState(entry.isOpen);
-  const shareUrl = entry.shareUrl ?? `https://capsul.app/shared/${entry.date}`; // TODO: remplacer avec l'URL fournie par le backend
+export function MemoryModal({ entry, onClose, onDelete }: MemoryModalProps) {
+  const [isOpen, setIsOpen]     = useState(entry.isOpen);
+  const [shareUrl, setShareUrl] = useState<string | null>(entry.shareUrl);
   const [shareStep, setShareStep] = useState<'idle' | 'confirming'>('idle');
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied]     = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const moodEmoji = MOOD_EMOJI[entry.mood];
 
-  const handleShare = () => {
-    setIsOpen(true);
-    setShareStep('confirming');
-    // TODO: POST /api/memories/:id/share
+  const handleShare = async () => {
+    try {
+      const updated = await api.patch<{ shareToken: string }>(`/memories/${entry.id}`, { isOpen: true });
+      const url = `${window.location.origin}/memories/${entry.id}/${updated.shareToken}`;
+      setShareUrl(url);
+      setIsOpen(true);
+      setShareStep('confirming');
+    } catch { /* ignore */ }
   };
 
-  const handleMakePrivate = () => {
-    setIsOpen(false);
-    // TODO: PATCH /api/memories/:id { isOpen: false }
+  const handleMakePrivate = async () => {
+    try {
+      await api.patch(`/memories/${entry.id}`, { isOpen: false });
+      setIsOpen(false);
+      setShareUrl(null);
+    } catch { /* ignore */ }
   };
 
   const handleCopy = async () => {
+    if (!shareUrl) return;
     await navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -164,17 +173,7 @@ export function MemoryModal({ entry, onClose, onDelete, onPreviewGuest }: Memory
                       }
                     </button>
                   </div>
-                  {/* TODO: supprimer ce bouton, lien temporaire pour guest preview */}
-                  {onPreviewGuest && (
-                    <button
-                      type="button"
-                      onClick={onPreviewGuest}
-                      className="flex items-center justify-center gap-1.5 text-xs text-mediumgrey hover:text-darkgrey transition-colors py-1"
-                    >
-                      <Eye size={12} />
-                      Preview guest view
-                    </button>
-                  )}
+
                 </div>
               )}
             </div>

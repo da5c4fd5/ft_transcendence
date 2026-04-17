@@ -8,12 +8,12 @@ import { api } from '../../lib/api';
 
 // Static achievement definitions — backend only returns unlocked IDs
 const ALL_ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_capsul',       emoji: '🌱', title: 'First Capsul',       description: '1 memory created',           unlocked: false },
-  { id: 'week_warrior',       emoji: '🔥', title: 'Week Warrior',       description: '7 day streak',              unlocked: false },
-  { id: 'wordsmith',          emoji: '✍️', title: 'Wordsmith',          description: '500 words written',         unlocked: false },
-  { id: 'monthly_master',     emoji: '⭐', title: 'Monthly Master',     description: '30 memories',                unlocked: false },
-  { id: 'visual_storyteller', emoji: '🎨', title: 'Visual Storyteller', description: '25 photo memories',        unlocked: false },
-  { id: 'consistency_king',   emoji: '💪', title: 'Consistency King',   description: '30 day streak',             unlocked: false },
+  { id: 'first_memory',      emoji: '🌱', title: 'First Memory',      description: 'Create your first memory',          unlocked: false },
+  { id: 'week_warrior',      emoji: '🔥', title: 'Week Warrior',      description: 'Write memories 7 days in a row',    unlocked: false },
+  { id: 'memory_keeper',     emoji: '📚', title: 'Memory Keeper',     description: 'Collect 30 memories',               unlocked: false },
+  { id: 'social_butterfly',  emoji: '🦋', title: 'Social Butterfly',  description: 'Have 5 friends',                    unlocked: false },
+  { id: 'open_book',         emoji: '📖', title: 'Open Book',         description: 'Share a memory with someone',       unlocked: false },
+  { id: 'contributor',       emoji: '✍️', title: 'Contributor',       description: 'Contribute to 5 memories',          unlocked: false },
 ];
 
 

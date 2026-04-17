@@ -316,13 +316,14 @@ export function MemoriesPage() {
       ]);
       setSelectedId(id);
       setSelectedEntry({
+        id:      mem.id,
         date:    mem.date.slice(0, 10),
         mood:    (mem.mood ?? 'Peaceful') as Mood,
         content: mem.content,
         media:   mem.media[0]?.url ?? null,
         isOpen:  mem.isOpen,
         shareUrl: mem.shareToken
-          ? `https://transcen.dence.fr/shared/${mem.id}/${mem.shareToken}`
+          ? `${window.location.origin}/memories/${mem.id}/${mem.shareToken}`
           : null,
         friendContributions: contribs.map(c => ({
           id:        c.id,

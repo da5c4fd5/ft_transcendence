@@ -56,36 +56,36 @@
   60%       { transform: scale(1) rotate(180deg); opacity: 0.9; }
 }
 
-/* ─── Hearts on pet — position: fixed, travel -110vh (always exits viewport top) ─── */
+/* ─── Hearts on pet — position: fixed, burst up to viewport top with quick fade ─── */
 @keyframes tree-heart-1 {
-  0%   { opacity: 0; transform: translate(0, 0) scale(0); }
-  10%  { opacity: 1; transform: translate(-22px, -20px) scale(1.2); }
-  82%  { opacity: 0.5; }
-  100% { opacity: 0; transform: translate(-80px, -110vh) scale(0.4); }
+  0%   { opacity: 0;   transform: translate(0, 0) scale(0.2); }
+  10%  { opacity: 1;   transform: translate(-18px, -22px) scale(1.1); }
+  48%  { opacity: 0.85; }
+  100% { opacity: 0;   transform: translate(-60px, -105vh) scale(0.4); }
 }
 @keyframes tree-heart-2 {
-  0%   { opacity: 0; transform: translate(0, 0) scale(0); }
-  11%  { opacity: 1; transform: translate(-8px, -24px) scale(1.25); }
-  82%  { opacity: 0.5; }
-  100% { opacity: 0; transform: translate(-24px, -110vh) scale(0.5); }
+  0%   { opacity: 0;   transform: translate(0, 0) scale(0.2); }
+  10%  { opacity: 1;   transform: translate(-6px, -28px) scale(1.25); }
+  48%  { opacity: 0.9; }
+  100% { opacity: 0;   transform: translate(-20px, -105vh) scale(0.55); }
 }
 @keyframes tree-heart-3 {
-  0%   { opacity: 0; transform: translate(0, 0) scale(0); }
-  10%  { opacity: 1; transform: translate(3px, -28px) scale(1.35); }
-  82%  { opacity: 0.6; }
-  100% { opacity: 0; transform: translate(6px, -110vh) scale(0.45); }
+  0%   { opacity: 0;   transform: translate(0, 0) scale(0.2); }
+  8%   { opacity: 1;   transform: translate(2px, -32px) scale(1.35); }
+  48%  { opacity: 0.9; }
+  100% { opacity: 0;   transform: translate(5px, -105vh) scale(0.5); }
 }
 @keyframes tree-heart-4 {
-  0%   { opacity: 0; transform: translate(0, 0) scale(0); }
-  11%  { opacity: 1; transform: translate(16px, -22px) scale(1.2); }
-  82%  { opacity: 0.5; }
-  100% { opacity: 0; transform: translate(40px, -110vh) scale(0.45); }
+  0%   { opacity: 0;   transform: translate(0, 0) scale(0.2); }
+  10%  { opacity: 1;   transform: translate(18px, -24px) scale(1.15); }
+  48%  { opacity: 0.85; }
+  100% { opacity: 0;   transform: translate(48px, -105vh) scale(0.45); }
 }
 @keyframes tree-heart-5 {
-  0%   { opacity: 0; transform: translate(0, 0) scale(0); }
-  10%  { opacity: 1; transform: translate(30px, -18px) scale(1.15); }
-  82%  { opacity: 0.4; }
-  100% { opacity: 0; transform: translate(88px, -110vh) scale(0.35); }
+  0%   { opacity: 0;   transform: translate(0, 0) scale(0.2); }
+  10%  { opacity: 1;   transform: translate(32px, -18px) scale(1.1); }
+  48%  { opacity: 0.8; }
+  100% { opacity: 0;   transform: translate(82px, -105vh) scale(0.35); }
 }
 
 /* ─── Pet burst leaves (fall from canopy) ─── */

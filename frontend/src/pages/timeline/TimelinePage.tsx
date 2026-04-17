@@ -228,7 +228,7 @@ function MoodBreakdown({ summaries }: { summaries: DaySummary[] }) {
   );
 }
 
-export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigateToToday?: () => void; onPreviewGuest?: () => void }) {
+export function TimelinePage({ onNavigateToToday }: { onNavigateToToday?: () => void }) {
   const currentYear = new Date().getFullYear();
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState(currentYear);
@@ -261,13 +261,14 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
       ]);
       setSelectedId(raw.id);
       setSelectedEntry({
+        id:      mem.id,
         date:    mem.date.slice(0, 10),
         mood:    (mem.mood ?? 'Peaceful') as Mood,
         content: mem.content,
         media:   mem.media[0]?.url ?? null,
         isOpen:  mem.isOpen,
         shareUrl: mem.shareToken
-          ? `https://transcen.dence.fr/shared/${mem.id}/${mem.shareToken}`
+          ? `${window.location.origin}/memories/${mem.id}/${mem.shareToken}`
           : null,
         friendContributions: contribs.map(c => ({
           id:        c.id,
@@ -350,7 +351,6 @@ export function TimelinePage({ onNavigateToToday, onPreviewGuest }: { onNavigate
               setSelectedId(null);
             }
           }}
-          onPreviewGuest={() => { setSelectedEntry(null); onPreviewGuest?.(); }}
         />
       )}
 

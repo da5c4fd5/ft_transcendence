@@ -145,7 +145,7 @@ function RoleBadge({ isAdmin, onClick }: { isAdmin: boolean; onClick?: () => voi
   );
 }
 
-export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGuestAnon }: AdminPageProps) {
+export function AdminPage({ currentUserId, isAdmin, onToggleAdmin }: AdminPageProps) {
   const [stats, setStats]   = useState<AdminStats>({ totalUsers: 0, totalMemories: 0, totalAdmins: 0 });
   const [users, setUsers]   = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
@@ -365,13 +365,6 @@ export function AdminPage({ currentUserId, isAdmin, onToggleAdmin, onPreviewGues
               className="px-4 py-2 bg-yellow rounded-full text-darkgrey font-semibold text-sm"
             >
               Switch role ({isAdmin ? 'pass to User' : 'pass to Admin'})
-            </button>
-            <button
-              type="button"
-              onClick={onPreviewGuestAnon}
-              className="px-4 py-2 bg-blue rounded-full text-darkgrey font-semibold text-sm"
-            >
-              Preview guest view (anonymous)
             </button>
           </div>
         )}

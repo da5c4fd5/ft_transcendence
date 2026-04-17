@@ -284,7 +284,6 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
   const [showLeaves,  setShowLeaves]  = useState(false);
   const [leavesKey,   setLeavesKey]   = useState(0);
   const [showThanks,  setShowThanks]  = useState(false);
-  const [petCount,    setPetCount]    = useState(0);
   const [bursts,      setBursts]      = useState<HeartBurst[]>([]);
 
   const burstId    = useRef(0);
@@ -296,19 +295,20 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
   const svgPx  = SIZE_PX[size];
 
   const handlePet = () => {
-    if (isPetting) return;
-    setIsPetting(true);
-    setPetCount(c => c + 1);
-    setTimeout(() => setIsPetting(false), 600);
-
-    // Spawn an independent heart burst at the tree's current screen position.
-    // Each burst lives 4 s and is removed individually — previous bursts are unaffected.
+    // Always spawn a heart burst — rapid clicks accumulate independently.
     const rect = buttonRef.current?.getBoundingClientRect();
     const x = rect ? rect.left + rect.width  * 0.5 : window.innerWidth  * 0.5;
-    const y = rect ? rect.top  + rect.height * 0.35 : window.innerHeight * 0.5;
+    const y = rect ? rect.top  + rect.height * 0.58 : window.innerHeight * 0.5;
     const id = ++burstId.current;
     setBursts(prev => [...prev, { id, x, y }]);
-    setTimeout(() => setBursts(prev => prev.filter(b => b.id !== id)), 4000);
+    // Remove this burst after animation completes (2.4s + longest delay 0.28s + margin)
+    setTimeout(() => setBursts(prev => prev.filter(b => b.id !== id)), 3000);
+
+    // Petting bounce — only start if not already mid-bounce
+    if (!isPetting) {
+      setIsPetting(true);
+      setTimeout(() => setIsPetting(false), 600);
+    }
 
     // Leaves / fruits — fall near the tree, reset on each pet is fine
     setShowLeaves(true);
@@ -428,11 +428,12 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
               className="pointer-events-none"
               style={{
                 position: 'fixed',
-                left: burst.x,
-                top:  burst.y,
+                // Center the heart icon (22px) on the burst origin
+                left: burst.x - 11,
+                top:  burst.y - 11,
                 zIndex: 9999,
                 color: '#FF6B9D',
-                animation: `${h.anim} 3s ease-out ${h.delay} forwards`,
+                animation: `${h.anim} 2.4s ease-out ${h.delay} forwards`,
               }}
             >
               <Heart size={22} fill="#FF6B9D" />
@@ -450,9 +451,7 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
           </div>
 
           {showThanks ? (
-            <span className="text-xs font-semibold text-pink">
-              Petted {petCount} {petCount === 1 ? 'time' : 'times'} 💗
-            </span>
+            <span className="text-xs font-semibold text-pink italic">*happy tree*</span>
           ) : (
             <span className="text-xs text-mediumgrey flex items-center gap-1">
               <Sparkles size={12} style={{ color: s.accent }} />

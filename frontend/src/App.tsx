@@ -13,7 +13,6 @@ import { TreePage } from './pages/tree/TreePage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { GuestPage } from './pages/guest/GuestPage';
-import { MOCK_SHARED_MEMORY } from './pages/guest/guest.mocks';
 import type { SharedMemory } from './pages/guest/guest.types';
 import type { User } from './pages/profile/profile.types';
 import { api, setUnauthorizedHandler } from './lib/api';
@@ -36,6 +35,7 @@ function SharedMemoryRoute({ memoryId, shareToken, user, onNavigateToWelcome }: 
   user: User | null;
   onNavigateToWelcome: () => void;
 }) {
+  const [, navigate] = useLocation();
   const [sharedMemory, setSharedMemory] = useState<SharedMemory | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -70,7 +70,7 @@ function SharedMemoryRoute({ memoryId, shareToken, user, onNavigateToWelcome }: 
     <GuestPage
       memory={sharedMemory}
       currentUser={user ? { username: user.username, avatarUrl: user.avatarUrl } : undefined}
-      onBack={() => window.history.back()}
+      onBack={() => user ? navigate('/today') : window.history.back()}
       onNavigateToWelcome={onNavigateToWelcome}
     />
   );
@@ -93,8 +93,6 @@ function AppInner() {
   const [location, navigate] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem(TOKEN_KEY));
   const [user, setUser]                       = useState<User | null>(null);
-  const [showGuestPreview, setShowGuestPreview]       = useState(false);
-  const [showGuestPreviewAnon, setShowGuestPreviewAnon] = useState(false);
 
   // Load user on startup if already authenticated
   useEffect(() => {
@@ -132,7 +130,7 @@ function AppInner() {
   };
 
   // Shared memory route — takes priority over auth state
-  const sharedMatch = location.match(/^\/shared\/([^/]+)\/([^/]+)/);
+  const sharedMatch = location.match(/^\/memories\/([^/]+)\/([^/]+)/);
   if (sharedMatch) {
     return (
       <SharedMemoryRoute
@@ -140,27 +138,6 @@ function AppInner() {
         shareToken={sharedMatch[2]}
         user={user}
         onNavigateToWelcome={() => navigate('/')}
-      />
-    );
-  }
-
-  // Guest preview overlays (full-screen, triggered by in-app actions)
-  if (showGuestPreview) {
-    return (
-      <GuestPage
-        memory={MOCK_SHARED_MEMORY}
-        currentUser={user ? { username: user.username, avatarUrl: user.avatarUrl } : undefined}
-        onBack={() => { setShowGuestPreview(false); navigate('/today'); }}
-        onNavigateToWelcome={() => { setShowGuestPreview(false); handleLogout(); }}
-      />
-    );
-  }
-  if (showGuestPreviewAnon) {
-    return (
-      <GuestPage
-        memory={MOCK_SHARED_MEMORY}
-        onBack={() => setShowGuestPreviewAnon(false)}
-        onNavigateToWelcome={() => { setShowGuestPreviewAnon(false); handleLogout(); }}
       />
     );
   }
@@ -196,7 +173,6 @@ function AppInner() {
           : <AuthLayout user={user}>
               <TimelinePage
                 onNavigateToToday={() => navigate('/today')}
-                onPreviewGuest={() => setShowGuestPreview(true)}
               />
             </AuthLayout>}
       </Route>
@@ -229,7 +205,6 @@ function AppInner() {
               <AdminPage
                 currentUserId={user?.id ?? ''}
                 isAdmin={user?.isAdmin ?? false}
-                onPreviewGuestAnon={() => setShowGuestPreviewAnon(true)}
               />
             </AuthLayout>}
       </Route>

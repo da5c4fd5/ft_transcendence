@@ -10,6 +10,7 @@ export interface FriendContribution {
 }
 
 export interface MemoryDetails {
+  id: string;
   date: string;
   mood: Mood;
   content: string;
@@ -23,5 +24,4 @@ export interface MemoryModalProps {
   entry: MemoryDetails;
   onClose: () => void;
   onDelete: () => void;
-  onPreviewGuest?: () => void; // TODO: a supprimer quand le routing invité sera fait
 }
