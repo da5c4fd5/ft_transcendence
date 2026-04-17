@@ -19,7 +19,10 @@ export const friends = new Elysia({
     (app) =>
       app
         .get("/", ({ user }) => FriendsService.list(user!.id), {
-          detail: { description: "List all friends and pending requests." }
+          detail: { description: "List accepted friends." }
+        })
+        .get("/requests", ({ user }) => FriendsService.listRequests(user!.id), {
+          detail: { description: "List incoming pending friend requests." }
         })
         .put(
           "/:userId",

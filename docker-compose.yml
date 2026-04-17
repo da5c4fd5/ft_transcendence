@@ -95,6 +95,7 @@ services:
       SSL_CERT_FILE: /run/certs/internal/ca.crt
     volumes:
       - certs:/run/certs:ro
+      - media:/app/uploads
     secrets:
       - postgres_password
       - jwt_secret
@@ -137,6 +138,7 @@ services:
 volumes:
   certs:
   database:
+  media:
 
 secrets:
   postgres_password:

@@ -21,7 +21,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [errors, setErrors]         = useState<{ email?: string; password?: string; global?: string }>({});
   const [loading, setLoading]       = useState(false);
 
-  // MFA step
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [mfaError, setMfaError] = useState('');

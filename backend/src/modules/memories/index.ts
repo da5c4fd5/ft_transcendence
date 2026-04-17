@@ -153,4 +153,13 @@ export const memories = new Elysia({
             detail: { description: "Attach a media file to a memory." }
           }
         )
+        .delete(
+          "/:memoryId/media",
+          ({ user, params }) =>
+            MemoriesService.deleteMedia(params.memoryId, user!.id),
+          {
+            response: { 204: t.Any(), 403: t.Any(), 404: t.Any() },
+            detail: { description: "Remove all media from a memory." }
+          }
+        )
   );

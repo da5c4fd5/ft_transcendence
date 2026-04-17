@@ -117,11 +117,26 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
-    // TODO: persist file to disk/S3 and derive a real URL
-    const url = `/media/${crypto.randomUUID()}`;
+
+    // Delete any existing media record so the new one becomes the single reference
+    await db.media.deleteMany({ where: { memoryId: id } });
+
+    const ext = (file.type.split("/")[1] ?? "bin").replace("jpeg", "jpg");
+    const filename = `${crypto.randomUUID()}.${ext}`;
+    const uploadDir = "/app/uploads";
+    await Bun.write(`${uploadDir}/${filename}`, await file.arrayBuffer());
+
+    const url = `/api/media/${filename}`;
     return db.media.create({
       data: { memoryId: id, url, mimeType: file.type }
     });
+  }
+
+  static async deleteMedia(id: string, userId: string) {
+    const memory = await db.memory.findUnique({ where: { id } });
+    if (!memory) throw status(404, { message: "Memory not found" });
+    if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
+    await db.media.deleteMany({ where: { memoryId: id } });
   }
 
   static async getPromptSuggestions() {

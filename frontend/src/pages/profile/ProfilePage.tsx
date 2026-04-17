@@ -226,45 +226,163 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
 type RawFriendUser = { id: string; username: string; avatarUrl: string | null };
 type RawFriend = { id: string; requesterId: string; recipientId: string; requester: RawFriendUser; recipient: RawFriendUser };
 
+type RawRequest = { id: string; requesterId: string; requester: RawFriendUser };
+
 function FriendsCard({ userId }: { userId: string }) {
-  const [friends, setFriends]     = useState<Friend[]>([]);
-  const [input, setInput]         = useState('');
-  const [addError, setAddError]   = useState<string | null>(null);
-  const [adding, setAdding]       = useState(false);
-  const [pingedIds, setPingedIds] = useState<Set<string>>(new Set());
+  const [friends, setFriends]           = useState<Friend[]>([]);
+  const [requests, setRequests]         = useState<RawRequest[]>([]);
+  const [input, setInput]               = useState('');
+  const [addError, setAddError]         = useState<string | null>(null);
+  const [adding, setAdding]             = useState(false);
+  const [pingedIds, setPingedIds]       = useState<Set<string>>(new Set());
+  const [suggestions, setSuggestions]   = useState<RawFriendUser[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlighted, setHighlighted]   = useState(-1);
+  const [selectedId, setSelectedId]     = useState<string | null>(null);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
 
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const timersRef    = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    api.get<RawFriend[]>('/friends').then(raw => {
-      setFriends(raw.map(f => {
-        const other = f.requesterId === userId ? f.recipient : f.requester;
-        return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: false };
-      }));
-    }).catch(() => {});
-    return () => { timersRef.current.forEach(clearTimeout); };
+  const refreshFriends = useCallback(async () => {
+    const [raw, reqs] = await Promise.all([
+      api.get<RawFriend[]>('/friends'),
+      api.get<RawRequest[]>('/friends/requests'),
+    ]);
+    setFriends(raw.map(f => {
+      const other = f.requesterId === userId ? f.recipient : f.requester;
+      return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: false };
+    }));
+    setRequests(reqs);
   }, [userId]);
 
-  const handleAdd = async () => {
-    const q = input.trim();
-    if (!q) return;
+  useEffect(() => {
+    refreshFriends().catch(() => {});
+    return () => { timersRef.current.forEach(clearTimeout); };
+  }, [refreshFriends]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const searchUsers = (q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim()) { setSuggestions([]); setShowDropdown(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await api.get<RawFriendUser[]>('/users/search', { q });
+        // Filter out already-friends and self
+        const friendIds = new Set(friends.map(f => f.id));
+        const filtered  = results.filter(r => r.id !== userId && !friendIds.has(r.id));
+        setSuggestions(filtered);
+        setShowDropdown(filtered.length > 0);
+        setHighlighted(-1);
+      } catch {
+        setSuggestions([]);
+        setShowDropdown(false);
+      }
+    }, 250);
+  };
+
+  const handleAddById = async (targetId: string) => {
     setAddError(null);
     setAdding(true);
+    setSuggestions([]);
+    setShowDropdown(false);
+    setInput('');
     try {
-      const results = await api.get<RawFriendUser[]>('/users/search', { q });
-      if (!results.length) { setAddError('No user found with that username.'); return; }
-      await api.put(`/friends/${results[0].id}`);
-      // Refresh list
-      const raw = await api.get<RawFriend[]>('/friends');
-      setFriends(raw.map(f => {
-        const other = f.requesterId === userId ? f.recipient : f.requester;
-        return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: false };
-      }));
-      setInput('');
+      await api.put(`/friends/${targetId}`);
+      await refreshFriends();
     } catch (err) {
       setAddError((err as ApiError).message ?? 'Failed to add friend.');
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleAdd = async () => {
+    // Keyboard: user highlighted a suggestion with arrow keys
+    if (highlighted >= 0 && suggestions[highlighted]) {
+      const s = suggestions[highlighted];
+      setInput(s.username);
+      setSelectedId(s.id);
+      setSuggestions([]);
+      setShowDropdown(false);
+      setHighlighted(-1);
+      handleAddById(s.id);
+      return;
+    }
+    const q = input.trim();
+    if (!q) return;
+    setAddError(null);
+    setAdding(true);
+    setSuggestions([]);
+    setShowDropdown(false);
+    try {
+      // If user selected from dropdown, use that ID directly
+      const targetId = selectedId;
+      if (targetId) {
+        await api.put(`/friends/${targetId}`);
+      } else {
+        const results = await api.get<RawFriendUser[]>('/users/search', { q });
+        if (!results.length) { setAddError('No user found with that username.'); return; }
+        await api.put(`/friends/${results[0].id}`);
+      }
+      await refreshFriends();
+      setInput('');
+      setSelectedId(null);
+    } catch (err) {
+      setAddError((err as ApiError).message ?? 'Failed to add friend.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (!showDropdown) {
+      if (e.key === 'Enter') handleAdd();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlighted(h => Math.min(h + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlighted(h => Math.max(h - 1, -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAdd();
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+      setHighlighted(-1);
+    }
+  };
+
+  const handleAccept = async (requesterId: string) => {
+    setRespondingId(requesterId);
+    try {
+      await api.put(`/friends/${requesterId}`); // auto-accepts since they sent it
+      await refreshFriends();
+    } catch { /* ignore */ } finally {
+      setRespondingId(null);
+    }
+  };
+
+  const handleDecline = async (requesterId: string) => {
+    setRespondingId(requesterId);
+    try {
+      await api.delete(`/friends/${requesterId}`);
+      await refreshFriends();
+    } catch { /* ignore */ } finally {
+      setRespondingId(null);
     }
   };
 
@@ -290,16 +408,57 @@ function FriendsCard({ userId }: { userId: string }) {
         </span>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Add friend by username..."
-            value={input}
-            onInput={(e) => { setInput((e.target as HTMLInputElement).value); setAddError(null); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
-            className="flex-1 px-4 py-2.5 rounded-full bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey placeholder:text-mediumgrey"
-          />
+      <div className="flex flex-col gap-1.5" ref={containerRef}>
+        <div className="flex gap-2 relative">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Add friend by username..."
+              value={input}
+              onInput={(e) => {
+                const v = (e.target as HTMLInputElement).value;
+                setInput(v);
+                setSelectedId(null);
+                setAddError(null);
+                searchUsers(v);
+              }}
+              onKeyDown={handleKeyDown}
+              onFocus={() => { if (suggestions.length) setShowDropdown(true); }}
+              className="w-full px-4 py-2.5 rounded-full bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey placeholder:text-mediumgrey"
+            />
+            {showDropdown && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-lg border border-black/8 overflow-hidden z-50">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setInput(s.username);
+                      setSelectedId(s.id);
+                      setSuggestions([]);
+                      setShowDropdown(false);
+                      setHighlighted(-1);
+                    }}
+                    onMouseEnter={() => setHighlighted(i)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors',
+                      i === highlighted ? 'bg-verylightorange' : 'hover:bg-verylightorange/60'
+                    )}
+                  >
+                    {s.avatarUrl ? (
+                      <img src={s.avatarUrl} alt={s.username} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-yellow/60 flex items-center justify-center shrink-0">
+                        <User size={14} className="text-darkgrey" />
+                      </div>
+                    )}
+                    <span className="text-sm font-semibold text-darkgrey">{s.username}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={handleAdd}
@@ -311,6 +470,46 @@ function FriendsCard({ userId }: { userId: string }) {
         </div>
         {addError && <p className="text-xs text-pink px-2">{addError}</p>}
       </div>
+
+      {requests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-bold text-mediumgrey uppercase tracking-wide px-1">
+            Friend requests · {requests.length}
+          </p>
+          {requests.map(r => (
+            <div key={r.id} className="flex items-center gap-3 p-3 rounded-2xl bg-verylightorange/60 border border-yellow/30">
+              {r.requester.avatarUrl ? (
+                <img src={r.requester.avatarUrl} alt={r.requester.username} className={avatarBase} />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-yellow/60 flex items-center justify-center shrink-0">
+                  <User size={18} className="text-darkgrey" />
+                </div>
+              )}
+              <span className="flex-1 text-sm font-bold text-darkgrey truncate">{r.requester.username}</span>
+              <div className="flex gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={respondingId === r.requester.id}
+                  onClick={() => handleAccept(r.requester.id)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-yellow text-darkgrey hover:bg-yellow/80 transition-colors disabled:opacity-50"
+                  title="Accept"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={respondingId === r.requester.id}
+                  onClick={() => handleDecline(r.requester.id)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-lightgrey text-darkgrey hover:bg-mediumgrey/30 transition-colors disabled:opacity-50"
+                  title="Decline"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {friends.map(f => {
@@ -616,11 +815,13 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
     <div className={cardBase}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Shield size={18} className={cn(status === 'active' ? 'text-blue' : 'text-pink')} />
+          {status === 'active'
+            ? <ShieldCheck size={18} className="text-pink" />
+            : <Shield size={18} className="text-pink" />}
           <h2 className="text-lg font-black text-darkgrey">Two-Factor Authentication</h2>
         </div>
         {status === 'active' && (
-          <span className="flex items-center gap-1 text-[10px] font-bold text-blue bg-blue/10 rounded-full px-2.5 py-1">
+          <span className="flex items-center gap-1 text-[10px] font-bold text-pink bg-verylightpink/40 rounded-full px-2.5 py-1">
             <ShieldCheck size={11} /> ENABLED
           </span>
         )}
@@ -637,10 +838,10 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
             type="button"
             onClick={handleStartSetup}
             disabled={status === 'loading-setup'}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue/10 text-pink text-sm font-bold hover:bg-blue/20 transition-colors w-fit disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors w-fit disabled:opacity-50"
           >
             <Shield size={14} />
-            {status === 'loading-setup' ? 'Loading…' : 'Enable 2FA'}
+            {status === 'loading-setup' ? 'Loading…' : 'Enable'}
           </button>
         </div>
       )}
@@ -690,9 +891,9 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
             <button
               type="submit"
               disabled={status === 'verifying'}
-              className="flex-1 py-2.5 rounded-full bg-blue text-white text-sm font-bold hover:bg-blue/80 transition-colors disabled:opacity-50"
+              className="flex-1 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
             >
-              {status === 'verifying' ? 'Verifying…' : 'Enable 2FA'}
+              {status === 'verifying' ? 'Verifying…' : 'Enable'}
             </button>
           </div>
         </form>
@@ -701,14 +902,14 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
       {/* ─── Active: MFA enabled ─── */}
       {status === 'active' && (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 bg-blue/5 rounded-2xl px-4 py-3">
-            <ShieldCheck size={15} className="text-blue shrink-0" />
-            <p className="text-sm text-blue font-medium">Your account is protected with 2FA.</p>
+          <div className="flex items-center gap-2 bg-verylightpink/40 rounded-2xl px-4 py-3">
+            <ShieldCheck size={15} className="text-pink shrink-0" />
+            <p className="text-sm text-pink font-medium">Your account is protected with 2FA.</p>
           </div>
           <button
             type="button"
             onClick={() => { setStatus('disabling'); setError(null); }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-pink/30 text-pink text-sm font-semibold hover:bg-verylightpink/30 transition-colors w-fit"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors w-fit"
           >
             <ShieldOff size={14} /> Disable 2FA
           </button>
@@ -733,7 +934,7 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
             <button
               type="submit"
               disabled={status === 'loading-disable'}
-              className="flex-1 py-2.5 rounded-full bg-pink text-white text-sm font-bold hover:bg-pink/80 transition-colors disabled:opacity-50"
+              className="flex-1 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
             >
               {status === 'loading-disable' ? 'Disabling…' : 'Disable 2FA'}
             </button>

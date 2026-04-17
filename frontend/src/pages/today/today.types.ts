@@ -1,6 +1,7 @@
 import type { Mood } from '../../components/MemoryModal/MemoryModal.types';
 
 export interface SavedMemory {
+  id: string;
   content: string;
   media: string | null;
 }

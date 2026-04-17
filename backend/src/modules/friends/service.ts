@@ -68,6 +68,16 @@ export abstract class FriendsService {
     });
   }
 
+  static async listRequests(userId: string) {
+    return db.friend.findMany({
+      where: { recipientId: userId, status: "PENDING" },
+      include: {
+        requester: { select: { id: true, username: true, avatarUrl: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+  }
+
   static async remove(userId: string, targetUserId: string) {
     await db.friend.deleteMany({
       where: {

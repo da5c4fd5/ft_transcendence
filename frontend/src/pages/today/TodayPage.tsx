@@ -315,7 +315,7 @@ export function TodayPage() {
       setStats(st);
 
       if (todayMem) {
-        setSavedMemory({ content: todayMem.content, media: todayMem.media[0]?.url ?? null });
+        setSavedMemory({ id: todayMem.id, content: todayMem.content, media: todayMem.media[0]?.url ?? null });
         setTodayState('saved');
         loadCapsuls();
       }
@@ -360,11 +360,24 @@ export function TodayPage() {
     if (!content.trim() || saving) return;
     setSaving(true);
     try {
-      const mem = await api.post<RawMemory>('/memories', { content });
+      let memId: string;
+      if (savedMemory?.id) {
+        // Editing an existing memory — use PATCH
+        await api.patch(`/memories/${savedMemory.id}`, { content });
+        memId = savedMemory.id;
+      } else {
+        // Creating a new memory
+        const mem = await api.post<RawMemory>('/memories', { content });
+        memId = mem.id;
+      }
       if (mediaFileRef.current) {
+        // New file selected — upload it (replaces any existing)
         const form = new FormData();
         form.append('file', mediaFileRef.current);
-        await api.upload(`/memories/${mem.id}/media`, form).catch(() => {});
+        await api.upload(`/memories/${memId}/media`, form).catch(() => {});
+      } else if (savedMemory?.id && savedMemory.media && !media) {
+        // User removed the existing image — delete it from the backend
+        await api.delete(`/memories/${memId}/media`).catch(() => {});
       }
       const [newTree, newStats] = await Promise.all([
         api.get<TreeData | null>('/users/me/tree').catch(() => null),
@@ -372,11 +385,11 @@ export function TodayPage() {
       ]);
       setTreeData(newTree ?? { lifeForce: 0, isDecreasing: false });
       setStats(newStats);
-      setSavedMemory({ content, media });
+      setSavedMemory({ id: memId, content, media });
       setTodayState('saved');
       loadCapsuls();
     } catch {
-      // noop — e.g. 409 if memory already exists
+      // noop
     } finally {
       setSaving(false);
     }
@@ -387,7 +400,7 @@ export function TodayPage() {
     setContent(savedMemory.content);
     setMedia(savedMemory.media);
     mediaFileRef.current = null;
-    setSavedMemory(null);
+    // Keep savedMemory (with its id) so handleCapsul can PATCH the right record
     setTodayState('prompt');
   };
 
@@ -395,6 +408,7 @@ export function TodayPage() {
     setContent('');
     setMedia(null);
     mediaFileRef.current = null;
+    if (savedMemory) setTodayState('saved');
   };
 
   const handleRefreshPrompt = async () => {
