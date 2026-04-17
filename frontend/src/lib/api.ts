@@ -1,4 +1,11 @@
-const BASE_URL = 'https://transcen.dence.fr:8443/api';
+declare const __APP_DOMAIN__: string;
+declare const __APP_HTTPS_PORT__: string;
+
+const API_DOMAIN = __APP_DOMAIN__ || window.location.hostname;
+const API_PORT = __APP_HTTPS_PORT__ && __APP_HTTPS_PORT__ !== '443'
+  ? `:${__APP_HTTPS_PORT__}`
+  : '';
+const BASE_URL = `https://${API_DOMAIN}${API_PORT}/api`;
 
 export type ApiError = {
   status: number;
