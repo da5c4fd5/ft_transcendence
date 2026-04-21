@@ -1,12 +1,14 @@
 import cors from "@elysiajs/cors";
 import swagger from "@elysiajs/swagger";
 import { Elysia } from "elysia";
-import { auth } from "./modules/auth";
-import { contributionsController } from "./modules/contributions";
-import { friendsController } from "./modules/friends";
-import { memoriesController } from "./modules/memories";
-import { users } from "./modules/users";
 import { errorHandlerPlugin } from "./plugins/error-handler.plugin";
+import { auth } from "./modules/auth";
+import { users } from "./modules/users";
+import { friends } from "./modules/friends";
+import { memories } from "./modules/memories";
+import { contributions } from "./modules/contributions";
+import { admin } from "./modules/admin";
+import { realtime } from "./modules/realtime";
 
 const hostname = process.env.HOST ?? "0.0.0.0";
 const port = Number(process.env.PORT ?? 4242);
@@ -25,13 +27,20 @@ const app = new Elysia()
     cors({
       methods: "GET, PUT, POST, PATCH, DELETE",
       allowedHeaders: ["Authorization", "Content-Type"],
-      origin: "transcen.dence.fr"
+      origin:
+        process.env.PROD === "true"
+          ? "transcen.dence.fr"
+          : ["transcen.dence.fr", "localhost:6767", "127.0.0.1:6767"]
     })
   )
   .onBeforeHandle(({ request, status }) => {
     if (["POST", "PUT", "PATCH"].includes(request.method)) {
       const contentType = request.headers.get("content-type") ?? "";
-      if (!contentType.startsWith("application/json")) {
+      if (
+        contentType !== "" &&
+        !contentType.startsWith("application/json") &&
+        !contentType.startsWith("multipart/form-data")
+      ) {
         return status(415, { error: "Content-Type must be application/json" });
       }
     }
@@ -39,15 +48,33 @@ const app = new Elysia()
   .use(errorHandlerPlugin)
   .use(auth)
   .use(users)
-  .use(friendsController)
-  .use(memoriesController)
-  .use(contributionsController)
+  .use(friends)
+  .use(memories)
+  .use(contributions)
+  .use(admin)
+  .use(realtime)
   .get("/", () => ({ status: "ok" }), { detail: { hide: true } })
+  .get(
+    "/media/:filename",
+    async ({ params }: { params: { filename: string } }) => {
+      const { filename } = params;
+      if (filename.includes("/") || filename.includes("..")) {
+        return new Response(JSON.stringify({ error: "Invalid filename" }), { status: 400 });
+      }
+      const file = Bun.file(`/app/uploads/${filename}`);
+      if (!(await file.exists())) {
+        return new Response(JSON.stringify({ error: "Not found" }), { status: 404 });
+      }
+      return new Response(file);
+    },
+    { detail: { hide: true } }
+  )
   .use(
     swagger({
       path: "/docs",
       documentation: {
         info: { title: "Capsul API Docs", version: "0.0.1" },
+        servers: [{ url: "/api", description: "API server (proxied via Nginx)" }],
         components: {
           securitySchemes: {
             bearerAuth: {

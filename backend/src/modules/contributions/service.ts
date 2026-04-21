@@ -1,6 +1,39 @@
 import { status } from "elysia";
+import { mkdir } from "node:fs/promises";
 import { db } from "../../db";
 import type { ContributionsModel } from "./model";
+
+const UPLOAD_DIR = "/app/uploads";
+const MAX_INLINE_IMAGE_BYTES = 5 * 1024 * 1024;
+const CONTRIBUTION_INCLUDE = {
+  contributor: { select: { username: true, avatarUrl: true } }
+} as const;
+
+function extensionForMime(mimeType: string) {
+  const subtype = mimeType.split("/")[1] ?? "bin";
+  return subtype.replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "") || "bin";
+}
+
+async function storeInlineImage(imageUrl?: string) {
+  if (!imageUrl) return null;
+  if (imageUrl.startsWith("/api/media/") || imageUrl.startsWith("/avatars/")) {
+    return imageUrl;
+  }
+
+  const match = imageUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw status(400, { message: "Invalid image data" });
+
+  const [, mimeType, base64] = match;
+  const bytes = Buffer.from(base64, "base64");
+  if (bytes.byteLength > MAX_INLINE_IMAGE_BYTES) {
+    throw status(413, { message: "Image is too large" });
+  }
+
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  const filename = `${crypto.randomUUID()}.${extensionForMime(mimeType)}`;
+  await Bun.write(`${UPLOAD_DIR}/${filename}`, bytes);
+  return `/api/media/${filename}`;
+}
 
 export abstract class ContributionsService {
   static async listByMemory(memoryId: string) {
@@ -9,7 +42,7 @@ export abstract class ContributionsService {
     return db.contribution.findMany({
       where: { memoryId },
       orderBy: { createdAt: "asc" },
-      include: { contributor: { omit: { passwordHash: true } } }
+      include: CONTRIBUTION_INCLUDE
     });
   }
 
@@ -24,13 +57,41 @@ export abstract class ContributionsService {
       throw status(403, {
         message: "This memory is not open for contributions"
       });
+    const [guestAvatarUrl, mediaUrl] = await Promise.all([
+      contributorId ? Promise.resolve(null) : storeInlineImage(data.guestAvatarUrl),
+      storeInlineImage(data.mediaUrl)
+    ]);
     return db.contribution.create({
       data: {
         memoryId,
         content: data.content,
         guestName: data.guestName,
+        guestAvatarUrl,
+        mediaUrl,
         contributorId: contributorId ?? null
-      }
+      },
+      include: CONTRIBUTION_INCLUDE
+    });
+  }
+
+  static async edit(
+    id: string,
+    requesterId: string,
+    data: ContributionsModel["editBody"]
+  ) {
+    const contribution = await db.contribution.findUnique({ where: { id } });
+    if (!contribution) throw status(404, { message: "Contribution not found" });
+    if (contribution.contributorId !== requesterId)
+      throw status(403, { message: "Forbidden" });
+    const mediaUrl =
+      data.mediaUrl === undefined ? undefined : await storeInlineImage(data.mediaUrl);
+    return db.contribution.update({
+      where: { id },
+      data: {
+        content: data.content,
+        ...(mediaUrl !== undefined ? { mediaUrl } : {})
+      },
+      include: CONTRIBUTION_INCLUDE
     });
   }
 
@@ -44,6 +105,6 @@ export abstract class ContributionsService {
     const isContributor = contribution.contributorId === requesterId;
     if (!isOwner && !isContributor) throw status(403, { message: "Forbidden" });
     await db.contribution.delete({ where: { id } });
-    return { message: "Deleted" };
+    return status(204);
   }
 }

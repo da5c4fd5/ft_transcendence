@@ -12,6 +12,7 @@ read_secret() {
 
 read_secret POSTGRES_PASSWORD
 read_secret JWT_SECRET
+read_secret MFA_ENCRYPTION_KEY
 
 export POSTGRES_DB="${POSTGRES_DB:-capsul}"
 export POSTGRES_USER="${POSTGRES_USER:-capsul}"

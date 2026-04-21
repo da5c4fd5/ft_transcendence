@@ -1,10 +1,14 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { authPlugin } from "../../plugins/auth.plugin";
+import { FriendsModel } from "./model";
 import { FriendsService } from "./service";
 
-export const friendsController = new Elysia({
+export const friends = new Elysia({
   prefix: "/friends",
-  tags: ["Friends"]
+  detail: {
+    tags: ["Friends"],
+    security: [{ bearerAuth: [] }]
+  }
 })
   .use(authPlugin)
   .guard(
@@ -15,11 +19,35 @@ export const friendsController = new Elysia({
     },
     (app) =>
       app
-        .get("/", ({ user }) => FriendsService.list(user!.sub))
-        .put("/:userId", ({ user, params }) =>
-          FriendsService.add(user!.sub, params.userId)
+        .get("/", ({ user }) => FriendsService.list(user!.id), {
+          response: { 200: t.Array(FriendsModel.friendListItemResponse) },
+          detail: { description: "List accepted friends." }
+        })
+        .get("/requests", ({ user }) => FriendsService.listRequests(user!.id), {
+          response: { 200: t.Array(FriendsModel.friendRequestResponse) },
+          detail: { description: "List incoming pending friend requests." }
+        })
+        .put(
+          "/:userId",
+          ({ user, params }) => FriendsService.add(user!.id, params.userId),
+          {
+            detail: {
+              description:
+                "Send a friend request, or accept one if a pending request already exists from the other user."
+            }
+          }
         )
-        .delete("/:userId", ({ user, params }) =>
-          FriendsService.remove(user!.sub, params.userId)
+        .delete(
+          "/:userId",
+          async ({ user, params }) => {
+            await FriendsService.remove(user!.id, params.userId);
+            return new Response(null, { status: 204 });
+          },
+          {
+            response: { 204: t.Any() },
+            detail: {
+              description: "Remove a friend or cancel/reject a pending request."
+            }
+          }
         )
   );

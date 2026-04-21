@@ -1,18 +1,40 @@
 import { status } from "elysia";
 import { db } from "../../db";
+import { isUserOnline } from "../../lib/realtime";
+
+const FRIEND_USER_SELECT = {
+  id: true,
+  username: true,
+  avatarUrl: true
+} as const;
 
 export abstract class FriendsService {
   static async list(userId: string) {
-    return db.friend.findMany({
+    const friendships = await db.friend.findMany({
       where: {
         status: "ACCEPTED",
         OR: [{ requesterId: userId }, { recipientId: userId }]
       },
-      include: {
-        requester: { omit: { passwordHash: true } },
-        recipient: { omit: { passwordHash: true } }
+      select: {
+        id: true,
+        requesterId: true,
+        recipientId: true,
+        requester: { select: FRIEND_USER_SELECT },
+        recipient: { select: FRIEND_USER_SELECT }
       }
     });
+
+    return friendships.map((friendship) => ({
+      ...friendship,
+      requester: {
+        ...friendship.requester,
+        online: isUserOnline(friendship.requester.id)
+      },
+      recipient: {
+        ...friendship.recipient,
+        online: isUserOnline(friendship.recipient.id)
+      }
+    }));
   }
 
   static async add(userId: string, targetUserId: string) {
@@ -65,6 +87,18 @@ export abstract class FriendsService {
         recipientId: targetUserId,
         status: "PENDING"
       }
+    });
+  }
+
+  static async listRequests(userId: string) {
+    return db.friend.findMany({
+      where: { recipientId: userId, status: "PENDING" },
+      select: {
+        id: true,
+        requesterId: true,
+        requester: { select: { id: true, username: true, avatarUrl: true } }
+      },
+      orderBy: { createdAt: "desc" }
     });
   }
 

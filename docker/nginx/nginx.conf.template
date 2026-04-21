@@ -29,6 +29,17 @@ server {
 	proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 	proxy_set_header X-Forwarded-Proto https;
 
+	location = /api/realtime {
+		rewrite ^/api/?(.*)$ /$1 break;
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection "upgrade";
+		proxy_ssl_verify on;
+		proxy_ssl_server_name on;
+		proxy_ssl_name backend;
+		proxy_ssl_trusted_certificate /etc/nginx/certs/internal/ca.crt;
+		proxy_pass https://$backend_upstream;
+	}
+
 	location ~ ^/api(?:/|$) {
 		rewrite ^/api/?(.*)$ /$1 break;
 		proxy_ssl_verify on;

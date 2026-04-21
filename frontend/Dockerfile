@@ -9,6 +9,11 @@ FROM deps AS dev
 
 COPY . .
 
+ARG DOMAIN
+ARG HTTPS_PORT
+ENV DOMAIN=${DOMAIN}
+ENV HTTPS_PORT=${HTTPS_PORT}
+
 EXPOSE 6767
 
 CMD ["bun", "run", "dev", "--", "--host", "0.0.0.0", "--port", "6767"]
@@ -16,6 +21,11 @@ CMD ["bun", "run", "dev", "--", "--host", "0.0.0.0", "--port", "6767"]
 FROM deps AS build
 
 COPY . .
+
+ARG DOMAIN
+ARG HTTPS_PORT
+ENV DOMAIN=${DOMAIN}
+ENV HTTPS_PORT=${HTTPS_PORT}
 
 RUN bun run build
 

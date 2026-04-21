@@ -1,0 +1,17 @@
+import type { Mood } from '../../components/MemoryModal/MemoryModal.types';
+
+export interface SavedMemory {
+  id: string;
+  content: string;
+  media: string | null;
+}
+
+// Past memory surfaced from GET /memories/reminders
+// date is ISO format — the "One year ago today" label is computed client-side
+export interface PastMemory {
+  id: string;
+  date: string;       // ISO "2025-04-09"
+  content: string;
+  media: string | null;
+  mood: Mood;
+}

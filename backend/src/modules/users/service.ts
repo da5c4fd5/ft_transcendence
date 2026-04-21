@@ -3,14 +3,108 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { db } from "../../db";
 import type { UsersModel } from "./model";
+import { encryptSecret, decryptSecret } from "../../lib/mfa-crypto";
+import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from "otplib";
+import QRCode from "qrcode";
 
 const AVATARS_DIR = join(import.meta.dir, "../../../public/avatars");
+const DELETE_ACCOUNT_CONFIRMATION = "delete my account";
+
+const SELF_USER_SELECT = {
+  id: true,
+  username: true,
+  email: true,
+  displayName: true,
+  avatarUrl: true,
+  notificationSettings: true,
+  isAdmin: true,
+  mfaSecret: true
+} as const;
+
+const PUBLIC_USER_SELECT = {
+  id: true,
+  username: true,
+  displayName: true,
+  avatarUrl: true
+} as const;
+
+const SEARCH_USER_SELECT = {
+  id: true,
+  username: true,
+  avatarUrl: true
+} as const;
+
+const totp = new TOTP({
+  crypto: new NobleCryptoPlugin(),
+  base32: new ScureBase32Plugin(),
+  issuer: "Transcendence"
+});
+
+const ACHIEVEMENTS = [
+  { id: "first_memory", check: (s: AchievementStats) => s.memCount >= 1 },
+  { id: "week_warrior", check: (s: AchievementStats) => s.distinctDays >= 7 },
+  { id: "memory_keeper", check: (s: AchievementStats) => s.memCount >= 30 },
+  {
+    id: "social_butterfly",
+    check: (s: AchievementStats) => s.friendCount >= 5
+  },
+  { id: "open_book", check: (s: AchievementStats) => s.hasOpen },
+  { id: "contributor", check: (s: AchievementStats) => s.contribCount >= 5 }
+] as const;
+
+type AchievementStats = {
+  memCount: number;
+  distinctDays: number;
+  friendCount: number;
+  hasOpen: boolean;
+  contribCount: number;
+};
+
+type SelfUserRecord = {
+  id: string;
+  username: string;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  notificationSettings: unknown;
+  isAdmin: boolean;
+  mfaSecret: string | null;
+};
 
 export abstract class UsersService {
-  static async findById(id: string) {
+  private static normalizeNotificationSettings(value: unknown) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+
+  private static toSelfProfile(user: SelfUserRecord) {
+    const { mfaSecret, notificationSettings, ...rest } = user;
+    return {
+      ...rest,
+      notificationSettings: UsersService.normalizeNotificationSettings(notificationSettings),
+      hasMfa: !!mfaSecret
+    };
+  }
+
+  static async findSelfById(id: string) {
+    const user = await db.user.findUniqueOrThrow({
+      where: { id },
+      select: SELF_USER_SELECT
+    });
+    return UsersService.toSelfProfile(user);
+  }
+
+  static async findPublicById(id: string) {
     return db.user.findUniqueOrThrow({
       where: { id },
-      omit: { passwordHash: true }
+      select: PUBLIC_USER_SELECT
+    });
+  }
+
+  static async findByUsername(username: string) {
+    return db.user.findMany({
+      where: { username: { startsWith: username } },
+      select: SEARCH_USER_SELECT,
+      take: 10
     });
   }
 
@@ -18,11 +112,12 @@ export abstract class UsersService {
     id: string,
     data: UsersModel["updateProfileBody"]
   ) {
-    return db.user.update({
+    const user = await db.user.update({
       where: { id },
       data,
-      omit: { passwordHash: true }
+      select: SELF_USER_SELECT
     });
+    return UsersService.toSelfProfile(user);
   }
 
   static async changePassword(
@@ -51,7 +146,6 @@ export abstract class UsersService {
       } satisfies UsersModel["changePasswordSame"]);
 
     const passwordHash = await Bun.password.hash(data.newPassword);
-
     await db.user.update({ where: { id }, data: { passwordHash } });
     return {
       message: "Password updated"
@@ -62,8 +156,34 @@ export abstract class UsersService {
     const user = await db.user.findUniqueOrThrow({ where: { id } });
     if (!(await Bun.password.verify(data.password, user.passwordHash)))
       throw status(422, { message: "Password is incorrect" });
-    await db.user.update({ where: { id }, data: { email: data.email } });
-    return { message: "Email updated" };
+    const updatedUser = await db.user.update({
+      where: { id },
+      data: { email: data.email },
+      select: SELF_USER_SELECT
+    });
+    return UsersService.toSelfProfile(updatedUser);
+  }
+
+  static async deleteSelf(
+    id: string,
+    data: UsersModel["deleteAccountBody"]
+  ) {
+    const user = await db.user.findUniqueOrThrow({ where: { id } });
+
+    if (!(await Bun.password.verify(data.password, user.passwordHash))) {
+      throw status(401, {
+        error: "Password is incorrect"
+      } satisfies UsersModel["deleteAccountInvalidPassword"]);
+    }
+
+    if (data.confirmation.trim() !== DELETE_ACCOUNT_CONFIRMATION) {
+      throw status(400, {
+        error: "Confirmation phrase does not match"
+      } satisfies UsersModel["deleteAccountInvalidConfirmation"]);
+    }
+
+    await db.user.delete({ where: { id } });
+    return status(204);
   }
 
   static async uploadAvatar(id: string, file: File) {
@@ -71,22 +191,24 @@ export abstract class UsersService {
     const filename = `${crypto.randomUUID()}.${ext}`;
     mkdirSync(AVATARS_DIR, { recursive: true });
     await Bun.write(join(AVATARS_DIR, filename), file);
-    return db.user.update({
+    const updatedUser = await db.user.update({
       where: { id },
       data: { avatarUrl: `/avatars/${filename}` },
-      omit: { passwordHash: true }
+      select: SELF_USER_SELECT
     });
+    return UsersService.toSelfProfile(updatedUser);
   }
 
   static async updateNotificationSettings(
     id: string,
     settings: UsersModel["notificationSettingsBody"]
   ) {
-    return db.user.update({
+    const updatedUser = await db.user.update({
       where: { id },
       data: { notificationSettings: settings },
-      omit: { passwordHash: true }
+      select: SELF_USER_SELECT
     });
+    return UsersService.toSelfProfile(updatedUser);
   }
 
   static async getTree(id: string) {
@@ -104,5 +226,103 @@ export abstract class UsersService {
       select: { treeState: true }
     });
     return treeState;
+  }
+
+  // ── MFA ────────────────────────────────────────────────────────────
+
+  /** Begin MFA setup: generate a new secret and return QR code data. */
+  static async setupMfa(userId: string, email: string) {
+    const secret = totp.generateSecret();
+    const uri = totp.toURI({ label: email, secret });
+    const qrCode = await QRCode.toDataURL(uri);
+
+    await db.user.update({
+      where: { id: userId },
+      data: { mfaPendingSecret: encryptSecret(secret) }
+    });
+
+    return { secret, qrCode } satisfies UsersModel["mfaSetupResponse"];
+  }
+
+  /** Confirm setup: verify code against pending secret, promote it to active. */
+  static async verifyMfaSetup(
+    userId: string,
+    { code }: UsersModel["mfaVerifyBody"]
+  ) {
+    const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+
+    if (!user.mfaPendingSecret)
+      throw status(400, { message: "No MFA setup in progress" });
+
+    const secret = decryptSecret(user.mfaPendingSecret);
+    const result = await totp.verify(code, { secret });
+    if (!result.valid)
+      throw status(422, { message: "Invalid TOTP code" });
+
+    await db.user.update({
+      where: { id: userId },
+      data: { mfaSecret: user.mfaPendingSecret, mfaPendingSecret: null }
+    });
+
+    return status(204);
+  }
+
+  /** Disable MFA: require both current password and a valid TOTP code. */
+  static async disableMfa(
+    userId: string,
+    { password, code }: UsersModel["mfaDisableBody"]
+  ) {
+    const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+
+    if (!user.mfaSecret)
+      throw status(400, { message: "MFA is not enabled" });
+
+    if (!(await Bun.password.verify(password, user.passwordHash)))
+      throw status(401, { message: "Password is incorrect" });
+
+    const secret = decryptSecret(user.mfaSecret);
+    const result = await totp.verify(code, { secret });
+    if (!result.valid)
+      throw status(422, { message: "Invalid TOTP code" });
+
+    await db.user.update({
+      where: { id: userId },
+      data: { mfaSecret: null, mfaPendingSecret: null }
+    });
+
+    return status(204);
+  }
+
+  // ── Achievements ───────────────────────────────────────────────────
+
+  /** Return the IDs of achievements the user has unlocked. */
+  static async getAchievements(userId: string): Promise<string[]> {
+    const [memCount, contribCount, friendCount, distinctDaysRows, hasOpen] =
+      await Promise.all([
+        db.memory.count({ where: { userId } }),
+        db.contribution.count({ where: { contributorId: userId } }),
+        db.friend.count({
+          where: {
+            OR: [{ requesterId: userId }, { recipientId: userId }],
+            status: "ACCEPTED"
+          }
+        }),
+        db.memory.findMany({
+          where: { userId },
+          select: { date: true },
+          distinct: ["date"]
+        }),
+        db.memory.findFirst({ where: { userId, isOpen: true } })
+      ]);
+
+    const stats: AchievementStats = {
+      memCount,
+      contribCount,
+      friendCount,
+      distinctDays: distinctDaysRows.length,
+      hasOpen: hasOpen !== null
+    };
+
+    return ACHIEVEMENTS.filter((a) => a.check(stats)).map((a) => a.id);
   }
 }

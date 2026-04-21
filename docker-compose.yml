@@ -88,19 +88,25 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       JWT_SECRET_FILE: /run/secrets/jwt_secret
+      MFA_ENCRYPTION_KEY_FILE: /run/secrets/mfa_encryption_key
       PGSSLMODE: verify-full
       PGSSLROOTCERT: /run/certs/internal/ca.crt
       NODE_EXTRA_CA_CERTS: /run/certs/internal/ca.crt
       SSL_CERT_FILE: /run/certs/internal/ca.crt
     volumes:
       - certs:/run/certs:ro
+      - media:/app/uploads
     secrets:
       - postgres_password
       - jwt_secret
+      - mfa_encryption_key
 
   frontend:
     build:
       context: ./frontend
+      args:
+        DOMAIN: ${DOMAIN:-transcen.dence.fr}
+        HTTPS_PORT: ${HTTPS_PORT:-443}
 
   nginx:
     build:
@@ -135,11 +141,14 @@ services:
 volumes:
   certs:
   database:
+  media:
 
 secrets:
   postgres_password:
     file: ./docker/secrets/postgres_password
   jwt_secret:
     file: ./docker/secrets/jwt_secret
+  mfa_encryption_key:
+    file: ./docker/secrets/mfa_encryption_key
   powerdnsadmin_api_key:
     file: ./docker/secrets/powerdnsadmin_api_key

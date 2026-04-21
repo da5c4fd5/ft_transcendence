@@ -15,6 +15,7 @@ datasource db {
 model Session {
   id        String   @id @default(cuid())
   userId    String
+  userAgent String?
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -33,13 +34,17 @@ model User {
   passwordHash         String
   username             String    @unique
   displayName          String?
-  bio                  String?   @db.VarChar(280)
   avatarUrl            String?
   /// JSON blob: { emailDigest, pushEnabled, reminderTime }
   notificationSettings Json      @default("{}")
   /// JSON blob for the gamification tree state
   treeState            Json      @default("{}")
   lastActiveAt         DateTime?
+  isAdmin              Boolean   @default(false)
+  /// Encrypted TOTP secret (AES-256-GCM). Null = MFA not enabled.
+  mfaSecret            String?   @db.Text
+  /// Encrypted TOTP secret during the setup flow. Cleared once verify completes.
+  mfaPendingSecret     String?   @db.Text
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -89,9 +94,11 @@ model Memory {
   date      DateTime @default(now()) @db.Date
   mood      String?  @db.VarChar(32)
   /// When true, anyone with the link can add a contribution
-  isOpen    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isOpen     Boolean  @default(false)
+  /// Unique token used for share links. Generated when isOpen is set to true.
+  shareToken String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   media         Media[]
@@ -124,7 +131,9 @@ model Contribution {
   /// Null when the contributor is a guest (not signed in)
   contributorId String?
   guestName     String?  @db.VarChar(64)
+  guestAvatarUrl String? @db.Text
   content       String   @db.Text
+  mediaUrl      String?  @db.Text
   createdAt     DateTime @default(now())
 
   memory      Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
