@@ -3,6 +3,25 @@ import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../db";
 import type { MemoriesModel } from "./model";
 
+function getLocalDayRange(reference = new Date()) {
+  const start = new Date(reference);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 1);
+
+  return { start, end };
+}
+
+function assertMemoryCanBeModifiedToday(memoryDate: Date) {
+  const { start, end } = getLocalDayRange();
+  if (memoryDate < start || memoryDate >= end) {
+    throw status(403, {
+      message: "Only today's memory can be updated or deleted"
+    });
+  }
+}
+
 export abstract class MemoriesService {
   static async list(userId: string, query: { page: number; limit: number }) {
     const [items, total] = await Promise.all([
@@ -32,8 +51,7 @@ export abstract class MemoriesService {
   static async create(userId: string, data: MemoriesModel["createBody"]) {
     const date = data.date ? new Date(data.date) : new Date();
     date.setHours(0, 0, 0, 0);
-    const nextDay = new Date(date);
-    nextDay.setDate(date.getDate() + 1);
+    const { end: nextDay } = getLocalDayRange(date);
 
     const existing = await db.memory.findFirst({
       where: { userId, date: { gte: date, lt: nextDay } }
@@ -60,6 +78,7 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
+    assertMemoryCanBeModifiedToday(memory.date);
 
     // Generate a share token when opening for the first time
     const shareToken =
@@ -74,10 +93,7 @@ export abstract class MemoriesService {
   }
 
   static async today(userId: string) {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    const nextDay = new Date(date);
-    nextDay.setDate(date.getDate() + 1);
+    const { start: date, end: nextDay } = getLocalDayRange();
 
     const memory = await db.memory.findFirst({
       where: { userId, date: { gte: date, lt: nextDay } },
@@ -109,6 +125,7 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
+    assertMemoryCanBeModifiedToday(memory.date);
     await db.memory.delete({ where: { id } });
     return status(204);
   }

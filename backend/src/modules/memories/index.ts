@@ -130,7 +130,11 @@ export const memories = new Elysia({
             MemoriesService.update(params.memoryId, user!.id, body),
           {
             body: MemoriesModel.updateBody,
-            detail: { description: "Update a memory's content or mood." }
+            response: { 403: t.Any(), 404: t.Any() },
+            detail: {
+              description:
+                "Update a memory's content or mood. Only today's memory can be updated."
+            }
           }
         )
         .delete(
@@ -139,7 +143,10 @@ export const memories = new Elysia({
             MemoriesService.delete(params.memoryId, user!.id),
           {
             response: { 204: t.Any(), 403: t.Any(), 404: t.Any() },
-            detail: { description: "Delete a memory and all its media." }
+            detail: {
+              description:
+                "Delete a memory and all its media. Only today's memory can be deleted."
+            }
           }
         )
 
