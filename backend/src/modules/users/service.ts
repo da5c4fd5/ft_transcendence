@@ -9,10 +9,28 @@ import QRCode from "qrcode";
 
 const AVATARS_DIR = join(import.meta.dir, "../../../public/avatars");
 
-const USER_OMIT = {
-  passwordHash: true,
-  mfaSecret: true,
-  mfaPendingSecret: true
+const SELF_USER_SELECT = {
+  id: true,
+  username: true,
+  email: true,
+  displayName: true,
+  avatarUrl: true,
+  notificationSettings: true,
+  isAdmin: true,
+  mfaSecret: true
+} as const;
+
+const PUBLIC_USER_SELECT = {
+  id: true,
+  username: true,
+  displayName: true,
+  avatarUrl: true
+} as const;
+
+const SEARCH_USER_SELECT = {
+  id: true,
+  username: true,
+  avatarUrl: true
 } as const;
 
 const totp = new TOTP({
@@ -41,17 +59,50 @@ type AchievementStats = {
   contribCount: number;
 };
 
+type SelfUserRecord = {
+  id: string;
+  username: string;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  notificationSettings: unknown;
+  isAdmin: boolean;
+  mfaSecret: string | null;
+};
+
 export abstract class UsersService {
-  static async findById(id: string) {
-    const user = await db.user.findUniqueOrThrow({ where: { id } });
-    const { passwordHash, mfaSecret, mfaPendingSecret, ...rest } = user;
-    return { ...rest, hasMfa: !!mfaSecret };
+  private static normalizeNotificationSettings(value: unknown) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+
+  private static toSelfProfile(user: SelfUserRecord) {
+    const { mfaSecret, notificationSettings, ...rest } = user;
+    return {
+      ...rest,
+      notificationSettings: UsersService.normalizeNotificationSettings(notificationSettings),
+      hasMfa: !!mfaSecret
+    };
+  }
+
+  static async findSelfById(id: string) {
+    const user = await db.user.findUniqueOrThrow({
+      where: { id },
+      select: SELF_USER_SELECT
+    });
+    return UsersService.toSelfProfile(user);
+  }
+
+  static async findPublicById(id: string) {
+    return db.user.findUniqueOrThrow({
+      where: { id },
+      select: PUBLIC_USER_SELECT
+    });
   }
 
   static async findByUsername(username: string) {
     return db.user.findMany({
       where: { username: { startsWith: username } },
-      select: { username: true, id: true, avatarUrl: true },
+      select: SEARCH_USER_SELECT,
       take: 10
     });
   }
@@ -60,7 +111,12 @@ export abstract class UsersService {
     id: string,
     data: UsersModel["updateProfileBody"]
   ) {
-    return db.user.update({ where: { id }, data, omit: USER_OMIT });
+    const user = await db.user.update({
+      where: { id },
+      data,
+      select: SELF_USER_SELECT
+    });
+    return UsersService.toSelfProfile(user);
   }
 
   static async changePassword(
@@ -99,11 +155,12 @@ export abstract class UsersService {
     const user = await db.user.findUniqueOrThrow({ where: { id } });
     if (!(await Bun.password.verify(data.password, user.passwordHash)))
       throw status(422, { message: "Password is incorrect" });
-    return db.user.update({
+    const updatedUser = await db.user.update({
       where: { id },
       data: { email: data.email },
-      omit: USER_OMIT
+      select: SELF_USER_SELECT
     });
+    return UsersService.toSelfProfile(updatedUser);
   }
 
   static async uploadAvatar(id: string, file: File) {
@@ -111,22 +168,24 @@ export abstract class UsersService {
     const filename = `${crypto.randomUUID()}.${ext}`;
     mkdirSync(AVATARS_DIR, { recursive: true });
     await Bun.write(join(AVATARS_DIR, filename), file);
-    return db.user.update({
+    const updatedUser = await db.user.update({
       where: { id },
       data: { avatarUrl: `/avatars/${filename}` },
-      omit: USER_OMIT
+      select: SELF_USER_SELECT
     });
+    return UsersService.toSelfProfile(updatedUser);
   }
 
   static async updateNotificationSettings(
     id: string,
     settings: UsersModel["notificationSettingsBody"]
   ) {
-    return db.user.update({
+    const updatedUser = await db.user.update({
       where: { id },
       data: { notificationSettings: settings },
-      omit: USER_OMIT
+      select: SELF_USER_SELECT
     });
+    return UsersService.toSelfProfile(updatedUser);
   }
 
   static async getTree(id: string) {

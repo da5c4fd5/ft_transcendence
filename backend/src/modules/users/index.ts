@@ -20,10 +20,12 @@ export const users = new Elysia({
     (app) =>
       app
         // ── Profile ──────────────────────────────────────────────────
-        .get("/me", ({ user }) => UsersService.findById(user!.id), {
+        .get("/me", ({ user }) => UsersService.findSelfById(user!.id), {
+          response: { 200: UsersModel.selfProfileResponse },
           detail: { description: "Return the authenticated user's profile." }
         })
-        .get("/:id", ({ params }) => UsersService.findById(params.id), {
+        .get("/:id", ({ params }) => UsersService.findPublicById(params.id), {
+          response: { 200: UsersModel.publicProfileResponse },
           detail: { description: "Return a public profile by user ID." }
         })
         .get(
@@ -31,6 +33,7 @@ export const users = new Elysia({
           ({ query }) => UsersService.findByUsername(query.q),
           {
             query: t.Object({ q: t.String() }),
+            response: { 200: t.Array(UsersModel.searchResultResponse) },
             detail: {
               description:
                 "Search users by username prefix. Returns up to 10 matches with id, username, and avatarUrl."
@@ -42,6 +45,7 @@ export const users = new Elysia({
           ({ user, body }) => UsersService.updateProfile(user!.id, body),
           {
             body: UsersModel.updateProfileBody,
+            response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description:
                 "Update username, displayName, or bio for the authenticated user."
@@ -71,6 +75,7 @@ export const users = new Elysia({
           ({ user, body }) => UsersService.changeEmail(user!.id, body),
           {
             body: UsersModel.changeEmailBody,
+            response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description:
                 "Change the account email. Requires the current password for confirmation."
@@ -84,6 +89,7 @@ export const users = new Elysia({
           ({ user, body }) => UsersService.uploadAvatar(user!.id, body.file),
           {
             body: UsersModel.avatarBody,
+            response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description:
                 "Upload a new avatar image (multipart/form-data). Returns the updated user profile."
@@ -98,6 +104,7 @@ export const users = new Elysia({
             UsersService.updateNotificationSettings(user!.id, body),
           {
             body: UsersModel.notificationSettingsBody,
+            response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description: "Update notification preferences."
             }

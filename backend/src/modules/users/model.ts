@@ -1,6 +1,44 @@
 import { t, type UnwrapSchema } from "elysia";
 
+const NullableString = t.Union([t.String(), t.Null()]);
+
 export const UsersModel = {
+  notificationSettingsResponse: t.Object({
+    emailDigest: t.Optional(t.Boolean()),
+    pushEnabled: t.Optional(t.Boolean()),
+    reminderTime: t.Optional(t.String())
+  }),
+
+  selfProfileResponse: t.Object({
+    id: t.String(),
+    username: t.String(),
+    email: t.String({ format: "email" }),
+    displayName: NullableString,
+    avatarUrl: NullableString,
+    notificationSettings: t.Optional(
+      t.Object({
+        emailDigest: t.Optional(t.Boolean()),
+        pushEnabled: t.Optional(t.Boolean()),
+        reminderTime: t.Optional(t.String())
+      })
+    ),
+    isAdmin: t.Boolean(),
+    hasMfa: t.Boolean()
+  }),
+
+  publicProfileResponse: t.Object({
+    id: t.String(),
+    username: t.String(),
+    displayName: NullableString,
+    avatarUrl: NullableString
+  }),
+
+  searchResultResponse: t.Object({
+    id: t.String(),
+    username: t.String(),
+    avatarUrl: NullableString
+  }),
+
   updateProfileBody: t.Object({
     username: t.Optional(t.String({ minLength: 2, maxLength: 32 })),
     displayName: t.Optional(t.String({ maxLength: 64 })),

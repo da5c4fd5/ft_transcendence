@@ -1,6 +1,12 @@
 import { status } from "elysia";
 import { db } from "../../db";
 
+const FRIEND_USER_SELECT = {
+  id: true,
+  username: true,
+  avatarUrl: true
+} as const;
+
 export abstract class FriendsService {
   static async list(userId: string) {
     return db.friend.findMany({
@@ -8,9 +14,12 @@ export abstract class FriendsService {
         status: "ACCEPTED",
         OR: [{ requesterId: userId }, { recipientId: userId }]
       },
-      include: {
-        requester: { omit: { passwordHash: true } },
-        recipient: { omit: { passwordHash: true } }
+      select: {
+        id: true,
+        requesterId: true,
+        recipientId: true,
+        requester: { select: FRIEND_USER_SELECT },
+        recipient: { select: FRIEND_USER_SELECT }
       }
     });
   }
@@ -71,7 +80,9 @@ export abstract class FriendsService {
   static async listRequests(userId: string) {
     return db.friend.findMany({
       where: { recipientId: userId, status: "PENDING" },
-      include: {
+      select: {
+        id: true,
+        requesterId: true,
         requester: { select: { id: true, username: true, avatarUrl: true } }
       },
       orderBy: { createdAt: "desc" }

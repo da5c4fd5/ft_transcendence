@@ -1,5 +1,6 @@
 import { Elysia, t } from "elysia";
 import { authPlugin } from "../../plugins/auth.plugin";
+import { FriendsModel } from "./model";
 import { FriendsService } from "./service";
 
 export const friends = new Elysia({
@@ -19,9 +20,11 @@ export const friends = new Elysia({
     (app) =>
       app
         .get("/", ({ user }) => FriendsService.list(user!.id), {
+          response: { 200: t.Array(FriendsModel.friendListItemResponse) },
           detail: { description: "List accepted friends." }
         })
         .get("/requests", ({ user }) => FriendsService.listRequests(user!.id), {
+          response: { 200: t.Array(FriendsModel.friendRequestResponse) },
           detail: { description: "List incoming pending friend requests." }
         })
         .put(
