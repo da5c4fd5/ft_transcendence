@@ -165,9 +165,10 @@ function SuccessBanner() {
   );
 }
 
-function PastMemoryCard({ memory, onRefresh }: {
+function PastMemoryCard({ memory, onRefresh, canRefresh }: {
   memory: PastMemory | null;
   onRefresh: () => void;
+  canRefresh: boolean;
 }) {
   if (!memory) {
     return (
@@ -185,7 +186,13 @@ function PastMemoryCard({ memory, onRefresh }: {
         <button
           type="button"
           onClick={onRefresh}
-          className="w-9 h-9 bg-white/40 rounded-full flex items-center justify-center shrink-0 hover:bg-white/60 transition-colors"
+          disabled={!canRefresh}
+          className={cn(
+            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors',
+            canRefresh
+              ? 'bg-white/40 hover:bg-white/60'
+              : 'bg-white/25 text-darkgrey/40 cursor-default'
+          )}
           aria-label="Show another memory"
         >
           <RefreshCw size={15} className="text-darkgrey" />
@@ -268,16 +275,23 @@ type RawMemory = {
   media: { url: string }[];
 };
 
+type RawReminder = {
+  id: string;
+  date: string;
+  content: string;
+  mood: string | null;
+};
+
 function pickPrompt(prompts: string[]): string {
   return prompts[Math.floor(Math.random() * prompts.length)] ?? '';
 }
 
-function toPastMemory(raw: RawMemory): PastMemory {
+function toPastMemory(raw: RawReminder): PastMemory {
   return {
     id: raw.id,
     date: raw.date.slice(0, 10),
     content: raw.content,
-    media: raw.media[0]?.url ?? null,
+    media: null,
     mood: (raw.mood ?? 'Neutral') as PastMemory['mood'],
   };
 }
@@ -316,24 +330,25 @@ export function TodayPage() {
 
       if (todayMem) {
         setSavedMemory({ id: todayMem.id, content: todayMem.content, media: todayMem.media[0]?.url ?? null });
+        await loadReminders();
         setTodayState('saved');
-        loadCapsuls();
       }
     }
     load();
   }, []);
 
-  const loadCapsuls = async () => {
-    const raw = await api.get<RawMemory[]>('/memories/capsuls').catch(() => [] as RawMemory[]);
+  const loadReminders = async () => {
+    const raw = await api.get<RawReminder[]>('/memories/reminders').catch(() => [] as RawReminder[]);
     const mapped = raw.map(toPastMemory);
-    // shuffle so it feels fresh each time
-    mapped.sort(() => Math.random() - 0.5);
     setCapsuls(mapped);
     setCapsulIdx(0);
+    return mapped;
   };
 
   useEffect(() => {
-    if (todayState === 'saved' && capsuls.length === 0) loadCapsuls();
+    if (todayState === 'saved' && capsuls.length === 0) {
+      void loadReminders();
+    }
   }, [todayState]);
 
   const pastMemory = capsuls[capsulIdx] ?? null;
@@ -386,8 +401,8 @@ export function TodayPage() {
       setTreeData(newTree ?? { lifeForce: 0, isDecreasing: false });
       setStats(newStats);
       setSavedMemory({ id: memId, content, media });
+      await loadReminders();
       setTodayState('saved');
-      loadCapsuls();
     } catch {
       // noop
     } finally {
@@ -453,6 +468,7 @@ export function TodayPage() {
               <PastMemoryCard
                 memory={pastMemory}
                 onRefresh={handleRefreshPastMemory}
+                canRefresh={capsuls.length > 1}
               />
             </>
           )}

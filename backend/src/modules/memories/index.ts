@@ -91,6 +91,12 @@ export const memories = new Elysia({
               "Return 3 backend-selected memories spread across the user's history, suitable for the time-capsule view."
           }
         })
+        .get("/reminders", ({ user }) => MemoriesService.getReminders(user!.id), {
+          detail: {
+            description:
+              "Return a cached pool of past memories for the Today reminder card, excluding today's entry."
+          }
+        })
 
         // ── Timeline / Calendar ───────────────────────────────────────
         .get(

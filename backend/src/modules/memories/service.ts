@@ -3,6 +3,21 @@ import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../db";
 import type { MemoriesModel } from "./model";
 
+const REMINDER_CACHE_TTL_MS = 5 * 60 * 1000;
+const REMINDER_POOL_LIMIT = 24;
+
+type ReminderMemory = {
+  id: string;
+  date: Date;
+  content: string;
+  mood: string | null;
+};
+
+const reminderCache = new Map<
+  string,
+  { expiresAt: number; items: ReminderMemory[] }
+>();
+
 function getLocalDayRange(reference = new Date()) {
   const start = new Date(reference);
   start.setHours(0, 0, 0, 0);
@@ -11,6 +26,15 @@ function getLocalDayRange(reference = new Date()) {
   end.setDate(start.getDate() + 1);
 
   return { start, end };
+}
+
+function shuffle<T>(items: T[]) {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 function assertMemoryCanBeModifiedToday(memoryDate: Date) {
@@ -23,6 +47,10 @@ function assertMemoryCanBeModifiedToday(memoryDate: Date) {
 }
 
 export abstract class MemoriesService {
+  static invalidateReminderCache(userId: string) {
+    reminderCache.delete(userId);
+  }
+
   static async list(userId: string, query: { page: number; limit: number }) {
     const [items, total] = await Promise.all([
       db.memory.findMany({
@@ -58,7 +86,7 @@ export abstract class MemoriesService {
     });
     if (existing) throw status(409, { message: "You already have a memory for today" });
 
-    return db.memory.create({
+    const memory = await db.memory.create({
       data: {
         userId,
         content: data.content,
@@ -68,6 +96,8 @@ export abstract class MemoriesService {
         ...(data.isOpen ? { shareToken: createId() } : {})
       }
     });
+    MemoriesService.invalidateReminderCache(userId);
+    return memory;
   }
 
   static async update(
@@ -86,10 +116,12 @@ export abstract class MemoriesService {
         ? createId()
         : undefined;
 
-    return db.memory.update({
+    const updated = await db.memory.update({
       where: { id },
       data: { ...data, ...(shareToken ? { shareToken } : {}) }
     });
+    MemoriesService.invalidateReminderCache(userId);
+    return updated;
   }
 
   static async today(userId: string) {
@@ -127,6 +159,7 @@ export abstract class MemoriesService {
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
     assertMemoryCanBeModifiedToday(memory.date);
     await db.memory.delete({ where: { id } });
+    MemoriesService.invalidateReminderCache(userId);
     return status(204);
   }
 
@@ -144,9 +177,11 @@ export abstract class MemoriesService {
     await Bun.write(`${uploadDir}/${filename}`, await file.arrayBuffer());
 
     const url = `/api/media/${filename}`;
-    return db.media.create({
+    const media = await db.media.create({
       data: { memoryId: id, url, mimeType: file.type }
     });
+    MemoriesService.invalidateReminderCache(userId);
+    return media;
   }
 
   static async deleteMedia(id: string, userId: string) {
@@ -154,6 +189,7 @@ export abstract class MemoriesService {
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
     await db.media.deleteMany({ where: { memoryId: id } });
+    MemoriesService.invalidateReminderCache(userId);
   }
 
   static async getPromptSuggestions() {
@@ -281,5 +317,34 @@ export abstract class MemoriesService {
       seen.add(m.id);
       return true;
     });
+  }
+
+  static async getReminders(userId: string, limit = 12) {
+    const cached = reminderCache.get(userId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.items.slice(0, limit);
+    }
+
+    const { start: todayStart } = getLocalDayRange();
+    const reminders = await db.memory.findMany({
+      where: {
+        userId,
+        date: { lt: todayStart }
+      },
+      select: {
+        id: true,
+        date: true,
+        content: true,
+        mood: true
+      },
+      orderBy: { date: "desc" }
+    });
+
+    const items = shuffle(reminders).slice(0, REMINDER_POOL_LIMIT);
+    reminderCache.set(userId, {
+      expiresAt: Date.now() + REMINDER_CACHE_TTL_MS,
+      items
+    });
+    return items.slice(0, limit);
   }
 }

@@ -6,7 +6,7 @@ export interface SavedMemory {
   media: string | null;
 }
 
-// Past memory surfaced from GET /memories/capsuls (first result)
+// Past memory surfaced from GET /memories/reminders
 // date is ISO format — the "One year ago today" label is computed client-side
 export interface PastMemory {
   id: string;
