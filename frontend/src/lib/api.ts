@@ -37,8 +37,28 @@ export function setUnauthorizedHandler(cb: () => void) {
   _onUnauthorized = cb;
 }
 
-function getToken(): string | null {
+export function getToken(): string | null {
   return localStorage.getItem('capsul_token');
+}
+
+export function getWebSocketUrl(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined | null>,
+): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const normalizedPath = path.startsWith('/api') ? path : `/api${path.startsWith('/') ? path : `/${path}`}`;
+  let urlStr = `${protocol}://${API_DOMAIN}${API_PORT}${normalizedPath}`;
+
+  if (params) {
+    const qs = new URLSearchParams();
+    for (const [key, val] of Object.entries(params)) {
+      if (val !== undefined && val !== null) qs.set(key, String(val));
+    }
+    const qsStr = qs.toString();
+    if (qsStr) urlStr += `?${qsStr}`;
+  }
+
+  return urlStr;
 }
 
 async function request<T>(

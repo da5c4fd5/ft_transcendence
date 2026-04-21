@@ -8,7 +8,8 @@ export const FriendsModel = {
   friendUserResponse: t.Object({
     id: t.String(),
     username: t.String(),
-    avatarUrl: NullableString
+    avatarUrl: NullableString,
+    online: t.Boolean()
   }),
 
   friendListItemResponse: t.Object({
@@ -18,12 +19,14 @@ export const FriendsModel = {
     requester: t.Object({
       id: t.String(),
       username: t.String(),
-      avatarUrl: NullableString
+      avatarUrl: NullableString,
+      online: t.Boolean()
     }),
     recipient: t.Object({
       id: t.String(),
       username: t.String(),
-      avatarUrl: NullableString
+      avatarUrl: NullableString,
+      online: t.Boolean()
     })
   }),
 

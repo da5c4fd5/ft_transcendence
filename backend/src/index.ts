@@ -8,6 +8,7 @@ import { friends } from "./modules/friends";
 import { memories } from "./modules/memories";
 import { contributions } from "./modules/contributions";
 import { admin } from "./modules/admin";
+import { realtime } from "./modules/realtime";
 
 const hostname = process.env.HOST ?? "0.0.0.0";
 const port = Number(process.env.PORT ?? 4242);
@@ -51,6 +52,7 @@ const app = new Elysia()
   .use(memories)
   .use(contributions)
   .use(admin)
+  .use(realtime)
   .get("/", () => ({ status: "ok" }), { detail: { hide: true } })
   .get(
     "/media/:filename",

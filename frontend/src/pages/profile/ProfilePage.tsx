@@ -6,6 +6,7 @@ import type { User as UserType } from './profile.types';
 import { formatSessionDateTime } from '../../lib/date';
 import { api, getApiErrorMessage, validateImageFile } from '../../lib/api';
 import type { ApiError } from '../../lib/api';
+import { useRealtime } from '../../lib/realtime';
 
 const cardBase   = 'bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm';
 const inputBase  = 'w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey';
@@ -235,16 +236,19 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
 }
 
 type RawFriendUser = { id: string; username: string; avatarUrl: string | null };
-type RawFriend = { id: string; requesterId: string; recipientId: string; requester: RawFriendUser; recipient: RawFriendUser };
+type RawFriendListUser = RawFriendUser & { online: boolean };
+type RawFriend = { id: string; requesterId: string; recipientId: string; requester: RawFriendListUser; recipient: RawFriendListUser };
 
 type RawRequest = { id: string; requesterId: string; requester: RawFriendUser };
 
 function FriendsCard({ userId }: { userId: string }) {
+  const { onlineUserIds, presenceReady, sendPing } = useRealtime();
   const [friends, setFriends]           = useState<Friend[]>([]);
   const [requests, setRequests]         = useState<RawRequest[]>([]);
   const [input, setInput]               = useState('');
   const [addError, setAddError]         = useState<string | null>(null);
   const [adding, setAdding]             = useState(false);
+  const [pendingPingIds, setPendingPingIds] = useState<Set<string>>(new Set());
   const [pingedIds, setPingedIds]       = useState<Set<string>>(new Set());
   const [suggestions, setSuggestions]   = useState<RawFriendUser[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -263,7 +267,7 @@ function FriendsCard({ userId }: { userId: string }) {
     ]);
     setFriends(raw.map(f => {
       const other = f.requesterId === userId ? f.recipient : f.requester;
-      return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: false };
+      return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: other.online };
     }));
     setRequests(reqs);
   }, [userId]);
@@ -272,6 +276,50 @@ function FriendsCard({ userId }: { userId: string }) {
     refreshFriends().catch(() => {});
     return () => { timersRef.current.forEach(clearTimeout); };
   }, [refreshFriends]);
+
+  useEffect(() => {
+    if (!presenceReady) return;
+    setFriends(prev => prev.map(friend => {
+      const online = onlineUserIds.has(friend.id);
+      return friend.online === online ? friend : { ...friend, online };
+    }));
+  }, [onlineUserIds, presenceReady]);
+
+  useEffect(() => {
+    const handlePingResult = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId: string; delivered: boolean }>).detail;
+      if (!detail?.userId) return;
+
+      setPendingPingIds(prev => {
+        const next = new Set(prev);
+        next.delete(detail.userId);
+        return next;
+      });
+
+      if (detail.delivered) {
+        setPingedIds(prev => new Set(prev).add(detail.userId));
+        const timer = setTimeout(() => {
+          setPingedIds(prev => {
+            const next = new Set(prev);
+            next.delete(detail.userId);
+            return next;
+          });
+          timersRef.current.delete(detail.userId);
+        }, 3000);
+        const previousTimer = timersRef.current.get(detail.userId);
+        if (previousTimer) clearTimeout(previousTimer);
+        timersRef.current.set(detail.userId, timer);
+        return;
+      }
+
+      setFriends(prev => prev.map(friend =>
+        friend.id === detail.userId ? { ...friend, online: false } : friend
+      ));
+    };
+
+    window.addEventListener('capsul:ping-result', handlePingResult as EventListener);
+    return () => window.removeEventListener('capsul:ping-result', handlePingResult as EventListener);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -398,13 +446,9 @@ function FriendsCard({ userId }: { userId: string }) {
   };
 
   const handlePing = async (id: string) => {
-    if (pingedIds.has(id)) return;
-    setPingedIds(prev => new Set(prev).add(id));
-    const timer = setTimeout(() => {
-      setPingedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-      timersRef.current.delete(id);
-    }, 3000);
-    timersRef.current.set(id, timer);
+    if (pingedIds.has(id) || pendingPingIds.has(id)) return;
+    if (!sendPing(id)) return;
+    setPendingPingIds(prev => new Set(prev).add(id));
   };
 
   return (
@@ -525,7 +569,8 @@ function FriendsCard({ userId }: { userId: string }) {
       <div className="flex flex-col gap-2">
         {friends.map(f => {
           const pinged = pingedIds.has(f.id);
-          const pingLabel = !f.online ? `${f.username} is offline` : pinged ? 'Ping sent!' : 'Remind to create a memory';
+          const pingPending = pendingPingIds.has(f.id);
+          const pingLabel = !f.online ? `${f.username} is offline` : pinged ? 'Ping sent!' : pingPending ? 'Sending ping...' : 'Remind to create a memory';
           return (
             <div key={f.id} className="flex items-center gap-3 p-3 rounded-2xl border border-black/5">
               {f.avatarUrl ? (
@@ -547,20 +592,22 @@ function FriendsCard({ userId }: { userId: string }) {
               <button
                 type="button"
                 onClick={() => handlePing(f.id)}
-                disabled={!f.online || pinged}
+                disabled={!f.online || pinged || pingPending}
                 aria-label={pingLabel}
                 title={pingLabel}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0',
                   pinged
                     ? 'bg-blue/20 text-blue cursor-default'
+                    : pingPending
+                      ? 'bg-yellow/30 text-darkgrey cursor-progress'
                     : f.online
                       ? 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey'
                       : 'bg-verylightorange text-mediumgrey/40 cursor-not-allowed',
                 )}
               >
                 {pinged ? <BellRing size={13} /> : <Bell size={13} />}
-                {pinged ? 'Pinged!' : 'Ping'}
+                {pinged ? 'Pinged!' : pingPending ? 'Sending...' : 'Ping'}
               </button>
             </div>
           );

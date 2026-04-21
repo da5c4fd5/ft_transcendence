@@ -17,6 +17,7 @@ import type { SharedMemory } from './pages/guest/guest.types';
 import type { User } from './pages/profile/profile.types';
 import { api, setUnauthorizedHandler } from './lib/api';
 import { getFormattedDate } from './lib/date';
+import { RealtimeProvider } from './lib/realtime';
 
 export const TOKEN_KEY = 'capsul_token';
 
@@ -139,8 +140,10 @@ function AppInner() {
 
   // Shared memory route — takes priority over auth state
   const sharedMatch = location.match(/^\/memories\/([^/]+)\/([^/]+)/);
+  let content: ComponentChildren;
+
   if (sharedMatch) {
-    return (
+    content = (
       <SharedMemoryRoute
         memoryId={sharedMatch[1]}
         shareToken={sharedMatch[2]}
@@ -148,13 +151,12 @@ function AppInner() {
         onNavigateToWelcome={() => navigate('/')}
       />
     );
-  }
-
-  // Still fetching user after page refresh — show nothing while loading
-  if (isAuthenticated && !user) return null;
-
-  return (
-    <Switch>
+  } else if (isAuthenticated && !user) {
+    // Still fetching user after page refresh — show nothing while loading
+    content = null;
+  } else {
+    content = (
+      <Switch>
       {/* Auth routes — redirect to /today if already authenticated */}
       <Route path="/">
         {isAuthenticated ? <Redirect to="/today" /> : <WelcomePage />}
@@ -221,8 +223,11 @@ function AppInner() {
       <Route>
         <Redirect to={isAuthenticated ? '/today' : '/'} />
       </Route>
-    </Switch>
-  );
+      </Switch>
+    );
+  }
+
+  return <RealtimeProvider enabled={isAuthenticated}>{content}</RealtimeProvider>;
 }
 
 const App = () => (

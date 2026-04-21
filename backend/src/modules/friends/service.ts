@@ -1,5 +1,6 @@
 import { status } from "elysia";
 import { db } from "../../db";
+import { isUserOnline } from "../../lib/realtime";
 
 const FRIEND_USER_SELECT = {
   id: true,
@@ -9,7 +10,7 @@ const FRIEND_USER_SELECT = {
 
 export abstract class FriendsService {
   static async list(userId: string) {
-    return db.friend.findMany({
+    const friendships = await db.friend.findMany({
       where: {
         status: "ACCEPTED",
         OR: [{ requesterId: userId }, { recipientId: userId }]
@@ -22,6 +23,18 @@ export abstract class FriendsService {
         recipient: { select: FRIEND_USER_SELECT }
       }
     });
+
+    return friendships.map((friendship) => ({
+      ...friendship,
+      requester: {
+        ...friendship.requester,
+        online: isUserOnline(friendship.requester.id)
+      },
+      recipient: {
+        ...friendship.recipient,
+        online: isUserOnline(friendship.recipient.id)
+      }
+    }));
   }
 
   static async add(userId: string, targetUserId: string) {
