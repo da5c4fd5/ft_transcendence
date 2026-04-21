@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
-import { Clock, Heart, Search, SlidersHorizontal, Share2 } from 'lucide-preact';
+import { clsx as cn } from 'clsx';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Heart, Search, SlidersHorizontal, Share2 } from 'lucide-preact';
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
 import type { Mood, MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
@@ -21,6 +22,8 @@ type RawContribution = {
   id: string;
   content: string;
   guestName: string | null;
+  guestAvatarUrl: string | null;
+  mediaUrl: string | null;
   createdAt: string;
   contributor: { username: string; avatarUrl: string | null } | null;
 };
@@ -48,6 +51,7 @@ function rawToCapsule(m: RawMemory): TimeCapsule {
 
 const PAGE_SIZE = 9;
 const ALL_MOODS: Mood[] = ['Joyful', 'Excited', 'Peaceful', 'Nostalgic', 'Sad', 'Anxious'];
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function distributeToColumns(items: MemoryCard[]): [MemoryCard[], MemoryCard[], MemoryCard[]] {
   const cols: [MemoryCard[], MemoryCard[], MemoryCard[]] = [[], [], []];
@@ -134,6 +138,344 @@ const PERIOD_OPTIONS: { value: PeriodFilter; label: string }[] = [
   { value: 'custom', label: 'Custom…'    },
 ];
 
+function parseDateString(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function toDateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date: Date, count: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + count, 1);
+}
+
+function getMonthCells(monthDate: Date): (string | null)[] {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (string | null)[] = Array(leadingEmptyDays).fill(null);
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push(toDateString(new Date(year, month, day)));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return cells;
+}
+
+function getMonthLabel(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function getCompactDateLabel(dateStr: string): string {
+  const date = parseDateString(dateStr);
+  if (!date) return 'Required';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function hasValidCustomRange(filters: CollectionFilters): boolean {
+  return filters.period !== 'custom' || Boolean(filters.dateFrom && filters.dateTo && filters.dateFrom <= filters.dateTo);
+}
+
+function MonthCalendar({ month, dateFrom, dateTo, selecting, onSelect }: {
+  month: Date;
+  dateFrom: string;
+  dateTo: string;
+  selecting: 'start' | 'end';
+  onSelect: (date: string) => void;
+}) {
+  const cells = getMonthCells(month);
+
+  return (
+    <div className="min-w-0">
+      <p className="text-center text-sm font-bold text-darkgrey mb-4">{getMonthLabel(month)}</p>
+      <div className="grid grid-cols-7 gap-y-1">
+        {WEEKDAY_LABELS.map(label => (
+          <span key={label} className="h-7 text-center text-[11px] font-bold text-mediumgrey">
+            {label}
+          </span>
+        ))}
+        {cells.map((day, index) => {
+          if (!day) return <div key={index} className="h-10" />;
+
+          const isStart = day === dateFrom;
+          const isEnd = day === dateTo;
+          const hasRange = Boolean(dateFrom && dateTo);
+          const isBetween = Boolean(hasRange && day > dateFrom && day < dateTo);
+          const isDisabled =
+            (selecting === 'start' && Boolean(dateTo) && day > dateTo) ||
+            (selecting === 'end' && Boolean(dateFrom) && day < dateFrom);
+
+          return (
+            <div
+              key={day}
+              className={cn(
+                'h-10 flex items-center justify-center',
+                isBetween && 'bg-blue/30',
+                isStart && hasRange && 'bg-linear-to-r from-transparent to-blue/30',
+                isEnd && hasRange && 'bg-linear-to-r from-blue/30 to-transparent',
+              )}
+            >
+              <button
+                type="button"
+                disabled={isDisabled}
+                onClick={() => onSelect(day)}
+                className={cn(
+                  'w-10 h-10 rounded-full text-sm font-semibold transition-colors',
+                  isStart || isEnd
+                    ? 'bg-darkgrey text-white'
+                    : isDisabled
+                      ? 'text-lightgrey cursor-not-allowed'
+                      : 'text-darkgrey hover:bg-verylightorange',
+                )}
+              >
+                {Number(day.slice(8, 10))}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DateRangePicker({ dateFrom, dateTo, onChange }: {
+  dateFrom: string;
+  dateTo: string;
+  onChange: (range: { dateFrom: string; dateTo: string }) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(dateFrom);
+  const [draftTo, setDraftTo] = useState(dateTo);
+  const [selecting, setSelecting] = useState<'start' | 'end'>('start');
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(parseDateString(dateFrom) ?? new Date()));
+
+  const hasCompleteRange = Boolean(draftFrom && draftTo && draftFrom <= draftTo);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setDraftFrom(dateFrom);
+    setDraftTo(dateTo);
+    setViewMonth(startOfMonth(parseDateString(dateFrom || dateTo) ?? new Date()));
+  }, [dateFrom, dateTo, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isOpen]);
+
+  const openPicker = (target: 'start' | 'end') => {
+    setDraftFrom(dateFrom);
+    setDraftTo(dateTo);
+    setSelecting(target === 'end' && !dateFrom ? 'start' : target);
+    setViewMonth(startOfMonth(parseDateString(dateFrom || dateTo) ?? new Date()));
+    setIsOpen(true);
+  };
+
+  const handleSelectDate = (day: string) => {
+    if (selecting === 'start') {
+      if (draftTo && day > draftTo) return;
+      setDraftFrom(day);
+      setSelecting('end');
+      return;
+    }
+
+    if (!draftFrom || day < draftFrom) return;
+    setDraftTo(day);
+  };
+
+  const handleClear = () => {
+    setDraftFrom('');
+    setDraftTo('');
+    setSelecting('start');
+  };
+
+  const handleApply = () => {
+    if (!hasCompleteRange) return;
+    onChange({ dateFrom: draftFrom, dateTo: draftTo });
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => openPicker('start')}
+          className={cn(
+            'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-colors',
+            dateFrom ? 'bg-verylightorange border-transparent' : 'bg-white border-orange/70',
+          )}
+        >
+          <Calendar size={16} className="text-mediumgrey shrink-0" />
+          <span className="min-w-0">
+            <span className="block text-[10px] font-bold text-mediumgrey tracking-widest uppercase">Start date</span>
+            <span className={cn('block text-sm font-semibold truncate', dateFrom ? 'text-darkgrey' : 'text-orange')}>
+              {getCompactDateLabel(dateFrom)}
+            </span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => openPicker('end')}
+          className={cn(
+            'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-colors',
+            dateTo ? 'bg-verylightorange border-transparent' : 'bg-white border-orange/70',
+          )}
+        >
+          <Calendar size={16} className="text-mediumgrey shrink-0" />
+          <span className="min-w-0">
+            <span className="block text-[10px] font-bold text-mediumgrey tracking-widest uppercase">End date</span>
+            <span className={cn('block text-sm font-semibold truncate', dateTo ? 'text-darkgrey' : 'text-orange')}>
+              {getCompactDateLabel(dateTo)}
+            </span>
+          </span>
+        </button>
+      </div>
+
+      {(!dateFrom || !dateTo) && (
+        <p className="mt-2 text-xs font-medium text-orange">Start and end dates are required.</p>
+      )}
+
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-darkgrey/30 px-3 py-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={() => setIsOpen(false)}
+        >
+          <div
+            className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-black/5 px-5 py-4">
+              <div>
+                <p className="text-lg font-black text-darkgrey">Choose dates</p>
+                <p className="text-sm text-mediumgrey">
+                  {hasCompleteRange
+                    ? `${getCompactDateLabel(draftFrom)} - ${getCompactDateLabel(draftTo)}`
+                    : selecting === 'start'
+                      ? 'Select a start date'
+                      : 'Select an end date'}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setSelecting('start')}
+                  className={cn(
+                    'rounded-full px-3 py-1.5 transition-colors',
+                    selecting === 'start' ? 'bg-darkgrey text-white' : 'bg-lightgrey text-mediumgrey',
+                  )}
+                >
+                  Start
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelecting('end')}
+                  className={cn(
+                    'rounded-full px-3 py-1.5 transition-colors',
+                    selecting === 'end' ? 'bg-darkgrey text-white' : 'bg-lightgrey text-mediumgrey',
+                  )}
+                >
+                  End
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="mb-4 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setViewMonth(month => addMonths(month, -1))}
+                  className="w-9 h-9 rounded-full bg-verylightorange text-darkgrey flex items-center justify-center hover:bg-lightgrey transition-colors"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMonth(month => addMonths(month, 1))}
+                  className="w-9 h-9 rounded-full bg-verylightorange text-darkgrey flex items-center justify-center hover:bg-lightgrey transition-colors"
+                  aria-label="Next month"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-7 sm:grid-cols-2">
+                <MonthCalendar
+                  month={viewMonth}
+                  dateFrom={draftFrom}
+                  dateTo={draftTo}
+                  selecting={selecting}
+                  onSelect={handleSelectDate}
+                />
+                <div className="hidden sm:block">
+                  <MonthCalendar
+                    month={addMonths(viewMonth, 1)}
+                    dateFrom={draftFrom}
+                    dateTo={draftTo}
+                    selecting={selecting}
+                    onSelect={handleSelectDate}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 border-t border-black/5 bg-white px-5 py-4">
+              <button
+                type="button"
+                onClick={handleClear}
+                className="text-sm font-semibold text-mediumgrey hover:text-darkgrey transition-colors underline underline-offset-2"
+              >
+                Clear dates
+              </button>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="rounded-full bg-lightgrey px-4 py-2 text-sm font-semibold text-darkgrey hover:bg-verylightorange transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!hasCompleteRange}
+                onClick={handleApply}
+                className="rounded-full bg-darkgrey px-4 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FilterPanel({ filters, onChange }: {
   filters: CollectionFilters;
   onChange: (f: CollectionFilters) => void;
@@ -162,21 +504,11 @@ function FilterPanel({ filters, onChange }: {
           ))}
         </div>
         {filters.period === 'custom' && (
-          <div className="flex items-center gap-2 mt-1">
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onInput={(e) => set({ dateFrom: (e.target as HTMLInputElement).value })}
-              className="flex-1 px-3 py-2 rounded-xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey"
-            />
-            <span className="text-mediumgrey text-sm">→</span>
-            <input
-              type="date"
-              value={filters.dateTo}
-              onInput={(e) => set({ dateTo: (e.target as HTMLInputElement).value })}
-              className="flex-1 px-3 py-2 rounded-xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey"
-            />
-          </div>
+          <DateRangePicker
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            onChange={(range) => set(range)}
+          />
         )}
       </div>
 
@@ -249,6 +581,8 @@ export function MemoriesPage() {
   const sentinelRef                       = useRef<HTMLDivElement>(null);
 
   const loadCollection = async (f: CollectionFilters) => {
+    if (!hasValidCustomRange(f)) return;
+
     setIsLoading(true);
     const params: Record<string, string | number | boolean | undefined | null> = { limit: 100 };
     if (f.mood !== 'all') params.mood = f.mood;
@@ -305,7 +639,7 @@ export function MemoriesPage() {
       f.dateFrom !== filters.dateFrom || f.dateTo !== filters.dateTo;
     setFilters(f);
     setVisibleCount(PAGE_SIZE);
-    if (serverChanged) loadCollection(f);
+    if (serverChanged && hasValidCustomRange(f)) loadCollection(f);
   };
 
   const handleCardClick = async (id: string) => {
@@ -328,10 +662,10 @@ export function MemoriesPage() {
         friendContributions: contribs.map(c => ({
           id:        c.id,
           guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
-          avatarURL: c.contributor?.avatarUrl ?? null,
+          avatarURL: c.contributor?.avatarUrl ?? c.guestAvatarUrl ?? null,
           date:      c.createdAt.slice(0, 10),
           content:   c.content,
-          media:     null,
+          media:     c.mediaUrl ?? null,
         })),
       });
     } catch { /* ignore */ }
@@ -349,7 +683,12 @@ export function MemoriesPage() {
     }
   };
 
+  const hasAppliedCustomRange = filters.period === 'custom' && Boolean(filters.dateFrom && filters.dateTo);
   const hasActiveFilters =
+    filters.mood !== 'all' ||
+    (filters.period !== 'all' && (filters.period !== 'custom' || hasAppliedCustomRange)) ||
+    filters.sharedOnly;
+  const hasFilterState =
     filters.mood !== 'all' ||
     filters.period !== 'all' ||
     filters.sharedOnly;
@@ -409,7 +748,7 @@ export function MemoriesPage() {
             type="button"
             onClick={() => setShowFilters(v => !v)}
             className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors shadow-sm border ${
-              showFilters || hasActiveFilters
+              showFilters || hasFilterState
                 ? 'bg-darkgrey text-white border-darkgrey'
                 : 'bg-white text-darkgrey border-black/5'
             }`}
@@ -422,7 +761,7 @@ export function MemoriesPage() {
         {showFilters && (
           <div className="bg-white rounded-2xl px-5 py-5 mb-4 shadow-sm flex flex-col gap-0">
             <FilterPanel filters={filters} onChange={handleFiltersChange} />
-            {hasActiveFilters && (
+            {hasFilterState && (
               <button
                 type="button"
                 onClick={() => handleFiltersChange(EMPTY_FILTERS)}
