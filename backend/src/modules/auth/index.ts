@@ -23,7 +23,7 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
       },
       detail: {
         description:
-          "Register a new account. On success returns a session token."
+          "Register a new account. The very first account is promoted to admin automatically. On success returns a session token."
       }
     }
   )

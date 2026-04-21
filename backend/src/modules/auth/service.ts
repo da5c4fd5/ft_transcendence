@@ -83,9 +83,15 @@ export abstract class Auth {
     const passwordHash = await Bun.password.hash(password);
     let userId: string;
     try {
-      const user = await db.user.create({
-        data: { email, username, passwordHash },
-        select: { id: true }
+      const user = await db.$transaction(async (tx) => {
+        // Serialize the "first user becomes admin" decision across concurrent signups.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(424242)`;
+
+        const isFirstUser = (await tx.user.count()) === 0;
+        return tx.user.create({
+          data: { email, username, passwordHash, isAdmin: isFirstUser },
+          select: { id: true }
+        });
       });
       userId = user.id;
     } catch (err) {
