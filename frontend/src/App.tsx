@@ -20,6 +20,7 @@ import { getFormattedDate } from './lib/date';
 import { RealtimeProvider } from './lib/realtime';
 
 export const TOKEN_KEY = 'capsul_token';
+const ROUTER_BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '/';
 
 type RawShared = {
   id: string; date: string; content: string; mood: string | null;
@@ -108,9 +109,11 @@ function AppInner() {
     if (!isAuthenticated) return;
     api.get<User>('/users/me').then(setUser).catch(() => {
       localStorage.removeItem(TOKEN_KEY);
+      setUser(null);
       setIsAuthenticated(false);
+      navigate('/login');
     });
-  }, []);
+  }, [isAuthenticated, navigate]);
 
   // Register global 401 handler
   useEffect(() => {
@@ -118,9 +121,9 @@ function AppInner() {
       localStorage.removeItem(TOKEN_KEY);
       setUser(null);
       setIsAuthenticated(false);
-      navigate('/');
+      navigate('/login');
     });
-  }, []);
+  }, [navigate]);
 
   const handleLogin = async (token?: string) => {
     if (token) localStorage.setItem(TOKEN_KEY, token);
@@ -174,12 +177,12 @@ function AppInner() {
       {/* Protected routes */}
       <Route path="/today">
         {!isAuthenticated
-          ? <Redirect to="/" />
+          ? <Redirect to="/login" />
           : <AuthLayout user={user}><TodayPage /></AuthLayout>}
       </Route>
       <Route path="/timeline">
         {!isAuthenticated
-          ? <Redirect to="/" />
+          ? <Redirect to="/login" />
           : <AuthLayout user={user}>
               <TimelinePage
                 onNavigateToToday={() => navigate('/today')}
@@ -188,17 +191,17 @@ function AppInner() {
       </Route>
       <Route path="/memories">
         {!isAuthenticated
-          ? <Redirect to="/" />
+          ? <Redirect to="/login" />
           : <AuthLayout user={user}><MemoriesPage /></AuthLayout>}
       </Route>
       <Route path="/tree">
         {!isAuthenticated
-          ? <Redirect to="/" />
+          ? <Redirect to="/login" />
           : <AuthLayout user={user}><TreePage /></AuthLayout>}
       </Route>
       <Route path="/profile">
         {!isAuthenticated
-          ? <Redirect to="/" />
+          ? <Redirect to="/login" />
           : user && <AuthLayout user={user}>
               <ProfilePage
                 user={user}
@@ -210,7 +213,7 @@ function AppInner() {
       </Route>
       <Route path="/admin">
         {!isAuthenticated
-          ? <Redirect to="/" />
+          ? <Redirect to="/login" />
           : <AuthLayout user={user}>
               <AdminPage
                 currentUserId={user?.id ?? ''}
@@ -231,7 +234,7 @@ function AppInner() {
 }
 
 const App = () => (
-  <Router>
+  <Router base={ROUTER_BASE}>
     <AppInner />
   </Router>
 );
