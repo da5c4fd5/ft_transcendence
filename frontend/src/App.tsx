@@ -214,6 +214,8 @@ function AppInner() {
       <Route path="/admin">
         {!isAuthenticated
           ? <Redirect to="/login" />
+          : !user?.isAdmin
+            ? <Redirect to="/today" />
           : <AuthLayout user={user}>
               <AdminPage
                 currentUserId={user?.id ?? ''}
