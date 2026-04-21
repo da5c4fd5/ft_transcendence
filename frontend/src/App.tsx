@@ -219,7 +219,6 @@ function AppInner() {
           : <AuthLayout user={user}>
               <AdminPage
                 currentUserId={user?.id ?? ''}
-                isAdmin={user?.isAdmin ?? false}
               />
             </AuthLayout>}
       </Route>

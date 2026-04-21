@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'preact/hooks';
-import { Users, Sparkles, ShieldCheck, Trash2, Search, ChevronDown, TriangleAlert } from 'lucide-preact';
+import { Users, Sparkles, ShieldCheck, Trash2, Search, TriangleAlert } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../../components/Avatar/Avatar';
 import type { AdminUser, AdminStats, AdminPageProps } from './admin.types';
@@ -145,13 +145,12 @@ function RoleBadge({ isAdmin, onClick }: { isAdmin: boolean; onClick?: () => voi
   );
 }
 
-export function AdminPage({ currentUserId, isAdmin, onToggleAdmin }: AdminPageProps) {
+export function AdminPage({ currentUserId }: AdminPageProps) {
   const [stats, setStats]   = useState<AdminStats>({ totalUsers: 0, totalMemories: 0, totalAdmins: 0 });
   const [users, setUsers]   = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [roleConfirmId, setRoleConfirmId]     = useState<string | null>(null);
-  const [showDevTools, setShowDevTools]       = useState(false);
 
   useEffect(() => {
     api.get<RawAdminStats>('/admin/stats').then(s => setStats({
@@ -346,30 +345,6 @@ export function AdminPage({ currentUserId, isAdmin, onToggleAdmin }: AdminPagePr
           />
         );
       })()}
-
-      {/* TODO: Dev Tools -> a supprimer */}
-      <div className="border border-dashed border-lightgrey rounded-3xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowDevTools(v => !v)}
-          className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-mediumgrey hover:text-darkgrey transition-colors"
-        >
-          <span>Dev Tools</span>
-          <ChevronDown size={15} className={cn('transition-transform duration-200', showDevTools && 'rotate-180')} />
-        </button>
-        {showDevTools && (
-          <div className="px-5 pb-5 flex flex-wrap gap-3 border-t border-dashed border-lightgrey pt-4">
-            <button
-              type="button"
-              onClick={onToggleAdmin}
-              className="px-4 py-2 bg-yellow rounded-full text-darkgrey font-semibold text-sm"
-            >
-              Switch role ({isAdmin ? 'pass to User' : 'pass to Admin'})
-            </button>
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }
