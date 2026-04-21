@@ -8,6 +8,7 @@ import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from "otplib";
 import QRCode from "qrcode";
 
 const AVATARS_DIR = join(import.meta.dir, "../../../public/avatars");
+const DELETE_ACCOUNT_CONFIRMATION = "delete my account";
 
 const SELF_USER_SELECT = {
   id: true,
@@ -161,6 +162,28 @@ export abstract class UsersService {
       select: SELF_USER_SELECT
     });
     return UsersService.toSelfProfile(updatedUser);
+  }
+
+  static async deleteSelf(
+    id: string,
+    data: UsersModel["deleteAccountBody"]
+  ) {
+    const user = await db.user.findUniqueOrThrow({ where: { id } });
+
+    if (!(await Bun.password.verify(data.password, user.passwordHash))) {
+      throw status(401, {
+        error: "Password is incorrect"
+      } satisfies UsersModel["deleteAccountInvalidPassword"]);
+    }
+
+    if (data.confirmation.trim() !== DELETE_ACCOUNT_CONFIRMATION) {
+      throw status(400, {
+        error: "Confirmation phrase does not match"
+      } satisfies UsersModel["deleteAccountInvalidConfirmation"]);
+    }
+
+    await db.user.delete({ where: { id } });
+    return status(204);
   }
 
   static async uploadAvatar(id: string, file: File) {

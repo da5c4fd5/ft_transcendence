@@ -59,6 +59,19 @@ export const UsersModel = {
     error: t.Literal("New password cannot be old password")
   }),
 
+  deleteAccountBody: t.Object({
+    password: t.String({ description: "Current account password" }),
+    confirmation: t.String({
+      description: 'Exact confirmation phrase: "delete my account"'
+    })
+  }),
+  deleteAccountInvalidPassword: t.Object({
+    error: t.Literal("Password is incorrect")
+  }),
+  deleteAccountInvalidConfirmation: t.Object({
+    error: t.Literal("Confirmation phrase does not match")
+  }),
+
   changeEmailBody: t.Object({
     password: t.String(),
     email: t.String({ format: "email" })

@@ -82,6 +82,22 @@ export const users = new Elysia({
             }
           }
         )
+        .delete(
+          "/me",
+          ({ user, body }) => UsersService.deleteSelf(user!.id, body),
+          {
+            body: UsersModel.deleteAccountBody,
+            response: {
+              204: t.Any(),
+              400: UsersModel.deleteAccountInvalidConfirmation,
+              401: UsersModel.deleteAccountInvalidPassword
+            },
+            detail: {
+              description:
+                'Permanently delete the authenticated user account and all cascaded data. Requires the current password and the exact confirmation phrase "delete my account".'
+            }
+          }
+        )
 
         // ── Avatar ────────────────────────────────────────────────────
         .post(

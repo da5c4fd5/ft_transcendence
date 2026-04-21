@@ -13,6 +13,7 @@ const inputBase  = 'w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 bor
 const ghostBtn   = 'flex items-center gap-1.5 text-xs font-semibold text-darkgrey border border-black/10 rounded-full px-3 py-1.5 hover:bg-lightgrey/30 transition-colors';
 const logoutBtn  = 'w-full flex items-center justify-center gap-2 py-3 rounded-full bg-verylightpink/30 text-pink font-semibold text-sm hover:bg-lightpink/80 transition-colors';
 const avatarBase = 'w-10 h-10 rounded-full object-cover shrink-0';
+const DELETE_ACCOUNT_CONFIRMATION = 'delete my account';
 
 function PasswordInput({ placeholder, value, onChange }: {
   placeholder: string;
@@ -1003,6 +1004,146 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
   );
 }
 
+function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleClose = () => {
+    if (deleting) return;
+    setIsOpen(false);
+    setPassword('');
+    setConfirmation('');
+    setError(null);
+  };
+
+  const handleDelete = async (e: Event) => {
+    e.preventDefault();
+    if (!password.trim()) {
+      setError('Please enter your password.');
+      return;
+    }
+    if (confirmation !== DELETE_ACCOUNT_CONFIRMATION) {
+      setError('The confirmation phrase does not match.');
+      return;
+    }
+
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.delete('/users/me', {
+        password,
+        confirmation,
+      });
+      onAccountDeleted();
+    } catch (err) {
+      const apiErr = err as ApiError;
+      setError(
+        apiErr.status === 401
+          ? 'Wrong password.'
+          : apiErr.status === 400
+            ? 'The confirmation phrase does not match.'
+            : (apiErr.message ?? 'Failed to delete account.')
+      );
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={cn(cardBase, 'border border-pink/20 bg-verylightpink/20')}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-2">
+            <ShieldOff size={18} className="text-pink mt-0.5 shrink-0" />
+            <div>
+              <h2 className="text-lg font-black text-darkgrey">Delete Account</h2>
+              <p className="text-sm text-mediumgrey mt-1 leading-relaxed">
+                Permanently remove your account, sessions, memories, friends, and related data.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="shrink-0 px-4 py-2 rounded-full bg-pink text-white text-sm font-bold hover:bg-pink/80 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" onClick={handleClose}>
+          <div className="absolute inset-0 bg-darkgrey/40 backdrop-blur-sm" />
+          <form
+            onSubmit={handleDelete}
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-white rounded-3xl p-7 w-full max-w-md flex flex-col gap-4 shadow-xl"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-pink/10 flex items-center justify-center shrink-0">
+                <ShieldOff size={22} className="text-pink" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-darkgrey">Delete your account?</h3>
+                <p className="text-sm text-mediumgrey mt-1 leading-relaxed">
+                  This action is irreversible. To confirm, enter your password and retype the phrase below manually.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-verylightpink/30 rounded-2xl px-4 py-3">
+              <p className="text-xs font-bold text-pink uppercase tracking-wide">Required phrase</p>
+              <p className="text-sm font-semibold text-darkgrey mt-1">{DELETE_ACCOUNT_CONFIRMATION}</p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <PasswordInput
+                placeholder="Current password"
+                value={password}
+                onChange={(v) => { setPassword(v); setError(null); }}
+              />
+              <input
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Retype the exact phrase"
+                value={confirmation}
+                onInput={(e) => { setConfirmation((e.target as HTMLInputElement).value); setError(null); }}
+                onPaste={(e) => e.preventDefault()}
+                onDrop={(e) => e.preventDefault()}
+                className={cn(inputBase, 'placeholder:text-mediumgrey')}
+              />
+            </div>
+
+            {error && <p className="text-xs text-pink">{error}</p>}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={deleting || !password.trim() || confirmation !== DELETE_ACCOUNT_CONFIRMATION}
+                className="flex-1 py-3 rounded-full bg-pink text-white text-sm font-bold hover:bg-pink/80 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Delete my account'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }: ProfilePageProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
@@ -1029,6 +1170,7 @@ export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }:
       <PasswordCard />
       <MfaCard initialHasMfa={user.hasMfa ?? false} />
       <SessionsCard />
+      <DeleteAccountCard onAccountDeleted={onLogout} />
 
     </div>
   );
