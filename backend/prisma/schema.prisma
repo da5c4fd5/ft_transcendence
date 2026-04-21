@@ -131,7 +131,9 @@ model Contribution {
   /// Null when the contributor is a guest (not signed in)
   contributorId String?
   guestName     String?  @db.VarChar(64)
+  guestAvatarUrl String? @db.Text
   content       String   @db.Text
+  mediaUrl      String?  @db.Text
   createdAt     DateTime @default(now())
 
   memory      Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)

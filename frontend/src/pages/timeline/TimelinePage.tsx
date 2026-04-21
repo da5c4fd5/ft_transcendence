@@ -11,7 +11,15 @@ import { getFormattedDate, getTodayDateStr } from '../../lib/date';
 
 type RawCalendarDay = { date: string; id: string; mood: string | null };
 type RawMemory = { id: string; date: string; content: string; mood: string | null; isOpen: boolean; shareToken: string | null; media: { url: string }[] };
-type RawContribution = { id: string; content: string; guestName: string | null; createdAt: string; contributor: { username: string; avatarUrl: string | null } | null };
+type RawContribution = {
+  id: string;
+  content: string;
+  guestName: string | null;
+  guestAvatarUrl: string | null;
+  mediaUrl: string | null;
+  createdAt: string;
+  contributor: { username: string; avatarUrl: string | null } | null;
+};
 
 const MOOD_CONFIG: Record<Mood, { cellColor: string }> = {
   Joyful:    { cellColor: 'bg-yellow'  },
@@ -273,10 +281,10 @@ export function TimelinePage({ onNavigateToToday }: { onNavigateToToday?: () => 
         friendContributions: contribs.map(c => ({
           id:        c.id,
           guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
-          avatarURL: c.contributor?.avatarUrl ?? null,
+          avatarURL: c.contributor?.avatarUrl ?? c.guestAvatarUrl ?? null,
           date:      c.createdAt.slice(0, 10),
           content:   c.content,
-          media:     null,
+          media:     c.mediaUrl ?? null,
         })),
       });
     } catch { /* ignore */ }

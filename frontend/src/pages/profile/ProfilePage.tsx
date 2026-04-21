@@ -4,7 +4,7 @@ import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
 import { formatSessionDateTime } from '../../lib/date';
-import { api } from '../../lib/api';
+import { api, getApiErrorMessage, validateImageFile } from '../../lib/api';
 import type { ApiError } from '../../lib/api';
 
 const cardBase   = 'bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm';
@@ -72,12 +72,23 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
   const usernameChanged = editUsername !== user.username;
 
   const handleAvatarChange = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      setError(imageError);
+      input.value = '';
+      return;
+    }
+    setError(null);
     setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => setAvatarPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
+    input.value = '';
   };
 
   const handleSave = async () => {
@@ -106,7 +117,7 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
       setAvatarFile(null);
       setCurrentPw('');
     } catch (err) {
-      setError((err as ApiError).message ?? 'Failed to save changes.');
+      setError(getApiErrorMessage(err, 'Failed to save changes.'));
     } finally {
       setSaving(false);
     }

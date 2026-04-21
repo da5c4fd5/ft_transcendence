@@ -4,21 +4,55 @@ import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Avatar } from '../../components/Avatar/Avatar';
 import { Button } from '../../components/Button/Button';
 import type { FriendContribution, SharedMemory, GuestPageProps } from './guest.types';
-import { api } from '../../lib/api';
-import { getTodayDateStr } from '../../lib/date';
+import { api, getApiErrorMessage, validateImageFile } from '../../lib/api';
 
+type RawContribution = {
+  id: string;
+  content: string;
+  guestName: string | null;
+  guestAvatarUrl: string | null;
+  mediaUrl: string | null;
+  createdAt: string;
+  contributor: { username: string; avatarUrl: string | null } | null;
+};
+
+function rawToFriendContribution(c: RawContribution): FriendContribution {
+  return {
+    id: c.id,
+    guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
+    avatarURL: c.contributor?.avatarUrl ?? c.guestAvatarUrl ?? null,
+    date: c.createdAt.slice(0, 10),
+    content: c.content,
+    media: c.mediaUrl ?? null,
+  };
+}
+
+function readImageAsDataUrl(file: File, onLoad: (result: string) => void) {
+  const reader = new FileReader();
+  reader.onload = (ev) => onLoad(ev.target?.result as string);
+  reader.readAsDataURL(file);
+}
 
 function JoinStep({ onJoin }: { onJoin: (username: string, avatarURL: string | null) => void }) {
   const [username, setUsername] = useState('');
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarChange = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setAvatarURL(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      setAvatarURL(null);
+      setError(imageError);
+      input.value = '';
+      return;
+    }
+    setError(null);
+    readImageAsDataUrl(file, setAvatarURL);
+    input.value = '';
   };
 
   return (
@@ -53,6 +87,7 @@ function JoinStep({ onJoin }: { onJoin: (username: string, avatarURL: string | n
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           <span className="text-[10px] font-bold text-mediumgrey tracking-widest">PROFILE PHOTO (OPTIONAL)</span>
+          {error && <p className="text-xs text-pink text-center max-w-xs">{error}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -90,6 +125,10 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [editMedia, setEditMedia] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const editFileRef = useRef<HTMLInputElement>(null);
 
@@ -97,42 +136,67 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
     mySessionIds.has(contrib.id) || (isLoggedIn && contrib.guestName === guestName);
 
   const handleMediaChange = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setContributionMedia(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      setContributionMedia(null);
+      setSubmitError(imageError);
+      input.value = '';
+      return;
+    }
+    setSubmitError(null);
+    readImageAsDataUrl(file, setContributionMedia);
+    input.value = '';
   };
 
   const handleEditMediaChange = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setEditMedia(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      setEditMedia(null);
+      setEditError(imageError);
+      input.value = '';
+      return;
+    }
+    setEditError(null);
+    readImageAsDataUrl(file, setEditMedia);
+    input.value = '';
   };
 
   const handleSend = async () => {
-    if (!contributionContent.trim()) return;
-    const tempId = String(Date.now());
-    const newContrib: FriendContribution = {
-      id: tempId,
-      guestName,
-      avatarURL: guestAvatarURL,
-      date: getTodayDateStr(),
-      content: contributionContent.trim(),
-      media: contributionMedia,
-    };
-    setContributions(prev => [...prev, newContrib]);
-    setMySessionIds(prev => new Set(prev).add(tempId));
-    setContributionContent('');
-    setContributionMedia(null);
-    setSent(true);
-    if (memory.id) {
-      api.post(`/memories/${memory.id}/contributions`, {
-        content: newContrib.content,
-        ...(isLoggedIn ? {} : { guestName }),
-      }).catch(() => {});
+    if (!contributionContent.trim() || isSending) return;
+    if (!memory.id) {
+      setSubmitError('Failed to send contribution.');
+      return;
+    }
+
+    setIsSending(true);
+    setSubmitError(null);
+    setSent(false);
+
+    try {
+      const saved = await api.post<RawContribution>(`/memories/${memory.id}/contributions`, {
+        content: contributionContent.trim(),
+        ...(isLoggedIn ? {} : {
+          guestName,
+          ...(guestAvatarURL ? { guestAvatarUrl: guestAvatarURL } : {}),
+        }),
+        ...(contributionMedia ? { mediaUrl: contributionMedia } : {}),
+      });
+      const savedContrib = rawToFriendContribution(saved);
+      setContributions(prev => [...prev, savedContrib]);
+      setMySessionIds(prev => new Set(prev).add(saved.id));
+      setContributionContent('');
+      setContributionMedia(null);
+      setSent(true);
+    } catch (err) {
+      setSubmitError(getApiErrorMessage(err, 'Failed to send contribution.'));
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -140,20 +204,42 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
     setEditingId(contrib.id);
     setEditContent(contrib.content);
     setEditMedia(contrib.media);
+    setEditError(null);
   };
 
-  const handleEditSave = () => {
-    if (!editContent.trim() || !editingId) return;
-    setContributions(prev => prev.map(c =>
-      c.id === editingId ? { ...c, content: editContent.trim(), media: editMedia } : c
-    ));
-    if (isLoggedIn && memory.id) {
-      api.patch(`/memories/${memory.id}/contributions/${editingId}`, { content: editContent.trim() }).catch(() => {});
+  const handleEditSave = async () => {
+    if (!editContent.trim() || !editingId || isSavingEdit) return;
+
+    if (!isLoggedIn || !memory.id) {
+      setContributions(prev => prev.map(c =>
+        c.id === editingId ? { ...c, content: editContent.trim(), media: editMedia } : c
+      ));
+      setEditError(null);
+      setEditingId(null);
+      return;
     }
-    setEditingId(null);
+
+    setIsSavingEdit(true);
+    setEditError(null);
+    try {
+      const saved = await api.patch<RawContribution>(`/memories/${memory.id}/contributions/${editingId}`, {
+        content: editContent.trim(),
+        ...(editMedia ? { mediaUrl: editMedia } : {}),
+      });
+      const savedContrib = rawToFriendContribution(saved);
+      setContributions(prev => prev.map(c => c.id === editingId ? savedContrib : c));
+      setEditingId(null);
+    } catch (err) {
+      setEditError(getApiErrorMessage(err, 'Failed to save changes.'));
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
-  const handleEditCancel = () => setEditingId(null);
+  const handleEditCancel = () => {
+    setEditingId(null);
+    setEditError(null);
+  };
 
   return (
     <div className="min-h-screen bg-orange/30">
@@ -216,7 +302,10 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
                     <div className="flex flex-col gap-2 mt-1">
                       <textarea
                         value={editContent}
-                        onInput={(e) => setEditContent((e.target as HTMLTextAreaElement).value)}
+                        onInput={(e) => {
+                          setEditContent((e.target as HTMLTextAreaElement).value);
+                          setEditError(null);
+                        }}
                         rows={3}
                         className="w-full bg-verylightorange rounded-2xl px-3 py-2 outline-none text-darkgrey text-sm resize-none border-2 border-transparent focus:border-yellow transition-colors"
                       />
@@ -232,6 +321,7 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
                           </button>
                         </div>
                       )}
+                      {editError && <p className="text-xs text-pink px-1">{editError}</p>}
                       <input ref={editFileRef} type="file" accept="image/*" className="hidden" onChange={handleEditMediaChange} />
                       <div className="flex items-center gap-2">
                         <button
@@ -248,10 +338,10 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
                         <button
                           type="button"
                           onClick={handleEditSave}
-                          disabled={!editContent.trim()}
+                          disabled={!editContent.trim() || isSavingEdit}
                           className="flex items-center gap-1.5 bg-darkgrey rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 transition-opacity"
                         >
-                          Save
+                          {isSavingEdit ? 'Saving...' : 'Save'}
                         </button>
                       </div>
                     </div>
@@ -286,7 +376,11 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
             <textarea
               placeholder="Share your thoughts or a memory related to this moment..."
               value={contributionContent}
-              onInput={(e) => { setContributionContent((e.target as HTMLTextAreaElement).value); setSent(false); }}
+              onInput={(e) => {
+                setContributionContent((e.target as HTMLTextAreaElement).value);
+                setSent(false);
+                setSubmitError(null);
+              }}
               rows={3}
               className="flex-1 bg-verylightorange rounded-2xl px-4 py-3 outline-none text-darkgrey placeholder:text-mediumgrey text-sm resize-none border-2 border-transparent focus:border-yellow transition-colors"
             />
@@ -295,6 +389,8 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
           {contributionMedia && (
             <img src={contributionMedia} alt="" className="rounded-2xl w-40 object-cover" />
           )}
+
+          {submitError && <p className="text-xs text-pink px-1">{submitError}</p>}
 
           <div className="flex items-center gap-3">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleMediaChange} />
@@ -309,11 +405,11 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
             <button
               type="button"
               onClick={handleSend}
-              disabled={!contributionContent.trim()}
+              disabled={!contributionContent.trim() || isSending}
               className="flex items-center gap-2 bg-verylightorange rounded-full px-4 py-2 text-sm font-semibold text-darkgrey disabled:opacity-40 hover:bg-orange/20 transition-colors"
             >
               <Send size={13} />
-              Send Contribution
+              {isSending ? 'Sending...' : 'Send Contribution'}
             </button>
           </div>
         </div>

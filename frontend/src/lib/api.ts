@@ -12,6 +12,24 @@ export type ApiError = {
   message: string;
 };
 
+export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const IMAGE_TOO_LARGE_MESSAGE = 'That image is too large. Please choose a smaller image.';
+
+export function validateImageFile(file: File): string | null {
+  return file.size > MAX_IMAGE_UPLOAD_BYTES ? IMAGE_TOO_LARGE_MESSAGE : null;
+}
+
+export function getApiErrorMessage(err: unknown, fallback = 'Something went wrong.'): string {
+  const apiErr = err as Partial<ApiError>;
+  if (apiErr?.status === 413) {
+    return IMAGE_TOO_LARGE_MESSAGE;
+  }
+  if (typeof apiErr?.message === 'string' && apiErr.message.trim()) {
+    return apiErr.message;
+  }
+  return fallback;
+}
+
 let _onUnauthorized: (() => void) | null = null;
 
 /** Register a callback that fires on any 401 response (e.g. to trigger logout). */

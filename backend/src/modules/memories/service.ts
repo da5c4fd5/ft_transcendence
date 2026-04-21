@@ -94,7 +94,7 @@ export abstract class MemoriesService {
         media: true,
         contributions: {
           orderBy: { createdAt: "asc" },
-          include: { contributor: { select: { username: true } } }
+          include: { contributor: { select: { username: true, avatarUrl: true } } }
         },
         user: { select: { username: true } }
       }
