@@ -43,7 +43,7 @@ export const AuthModel = {
     username: t.String({
       minLength: 2,
       maxLength: 32,
-      pattern: "[a-z0-9\\-]{2,32}"
+      pattern: "^[a-z0-9\\-]{2,32}$"
     })
   }),
   signUpResponse: t.Object({

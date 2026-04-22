@@ -14,6 +14,10 @@ const totp = new TOTP({
 
 type TokenSigner = (payload: { sub: string; jti: string }) => Promise<string>;
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export abstract class Auth {
   static async logIn(
     { email, password }: AuthModel["logInBody"],
@@ -23,7 +27,8 @@ export abstract class Auth {
     const DUMMY_HASH =
       "$argon2id$v=19$m=65536,t=2,p=1$JgB5ZgIdHXxaGkpjo1AtlSUMzI921hJg1R9fczMtElU$l0S6Tmhcddlt2/q/UUV6B2inpLhld7ukux6SdepG7rg";
 
-    const user = await db.user.findUnique({ where: { email } });
+    const normalizedEmail = normalizeEmail(email);
+    const user = await db.user.findUnique({ where: { email: normalizedEmail } });
     const hash = user?.passwordHash ?? DUMMY_HASH;
     const isValid = await Bun.password.verify(password, hash);
 
@@ -86,6 +91,7 @@ export abstract class Auth {
     signToken: TokenSigner,
     userAgent?: string
   ) {
+    const normalizedEmail = normalizeEmail(email);
     const passwordHash = await Bun.password.hash(password);
     let userId: string;
     try {
@@ -95,7 +101,12 @@ export abstract class Auth {
 
         const isFirstUser = (await tx.user.count()) === 0;
         return tx.user.create({
-          data: { email, username, passwordHash, isAdmin: isFirstUser },
+          data: {
+            email: normalizedEmail,
+            username,
+            passwordHash,
+            isAdmin: isFirstUser
+          },
           select: { id: true }
         });
       });
@@ -109,7 +120,7 @@ export abstract class Auth {
       throw status("Internal Server Error", {});
     }
     try {
-      await issueEmailVerification(userId, email);
+      await issueEmailVerification(userId, normalizedEmail);
     } catch (error) {
       console.error("Failed to send signup verification email", { userId, error });
     }

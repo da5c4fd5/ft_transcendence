@@ -117,6 +117,10 @@ function getDaysSinceLocalDate(date: Date) {
   return Math.max(0, Math.round(diffMs / (24 * 60 * 60 * 1000)));
 }
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export abstract class UsersService {
   private static rethrowUniqueConstraint(error: unknown) {
     if (
@@ -228,7 +232,8 @@ export abstract class UsersService {
 
   static async changeEmail(id: string, data: UsersModel["changeEmailBody"]) {
     const user = await db.user.findUniqueOrThrow({ where: { id } });
-    if (data.email === user.email) {
+    const normalizedEmail = normalizeEmail(data.email);
+    if (normalizedEmail === user.email) {
       return UsersService.findSelfById(id);
     }
     if (!(await Bun.password.verify(data.password, user.passwordHash)))
@@ -238,7 +243,7 @@ export abstract class UsersService {
       updatedUser = await db.user.update({
         where: { id },
         data: {
-          email: data.email,
+          email: normalizedEmail,
           emailVerifiedAt: null,
           emailVerificationCodeHash: null,
           emailVerificationExpiresAt: null,
