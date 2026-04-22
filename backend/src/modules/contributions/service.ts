@@ -67,7 +67,7 @@ export abstract class ContributionsService {
       data: {
         memoryId,
         content: data.content,
-        guestName: data.guestName,
+        guestName: contributorId ? null : data.guestName,
         guestAvatarUrl,
         mediaUrl,
         contributorId: contributorId ?? null
