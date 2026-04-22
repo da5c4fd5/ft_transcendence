@@ -11,6 +11,7 @@ import { memories } from "./modules/memories";
 import { contributions } from "./modules/contributions";
 import { admin } from "./modules/admin";
 import { realtime } from "./modules/realtime";
+import { publicApi } from "./modules/public-api";
 import { bootstrapMoodClassificationWorker } from "./lib/mood-classifier";
 
 const hostname = process.env.HOST ?? "0.0.0.0";
@@ -29,7 +30,7 @@ const app = new Elysia()
   .use(
     cors({
       methods: "GET, PUT, POST, PATCH, DELETE",
-      allowedHeaders: ["Authorization", "Content-Type"],
+      allowedHeaders: ["Authorization", "Content-Type", "X-API-Key"],
       origin:
         process.env.PROD === "true"
           ? "transcen.dence.fr"
@@ -57,6 +58,7 @@ const app = new Elysia()
   .use(contributions)
   .use(admin)
   .use(realtime)
+  .use(publicApi)
   .get("/", () => ({ status: "ok" }), { detail: { hide: true } })
   .get(
     "/media/:filename",
@@ -161,6 +163,11 @@ const app = new Elysia()
               type: "http",
               scheme: "bearer",
               bearerFormat: "JWT"
+            },
+            apiKeyAuth: {
+              type: "apiKey",
+              in: "header",
+              name: "X-API-Key"
             }
           }
         }

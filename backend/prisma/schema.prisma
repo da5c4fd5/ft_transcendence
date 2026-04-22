@@ -45,6 +45,9 @@ model User {
   treeState            Json      @default("{}")
   lastActiveAt         DateTime?
   isAdmin              Boolean   @default(false)
+  publicApiKeyHash     String?   @unique @db.Text
+  publicApiKeyPreview  String?   @db.VarChar(64)
+  publicApiKeyCreatedAt DateTime?
   /// Encrypted TOTP secret (AES-256-GCM). Null = MFA not enabled.
   mfaSecret            String?   @db.Text
   /// Encrypted TOTP secret during the setup flow. Cleared once verify completes.

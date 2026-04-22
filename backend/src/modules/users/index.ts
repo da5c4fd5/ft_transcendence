@@ -99,6 +99,39 @@ export const users = new Elysia({
             }
           }
         )
+        .get(
+          "/me/public-api-key",
+          ({ user }) => UsersService.getPublicApiKey(user!.id),
+          {
+            response: { 200: UsersModel.publicApiKeyInfoResponse },
+            detail: {
+              description:
+                "Return the authenticated user's public API key status and preview."
+            }
+          }
+        )
+        .post(
+          "/me/public-api-key",
+          ({ user }) => UsersService.issuePublicApiKey(user!.id),
+          {
+            response: { 200: UsersModel.publicApiKeyIssueResponse },
+            detail: {
+              description:
+                "Generate a fresh public API key for the authenticated user. The raw key is only returned once."
+            }
+          }
+        )
+        .delete(
+          "/me/public-api-key",
+          ({ user }) => UsersService.revokePublicApiKey(user!.id),
+          {
+            response: { 204: t.Any() },
+            detail: {
+              description:
+                "Revoke the authenticated user's public API key immediately."
+            }
+          }
+        )
         .delete(
           "/me",
           ({ user, body }) => UsersService.deleteSelf(user!.id, body),

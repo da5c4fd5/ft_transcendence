@@ -4,6 +4,11 @@ export interface User {
   email: string;
   emailVerified: boolean;
   avatarUrl: string | null;
+  publicApi: {
+    enabled: boolean;
+    preview: string | null;
+    createdAt: string | null;
+  };
   isAdmin: boolean;
   hasMfa?: boolean;
 }

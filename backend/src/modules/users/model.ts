@@ -9,6 +9,12 @@ export const UsersModel = {
     reminderTime: t.Optional(t.String())
   }),
 
+  publicApiKeyInfoResponse: t.Object({
+    enabled: t.Boolean(),
+    preview: NullableString,
+    createdAt: t.Union([t.String({ format: "date-time" }), t.Null()])
+  }),
+
   selfProfileResponse: t.Object({
     id: t.String(),
     username: t.String(),
@@ -23,6 +29,11 @@ export const UsersModel = {
         reminderTime: t.Optional(t.String())
       })
     ),
+    publicApi: t.Object({
+      enabled: t.Boolean(),
+      preview: NullableString,
+      createdAt: t.Union([t.String({ format: "date-time" }), t.Null()])
+    }),
     isAdmin: t.Boolean(),
     hasMfa: t.Boolean()
   }),
@@ -79,6 +90,11 @@ export const UsersModel = {
   }),
   emailVerificationRequestResponse: t.Object({
     message: t.String()
+  }),
+  publicApiKeyIssueResponse: t.Object({
+    key: t.String(),
+    preview: t.String(),
+    createdAt: t.String({ format: "date-time" })
   }),
   emailVerificationBody: t.Object({
     code: t.String({ minLength: 6, maxLength: 6 })

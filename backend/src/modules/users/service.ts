@@ -9,6 +9,10 @@ import {
   verifyEmailCode
 } from "../../lib/email-verification";
 import { assertImageFileSize } from "../../lib/images";
+import {
+  createPublicApiKey,
+  revokePublicApiKey as revokeStoredPublicApiKey
+} from "../../lib/public-api";
 import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from "otplib";
 import QRCode from "qrcode";
 import { MemoriesService } from "../memories/service";
@@ -34,6 +38,8 @@ const SELF_USER_SELECT = {
   displayName: true,
   avatarUrl: true,
   notificationSettings: true,
+  publicApiKeyPreview: true,
+  publicApiKeyCreatedAt: true,
   isAdmin: true,
   mfaSecret: true
 } as const;
@@ -85,6 +91,8 @@ type SelfUserRecord = {
   displayName: string | null;
   avatarUrl: string | null;
   notificationSettings: unknown;
+  publicApiKeyPreview: string | null;
+  publicApiKeyCreatedAt: Date | null;
   isAdmin: boolean;
   mfaSecret: string | null;
 };
@@ -107,11 +115,23 @@ export abstract class UsersService {
   }
 
   private static toSelfProfile(user: SelfUserRecord) {
-    const { mfaSecret, notificationSettings, emailVerifiedAt, ...rest } = user;
+    const {
+      mfaSecret,
+      notificationSettings,
+      emailVerifiedAt,
+      publicApiKeyPreview,
+      publicApiKeyCreatedAt,
+      ...rest
+    } = user;
     return {
       ...rest,
       emailVerified: !!emailVerifiedAt,
       notificationSettings: UsersService.normalizeNotificationSettings(notificationSettings),
+      publicApi: {
+        enabled: !!publicApiKeyPreview,
+        preview: publicApiKeyPreview,
+        createdAt: publicApiKeyCreatedAt?.toISOString() ?? null
+      },
       hasMfa: !!mfaSecret
     };
   }
@@ -312,6 +332,31 @@ export abstract class UsersService {
   ) {
     await verifyEmailCode(id, data.code.trim());
     return UsersService.findSelfById(id);
+  }
+
+  static async getPublicApiKey(id: string) {
+    const user = await db.user.findUniqueOrThrow({
+      where: { id },
+      select: {
+        publicApiKeyPreview: true,
+        publicApiKeyCreatedAt: true
+      }
+    });
+
+    return {
+      enabled: !!user.publicApiKeyPreview,
+      preview: user.publicApiKeyPreview,
+      createdAt: user.publicApiKeyCreatedAt?.toISOString() ?? null
+    };
+  }
+
+  static issuePublicApiKey(id: string) {
+    return createPublicApiKey(id);
+  }
+
+  static async revokePublicApiKey(id: string) {
+    await revokeStoredPublicApiKey(id);
+    return status(204);
   }
 
   // ── MFA ────────────────────────────────────────────────────────────
