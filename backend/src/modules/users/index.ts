@@ -43,7 +43,7 @@ export const users = new Elysia({
             response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description:
-                "Update username, displayName, or bio for the authenticated user."
+                "Update username or displayName for the authenticated user."
             }
           }
         )

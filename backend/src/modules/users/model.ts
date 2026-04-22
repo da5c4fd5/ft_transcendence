@@ -53,8 +53,7 @@ export const UsersModel = {
 
   updateProfileBody: t.Object({
     username: t.Optional(t.String({ minLength: 2, maxLength: 32 })),
-    displayName: t.Optional(t.String({ maxLength: 64 })),
-    bio: t.Optional(t.String({ maxLength: 280 }))
+    displayName: t.Optional(t.String({ maxLength: 64 }))
   }),
 
   changePasswordBody: t.Object({
