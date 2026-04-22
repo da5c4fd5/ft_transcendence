@@ -283,7 +283,7 @@ function EmailVerificationCard({ user, onUserUpdate }: { user: UserType; onUserU
     setMessage(null);
     try {
       const result = await api.post<{ message: string }>('/users/me/email/verify/resend');
-      setMessage(`${result.message}. Until SMTP is configured, the code is logged on the backend.`);
+      setMessage(result.message);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to send a verification code.'));
     } finally {
@@ -335,8 +335,7 @@ function EmailVerificationCard({ user, onUserUpdate }: { user: UserType; onUserU
       </div>
 
       <p className="text-sm text-mediumgrey leading-relaxed">
-        Verify <span className="font-semibold text-darkgrey">{user.email}</span> with the 6-digit code we generated for you.
-        Until mail delivery is configured, the code is logged on the backend.
+        Verify <span className="font-semibold text-darkgrey">{user.email}</span> with the 6-digit code sent to your inbox.
       </p>
 
       <form onSubmit={handleVerify} className="flex flex-col gap-3">

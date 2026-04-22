@@ -9,7 +9,7 @@ services:
       PROD: ${PROD:-false}
       TLS_MODE: ${TLS_MODE:-selfsigned}
     volumes:
-      - ${ROOT_DIR:-./.capsul}/certs:/certs
+      - ${ROOT_DIR:-./.capsul}/certs:/certs:z
     restart: "no"
     networks:
       - capsul_net
@@ -23,8 +23,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-capsul}
       POSTGRES_USER: ${POSTGRES_USER:-capsul}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets:
-      - postgres_password
     command:
       - postgres
       - -c
@@ -62,8 +60,9 @@ services:
       - -c
       - max_wal_size=2GB
     volumes:
-      - ${ROOT_DIR:-./.capsul}/database:/var/lib/postgresql/data
-      - ${ROOT_DIR:-./.capsul}/certs:/run/certs:ro
+      - ${ROOT_DIR:-./.capsul}/database:/var/lib/postgresql/data:Z
+      - ${ROOT_DIR:-./.capsul}/certs:/run/certs:ro,z
+      - ./docker/secrets/postgres_password:/run/secrets/postgres_password:ro,z
     networks:
       - capsul_net
     healthcheck:
@@ -109,12 +108,11 @@ services:
       NODE_EXTRA_CA_CERTS: /run/certs/internal/ca.crt
       SSL_CERT_FILE: /run/certs/internal/ca.crt
     volumes:
-      - ${ROOT_DIR:-./.capsul}/certs:/run/certs:ro
-      - ${ROOT_DIR:-./.capsul}/media:/app/uploads
-    secrets:
-      - postgres_password
-      - jwt_secret
-      - mfa_encryption_key
+      - ${ROOT_DIR:-./.capsul}/certs:/run/certs:ro,z
+      - ${ROOT_DIR:-./.capsul}/media:/app/uploads:Z
+      - ./docker/secrets/postgres_password:/run/secrets/postgres_password:ro,z
+      - ./docker/secrets/jwt_secret:/run/secrets/jwt_secret:ro,Z
+      - ./docker/secrets/mfa_encryption_key:/run/secrets/mfa_encryption_key:ro,Z
     networks:
       - capsul_net
 
@@ -127,7 +125,7 @@ services:
     expose:
       - "8000"
     volumes:
-      - ${ROOT_DIR:-./.capsul}/mood-classifier:/cache
+      - ${ROOT_DIR:-./.capsul}/mood-classifier:/cache:Z
     healthcheck:
       test:
         - CMD
@@ -154,7 +152,7 @@ services:
     expose:
       - "11434"
     volumes:
-      - ${ROOT_DIR:-./.capsul}/ollama:/root/.ollama
+      - ${ROOT_DIR:-./.capsul}/ollama:/root/.ollama:Z
     healthcheck:
       test:
         - CMD-SHELL
@@ -201,21 +199,10 @@ services:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
     volumes:
-      - ${ROOT_DIR:-./.capsul}/certs:/etc/nginx/certs
-    secrets:
-      - powerdnsadmin_api_key
+      - ${ROOT_DIR:-./.capsul}/certs:/etc/nginx/certs:z
+      - ./docker/secrets/powerdnsadmin_api_key:/run/secrets/powerdnsadmin_api_key:ro,Z
     networks:
       - capsul_net
 
 networks:
   capsul_net:
-
-secrets:
-  postgres_password:
-    file: ./docker/secrets/postgres_password
-  jwt_secret:
-    file: ./docker/secrets/jwt_secret
-  mfa_encryption_key:
-    file: ./docker/secrets/mfa_encryption_key
-  powerdnsadmin_api_key:
-    file: ./docker/secrets/powerdnsadmin_api_key

@@ -9,8 +9,8 @@ import {
   verifyEmailCode
 } from "../../lib/email-verification";
 import { buildUserDataExport } from "../../lib/data-export";
+import { isMailConfigured, sendMail } from "../../lib/mailer";
 import { assertImageFileSize } from "../../lib/images";
-import { sendMail } from "../../lib/mailer";
 import {
   createPublicApiKey,
   revokePublicApiKey as revokeStoredPublicApiKey
@@ -127,7 +127,7 @@ export abstract class UsersService {
     } = user;
     return {
       ...rest,
-      emailVerified: !!emailVerifiedAt,
+      emailVerified: !!emailVerifiedAt || !isMailConfigured(),
       notificationSettings: UsersService.normalizeNotificationSettings(notificationSettings),
       publicApi: {
         enabled: !!publicApiKeyPreview,

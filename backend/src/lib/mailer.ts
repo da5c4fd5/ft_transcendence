@@ -6,6 +6,10 @@ const smtpPort = Number(process.env.SMTP_PORT ?? 1025);
 const smtpEmail = process.env.SMTP_EMAIL;
 const smtpPassword = process.env.SMTP_PASSWORD;
 
+export function isMailConfigured() {
+  return !!smtpHost && !!smtpEmail;
+}
+
 let transporter:
   | ReturnType<typeof nodemailer.createTransport>
   | null
@@ -16,7 +20,7 @@ function getTransporter() {
     return transporter;
   }
 
-  if (!smtpHost || !smtpEmail) {
+  if (!isMailConfigured()) {
     transporter = null;
     return transporter;
   }

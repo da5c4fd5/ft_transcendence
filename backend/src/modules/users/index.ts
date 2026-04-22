@@ -71,7 +71,7 @@ export const users = new Elysia({
             response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description:
-                "Change the account email. Requires the current password for confirmation and resets email verification."
+                "Change the account email. Requires the current password for confirmation and resets email verification when SMTP is configured."
             }
           }
         )
@@ -82,7 +82,7 @@ export const users = new Elysia({
             response: { 200: UsersModel.emailVerificationRequestResponse },
             detail: {
               description:
-                "Issue a fresh 6-digit email verification code for the authenticated user."
+                "Issue a fresh 6-digit email verification code for the authenticated user. If SMTP is not configured, email verification is treated as disabled."
             }
           }
         )
@@ -95,7 +95,7 @@ export const users = new Elysia({
             response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description:
-                "Verify the authenticated user's email with a 6-digit code."
+                "Verify the authenticated user's email with a 6-digit code. If SMTP is not configured, the account is considered verified automatically."
             }
           }
         )

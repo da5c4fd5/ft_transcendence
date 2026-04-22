@@ -1,6 +1,7 @@
 import { createHash, randomInt } from "crypto";
 import { status } from "elysia";
 import { db } from "../db";
+import { isMailConfigured } from "./mailer";
 
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 30 * 1000;
@@ -14,6 +15,20 @@ function generateCode() {
 }
 
 export async function issueEmailVerification(userId: string, email: string) {
+  if (!isMailConfigured()) {
+    await db.user.update({
+      where: { id: userId },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerificationCodeHash: null,
+        emailVerificationExpiresAt: null,
+        emailVerificationSentAt: null
+      }
+    });
+
+    return { message: "Email verification is disabled" } as const;
+  }
+
   const current = await db.user.findUniqueOrThrow({
     where: { id: userId },
     select: {
@@ -54,6 +69,19 @@ export async function issueEmailVerification(userId: string, email: string) {
 }
 
 export async function verifyEmailCode(userId: string, code: string) {
+  if (!isMailConfigured()) {
+    await db.user.update({
+      where: { id: userId },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerificationCodeHash: null,
+        emailVerificationExpiresAt: null,
+        emailVerificationSentAt: null
+      }
+    });
+    return;
+  }
+
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
     select: {
