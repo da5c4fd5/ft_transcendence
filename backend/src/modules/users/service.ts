@@ -278,6 +278,15 @@ export abstract class UsersService {
       } satisfies UsersModel["deleteAccountInvalidConfirmation"]);
     }
 
+    if (user.isAdmin) {
+      const adminCount = await db.user.count({ where: { isAdmin: true } });
+      if (adminCount <= 1) {
+        throw status(400, {
+          error: "At least one admin must remain"
+        });
+      }
+    }
+
     if (isMailConfigured()) {
       await sendMail({
         to: user.email,

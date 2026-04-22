@@ -82,6 +82,9 @@ export const UsersModel = {
   deleteAccountInvalidConfirmation: t.Object({
     error: t.Literal("Confirmation phrase does not match")
   }),
+  deleteAccountLastAdmin: t.Object({
+    error: t.Literal("At least one admin must remain")
+  }),
 
   changeEmailBody: t.Object({
     password: t.String(),

@@ -150,7 +150,10 @@ export const users = new Elysia({
             body: UsersModel.deleteAccountBody,
             response: {
               204: t.Any(),
-              400: UsersModel.deleteAccountInvalidConfirmation,
+              400: t.Union([
+                UsersModel.deleteAccountInvalidConfirmation,
+                UsersModel.deleteAccountLastAdmin
+              ]),
               401: UsersModel.deleteAccountInvalidPassword
             },
             detail: {

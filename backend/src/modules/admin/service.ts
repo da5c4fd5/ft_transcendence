@@ -14,6 +14,19 @@ const ADMIN_USER_SELECT = {
 } as const;
 
 export abstract class AdminService {
+  private static async assertNotRemovingLastAdmin(userId: string) {
+    const target = await db.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true }
+    });
+    if (!target?.isAdmin) return;
+
+    const adminCount = await db.user.count({ where: { isAdmin: true } });
+    if (adminCount <= 1) {
+      throw status(400, { message: "At least one admin must remain" });
+    }
+  }
+
   static async getStats() {
     const [userCount, memoryCount, sessionCount] = await Promise.all([
       db.user.count(),
@@ -193,6 +206,7 @@ export abstract class AdminService {
   static async deleteUser(id: string) {
     const user = await db.user.findUnique({ where: { id } });
     if (!user) throw status(404, { message: "User not found" });
+    await AdminService.assertNotRemovingLastAdmin(id);
     await db.user.delete({ where: { id } });
     return status(204);
   }
@@ -200,6 +214,9 @@ export abstract class AdminService {
   static async updateUser(id: string, data: AdminModel["updateUserBody"]) {
     const user = await db.user.findUnique({ where: { id } });
     if (!user) throw status(404, { message: "User not found" });
+    if (data.isAdmin === false) {
+      await AdminService.assertNotRemovingLastAdmin(id);
+    }
     try {
       return await db.user.update({
         where: { id },
