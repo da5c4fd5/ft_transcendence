@@ -1,7 +1,7 @@
 import { createHash, randomInt } from "crypto";
 import { status } from "elysia";
 import { db } from "../db";
-import { isMailConfigured } from "./mailer";
+import { isMailConfigured, sendMail } from "./mailer";
 
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 30 * 1000;
@@ -63,7 +63,25 @@ export async function issueEmailVerification(userId: string, email: string) {
     }
   });
 
-  console.info("Email verification code generated", { userId, email, code });
+  try {
+    await sendMail({
+      to: email,
+      subject: "Your Capsul verification code",
+      text:
+        `Your Capsul verification code is ${code}.\n\n` +
+        "It expires in 15 minutes."
+    });
+  } catch (error) {
+    await db.user.update({
+      where: { id: userId },
+      data: {
+        emailVerificationCodeHash: null,
+        emailVerificationExpiresAt: null,
+        emailVerificationSentAt: null
+      }
+    });
+    throw error;
+  }
 
   return { message: "Verification code sent" } as const;
 }
