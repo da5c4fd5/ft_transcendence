@@ -8,8 +8,8 @@ export const authPlugin = new Elysia({ name: "auth-plugin" })
   .derive({ as: "global" }, async ({ headers, cookie, jwt }) => {
     const cookieVal = cookie.session?.value;
     const token: string | undefined =
-      (typeof cookieVal === "string" ? cookieVal : undefined) ??
-      headers.authorization?.replace("Bearer ", "");
+      headers.authorization?.replace("Bearer ", "") ??
+      (typeof cookieVal === "string" ? cookieVal : undefined);
 
     if (!token) return { user: null };
 
