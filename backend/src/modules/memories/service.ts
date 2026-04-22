@@ -227,6 +227,7 @@ export abstract class MemoriesService {
     assertMemoryCanBeModifiedToday(memory.date);
     await db.media.deleteMany({ where: { memoryId: id } });
     MemoriesService.invalidateReminderCache(userId);
+    return status(204);
   }
 
   static async getTimeline(
