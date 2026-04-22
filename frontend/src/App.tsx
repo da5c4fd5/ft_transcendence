@@ -8,6 +8,7 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { TodayPage } from './pages/today/TodayPage';
 import { TimelinePage } from './pages/timeline/TimelinePage';
+import { ChatPage } from './pages/chat/ChatPage';
 import { MemoriesPage } from './pages/memories/MemoriesPage';
 import { TreePage } from './pages/tree/TreePage';
 import { ProfilePage } from './pages/profile/ProfilePage';
@@ -189,6 +190,11 @@ function AppInner() {
                 onNavigateToToday={() => navigate('/today')}
               />
             </AuthLayout>}
+      </Route>
+      <Route path="/chat">
+        {!isAuthenticated
+          ? <Redirect to="/login" />
+          : user && <AuthLayout user={user}><ChatPage currentUserId={user.id} /></AuthLayout>}
       </Route>
       <Route path="/memories">
         {!isAuthenticated

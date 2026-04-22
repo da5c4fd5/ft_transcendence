@@ -9,7 +9,17 @@ type RealtimeEvent =
   | { type: "presence_snapshot"; userIds: string[] }
   | { type: "presence"; userId: string; online: boolean }
   | { type: "ping"; fromUserId: string; fromUsername: string }
-  | { type: "ping_result"; userId: string; delivered: boolean };
+  | { type: "ping_result"; userId: string; delivered: boolean }
+  | {
+      type: "chat_message";
+      message: {
+        id: string;
+        senderId: string;
+        recipientId: string;
+        content: string;
+        createdAt: string;
+      };
+    };
 
 type ConnectionState = {
   socket: RealtimeSocket;
@@ -148,6 +158,24 @@ export async function sendFriendPing(fromUserId: string, toUserId: string) {
       fromUsername: sender.username
     }) > 0
   );
+}
+
+export function broadcastChatMessage(message: {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  content: string;
+  createdAt: string;
+}) {
+  const event: RealtimeEvent = {
+    type: "chat_message",
+    message
+  };
+
+  sendToUser(message.senderId, event);
+  if (message.recipientId !== message.senderId) {
+    sendToUser(message.recipientId, event);
+  }
 }
 
 setInterval(async () => {

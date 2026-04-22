@@ -27,7 +27,18 @@ type PingResultEvent = {
   delivered: boolean;
 };
 
-type RealtimeServerEvent = PresenceSnapshotEvent | PresenceEvent | PingEvent | PingResultEvent;
+type ChatMessageEvent = {
+  type: 'chat_message';
+  message: {
+    id: string;
+    senderId: string;
+    recipientId: string;
+    content: string;
+    createdAt: string;
+  };
+};
+
+type RealtimeServerEvent = PresenceSnapshotEvent | PresenceEvent | PingEvent | PingResultEvent | ChatMessageEvent;
 
 type RealtimeContextValue = {
   connected: boolean;
@@ -57,6 +68,27 @@ function parseRealtimeEvent(raw: string): RealtimeServerEvent | null {
     }
     if (parsed?.type === 'ping_result' && typeof parsed.userId === 'string' && typeof parsed.delivered === 'boolean') {
       return { type: 'ping_result', userId: parsed.userId, delivered: parsed.delivered };
+    }
+    if (
+      parsed?.type === 'chat_message' &&
+      parsed.message &&
+      typeof parsed.message === 'object' &&
+      typeof parsed.message.id === 'string' &&
+      typeof parsed.message.senderId === 'string' &&
+      typeof parsed.message.recipientId === 'string' &&
+      typeof parsed.message.content === 'string' &&
+      typeof parsed.message.createdAt === 'string'
+    ) {
+      return {
+        type: 'chat_message',
+        message: {
+          id: parsed.message.id,
+          senderId: parsed.message.senderId,
+          recipientId: parsed.message.recipientId,
+          content: parsed.message.content,
+          createdAt: parsed.message.createdAt,
+        },
+      };
     }
   } catch {
     // ignore malformed socket payloads
@@ -141,6 +173,9 @@ export function RealtimeProvider({ enabled, children }: { enabled: boolean; chil
             break;
           case 'ping_result':
             window.dispatchEvent(new CustomEvent('capsul:ping-result', { detail: message }));
+            break;
+          case 'chat_message':
+            window.dispatchEvent(new CustomEvent('capsul:chat-message', { detail: message }));
             break;
         }
       };

@@ -60,6 +60,8 @@ model User {
   recvRequests  Friend[]       @relation("Recipient")
   memories      Memory[]
   contributions Contribution[]
+  sentChatMessages ChatMessage[] @relation("SentChatMessages")
+  receivedChatMessages ChatMessage[] @relation("ReceivedChatMessages")
   promptSuggestionState PromptSuggestionState? @relation("UserPromptSuggestionState")
   promptSuggestions     PromptSuggestion[]
   moodClassificationJobs MoodClassificationJob[]
@@ -153,6 +155,22 @@ model Contribution {
 
   @@index([memoryId])
   @@map("contributions")
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String   @db.Text
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+
+  sender    User @relation("SentChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("ReceivedChatMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId, createdAt(sort: Desc)])
+  @@index([recipientId, senderId, createdAt(sort: Desc)])
+  @@map("chat_messages")
 }
 
 enum PromptSuggestionStatus {

@@ -7,6 +7,7 @@ import { errorHandlerPlugin } from "./plugins/error-handler.plugin";
 import { auth } from "./modules/auth";
 import { users } from "./modules/users";
 import { friends } from "./modules/friends";
+import { chat } from "./modules/chat";
 import { memories } from "./modules/memories";
 import { contributions } from "./modules/contributions";
 import { admin } from "./modules/admin";
@@ -54,6 +55,7 @@ const app = new Elysia()
   .use(auth)
   .use(users)
   .use(friends)
+  .use(chat)
   .use(memories)
   .use(contributions)
   .use(admin)
