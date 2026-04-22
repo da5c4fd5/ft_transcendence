@@ -245,13 +245,15 @@ export abstract class UsersService {
       } satisfies UsersModel["deleteAccountInvalidConfirmation"]);
     }
 
-    await sendMail({
-      to: user.email,
-      subject: "Your Capsul account was deleted",
-      text:
-        `Hello ${user.username},\n\n` +
-        `This is a confirmation that your Capsul account and related data were deleted on ${new Date().toISOString()}.\n`
-    });
+    if (isMailConfigured()) {
+      await sendMail({
+        to: user.email,
+        subject: "Your Capsul account was deleted",
+        text:
+          `Hello ${user.username},\n\n` +
+          `This is a confirmation that your Capsul account and related data were deleted on ${new Date().toISOString()}.\n`
+      });
+    }
 
     await db.user.delete({ where: { id } });
     return status(204);
@@ -267,13 +269,15 @@ export abstract class UsersService {
     });
 
     const payload = await buildUserDataExport(id);
-    await sendMail({
-      to: user.email,
-      subject: "Your Capsul data export",
-      text:
-        `Hello ${user.username},\n\n` +
-        `This is a confirmation that a readable export of your Capsul data was requested on ${new Date().toISOString()}.\n`
-    });
+    if (isMailConfigured()) {
+      await sendMail({
+        to: user.email,
+        subject: "Your Capsul data export",
+        text:
+          `Hello ${user.username},\n\n` +
+          `This is a confirmation that a readable export of your Capsul data was requested on ${new Date().toISOString()}.\n`
+      });
+    }
 
     const filename = `capsul-data-export-${new Date().toISOString().slice(0, 10)}.json`;
     return new Response(JSON.stringify(payload, null, 2), {
