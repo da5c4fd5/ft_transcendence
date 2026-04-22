@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { Home, Clock, Sparkles, Sprout, User, ShieldCheck, ChevronDown } from 'lucide-preact';
-import { Link, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../Avatar/Avatar';
 import type { NavbarProps } from './Navbar.types';
@@ -14,11 +14,32 @@ const NAV_ITEMS = [
 
 const navBtnBase = 'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200';
 const dropdownItemBase = 'w-full flex items-center gap-3 px-4 py-3 text-sm text-darkgrey hover:bg-verylightorange transition-colors';
+const ROUTER_BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '/';
+
+function appHref(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return ROUTER_BASE === '/' ? normalizedPath : `${ROUTER_BASE}${normalizedPath}`;
+}
 
 export function Navbar({ user }: NavbarProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleNavigate = (e: MouseEvent, path: string) => {
+    if (
+      e.defaultPrevented ||
+      e.button !== 0 ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey
+    ) {
+      return;
+    }
+    e.preventDefault();
+    navigate(path);
+  };
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -37,17 +58,22 @@ export function Navbar({ user }: NavbarProps) {
     <>
       <header className="hidden md:flex fixed top-0 left-0 right-0 z-40 items-center justify-between px-6 py-3 bg-white/80 backdrop-blur-md border-b border-black/5">
 
-        <Link href="/today" className="text-xl font-black text-darkgrey tracking-tight cursor-pointer">
+        <a
+          href={appHref('/today')}
+          onClick={(e) => handleNavigate(e, '/today')}
+          className="text-xl font-black text-darkgrey tracking-tight cursor-pointer"
+        >
           CAPSUL
-        </Link>
+        </a>
 
         <nav className="flex items-center gap-1">
           {NAV_ITEMS.map(({ href, label, Icon }) => {
             const isActive = location === href;
             return (
-              <Link
+              <a
                 key={href}
-                href={href}
+                href={appHref(href)}
+                onClick={(e) => handleNavigate(e, href)}
                 className={cn(
                   navBtnBase,
                   isActive
@@ -57,7 +83,7 @@ export function Navbar({ user }: NavbarProps) {
               >
                 <Icon size={18} strokeWidth={1.8} />
                 {label}
-              </Link>
+              </a>
             );
           })}
         </nav>
@@ -77,8 +103,9 @@ export function Navbar({ user }: NavbarProps) {
               />
             </button>
           ) : (
-            <Link
-              href="/profile"
+            <a
+              href={appHref('/profile')}
+              onClick={(e) => handleNavigate(e, '/profile')}
               className="flex items-center gap-1.5 rounded-full transition-opacity hover:opacity-80"
               aria-label="User profile"
             >
@@ -89,28 +116,34 @@ export function Navbar({ user }: NavbarProps) {
                   <User size={18} className="text-darkgrey" />
                 </div>
               )}
-            </Link>
+            </a>
           )}
 
           {dropdownOpen && (
             <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-black/5 overflow-hidden py-1">
-              <Link
-                href="/profile"
-                onClick={() => setDropdownOpen(false)}
+              <button
+                type="button"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  navigate('/profile');
+                }}
                 className={dropdownItemBase}
               >
                 <User size={16} className="text-mediumgrey" />
                 My Profile
-              </Link>
+              </button>
               <div className="h-px bg-black/5 mx-3" />
-              <Link
-                href="/admin"
-                onClick={() => setDropdownOpen(false)}
+              <button
+                type="button"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  navigate('/admin');
+                }}
                 className={dropdownItemBase}
               >
                 <ShieldCheck size={16} className="text-mediumgrey" />
                 Admin Dashboard
-              </Link>
+              </button>
             </div>
           )}
         </div>
@@ -120,9 +153,10 @@ export function Navbar({ user }: NavbarProps) {
         {[...NAV_ITEMS, { href: '/profile', label: 'Profile', Icon: User }].map(({ href, label, Icon }) => {
           const isActive = location === href;
           return (
-            <Link
+            <a
               key={href}
-              href={href}
+              href={appHref(href)}
+              onClick={(e) => handleNavigate(e, href)}
               className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors"
             >
               <div className={cn(
@@ -134,7 +168,7 @@ export function Navbar({ user }: NavbarProps) {
               <span className={cn('text-[10px] font-semibold', isActive ? 'text-darkgrey' : 'text-mediumgrey')}>
                 {label}
               </span>
-            </Link>
+            </a>
           );
         })}
       </nav>
