@@ -12,8 +12,8 @@ export type ApiError = {
   message: string;
 };
 
-export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
-export const IMAGE_TOO_LARGE_MESSAGE = 'That image is too large. Please choose a smaller image.';
+export const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const IMAGE_TOO_LARGE_MESSAGE = 'That image is too large. Please choose an image up to 10 MB.';
 
 export function validateImageFile(file: File): string | null {
   return file.size > MAX_IMAGE_UPLOAD_BYTES ? IMAGE_TOO_LARGE_MESSAGE : null;

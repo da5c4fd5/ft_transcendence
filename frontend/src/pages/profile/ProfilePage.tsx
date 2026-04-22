@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Copy, CheckCheck } from 'lucide-preact';
+import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Copy, CheckCheck, Mail } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
@@ -219,6 +219,18 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
       <div className="text-center">
         <h2 className="text-xl font-black text-darkgrey">{user.username}</h2>
         <p className="text-sm text-mediumgrey mt-0.5">{user.email}</p>
+        <div className="mt-2 flex justify-center">
+          <span
+            className={cn(
+              'text-[11px] font-bold rounded-full px-3 py-1',
+              user.emailVerified
+                ? 'bg-blue/15 text-blue'
+                : 'bg-orange/20 text-darkgrey',
+            )}
+          >
+            {user.emailVerified ? 'Email verified' : 'Email not verified'}
+          </span>
+        </div>
       </div>
 
       <button
@@ -232,6 +244,114 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
       <button type="button" onClick={onLogout} className={logoutBtn}>
         <LogOut size={15} /> Log Out
       </button>
+    </div>
+  );
+}
+
+function EmailVerificationCard({ user, onUserUpdate }: { user: UserType; onUserUpdate: (u: UserType) => void }) {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
+  const handleResend = async () => {
+    setSending(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await api.post<{ message: string }>('/users/me/email/verify/resend');
+      setMessage(`${result.message}. Until SMTP is configured, the code is logged on the backend.`);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to send a verification code.'));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleVerify = async (e: Event) => {
+    e.preventDefault();
+    if (code.trim().length !== 6) {
+      setError('Enter the 6-digit code.');
+      return;
+    }
+    setVerifying(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await api.post<UserType>('/users/me/email/verify', { code: code.trim() });
+      onUserUpdate(updated);
+      setCode('');
+      setMessage('Email verified successfully.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to verify the email.'));
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  if (user.emailVerified) {
+    return (
+      <div className={cn(cardBase, 'border border-blue/20 bg-blue/5')}>
+        <div className="flex items-center gap-2">
+          <Mail size={18} className="text-blue" />
+          <h2 className="text-lg font-black text-darkgrey">Email Verification</h2>
+        </div>
+        <div className="flex items-center gap-2 bg-blue/10 rounded-2xl px-4 py-3">
+          <CheckCheck size={15} className="text-blue shrink-0" />
+          <p className="text-sm text-blue font-medium">Your email address is verified.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cardBase}>
+      <div className="flex items-center gap-2">
+        <Mail size={18} className="text-pink" />
+        <h2 className="text-lg font-black text-darkgrey">Email Verification</h2>
+      </div>
+
+      <p className="text-sm text-mediumgrey leading-relaxed">
+        Verify <span className="font-semibold text-darkgrey">{user.email}</span> with the 6-digit code we generated for you.
+        Until mail delivery is configured, the code is logged on the backend.
+      </p>
+
+      <form onSubmit={handleVerify} className="flex flex-col gap-3">
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          value={code}
+          onInput={(e) => {
+            setCode((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6));
+            setError(null);
+          }}
+          placeholder="000000"
+          className={cn(inputBase, 'tracking-[0.4em] text-center font-mono placeholder:tracking-normal placeholder:text-mediumgrey')}
+        />
+
+        {message && <p className="text-xs text-blue px-1">{message}</p>}
+        {error && <p className="text-xs text-pink px-1">{error}</p>}
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={sending}
+            className="flex-1 py-3 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors disabled:opacity-50"
+          >
+            {sending ? 'Generating…' : 'Resend code'}
+          </button>
+          <button
+            type="submit"
+            disabled={verifying || code.trim().length !== 6}
+            className="flex-1 py-3 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
+          >
+            {verifying ? 'Verifying…' : 'Verify email'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -1149,6 +1269,7 @@ export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }:
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
 
       <ProfileCard user={user} onLogout={onLogout} onUserUpdate={onUserUpdate} />
+      <EmailVerificationCard user={user} onUserUpdate={onUserUpdate} />
 
       {user.isAdmin && (
         <button

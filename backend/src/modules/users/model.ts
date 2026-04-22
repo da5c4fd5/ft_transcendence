@@ -13,6 +13,7 @@ export const UsersModel = {
     id: t.String(),
     username: t.String(),
     email: t.String({ format: "email" }),
+    emailVerified: t.Boolean(),
     displayName: NullableString,
     avatarUrl: NullableString,
     notificationSettings: t.Optional(
@@ -76,6 +77,12 @@ export const UsersModel = {
     password: t.String(),
     email: t.String({ format: "email" })
   }),
+  emailVerificationRequestResponse: t.Object({
+    message: t.String()
+  }),
+  emailVerificationBody: t.Object({
+    code: t.String({ minLength: 6, maxLength: 6 })
+  }),
 
   notificationSettingsBody: t.Object({
     emailDigest: t.Optional(t.Boolean()),
@@ -84,7 +91,13 @@ export const UsersModel = {
   }),
 
   avatarBody: t.Object({ file: t.File({ type: "image/*" }) }),
-  treeBody: t.Any(),
+  treeResponse: t.Object({
+    lifeForce: t.Number({ minimum: 0, maximum: 100 }),
+    isDecreasing: t.Boolean(),
+    stage: t.Number({ minimum: 1, maximum: 8 }),
+    stageLabel: t.String(),
+    lastMemoryDate: t.Union([t.String({ format: "date" }), t.Null()])
+  }),
 
   // ── MFA ──────────────────────────────────────────────────────────
   mfaSetupResponse: t.Object({

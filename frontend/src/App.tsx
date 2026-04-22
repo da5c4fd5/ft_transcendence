@@ -103,6 +103,7 @@ function AppInner() {
   const [location, navigate] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem(TOKEN_KEY));
   const [user, setUser]                       = useState<User | null>(null);
+  const authenticatedHome = user && !user.emailVerified ? '/profile' : '/today';
 
   // Load user on startup if already authenticated
   useEffect(() => {
@@ -130,7 +131,7 @@ function AppInner() {
     setIsAuthenticated(true);
     const u = await api.get<User>('/users/me');
     setUser(u);
-    navigate('/today');
+    navigate(u.emailVerified ? '/today' : '/profile');
   };
 
   const handleLogout = async () => {
@@ -162,16 +163,16 @@ function AppInner() {
       <Switch>
       {/* Auth routes — redirect to /today if already authenticated */}
       <Route path="/">
-        {isAuthenticated ? <Redirect to="/today" /> : <WelcomePage />}
+        {isAuthenticated ? <Redirect to={authenticatedHome} /> : <WelcomePage />}
       </Route>
       <Route path="/login">
-        {isAuthenticated ? <Redirect to="/today" /> : <LoginPage onLogin={handleLogin} />}
+        {isAuthenticated ? <Redirect to={authenticatedHome} /> : <LoginPage onLogin={handleLogin} />}
       </Route>
       <Route path="/signup">
-        {isAuthenticated ? <Redirect to="/today" /> : <RegisterPage onLogin={handleLogin} />}
+        {isAuthenticated ? <Redirect to={authenticatedHome} /> : <RegisterPage onLogin={handleLogin} />}
       </Route>
       <Route path="/forgot-password">
-        {isAuthenticated ? <Redirect to="/today" /> : <ForgotPasswordPage />}
+        {isAuthenticated ? <Redirect to={authenticatedHome} /> : <ForgotPasswordPage />}
       </Route>
 
       {/* Protected routes */}
@@ -225,7 +226,7 @@ function AppInner() {
 
       {/* Catch-all fallback */}
       <Route>
-        <Redirect to={isAuthenticated ? '/today' : '/'} />
+        <Redirect to={isAuthenticated ? authenticatedHome : '/'} />
       </Route>
       </Switch>
     );

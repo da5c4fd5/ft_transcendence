@@ -1,6 +1,9 @@
 export interface TreeData {
   lifeForce: number;     // 0–100 (score computed by the backend)
   isDecreasing: boolean; // true if lifeForce is trending down
+  stage: number;
+  stageLabel: string;
+  lastMemoryDate: string | null;
 }
 
 // Achievements — backend returns only unlocked IDs as string[]

@@ -9,6 +9,9 @@ all: start
 start up: generate
 	$(PROD) up -d --build
 
+seed: start
+	$(PROD) run --rm backend sh -lc 'bun --bun run db:generate && bun --bun run db:seed'
+
 dev: generate
 	$(DEV) up --build
 
@@ -45,4 +48,4 @@ renew: generate
 ps:
 	$(PROD) ps
 
-.PHONY: all start up dev stop clean fclean restart logs renew ps generate
+.PHONY: all start up seed dev stop clean fclean restart logs renew ps generate

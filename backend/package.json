@@ -9,6 +9,7 @@
     "db:migrate": "bun --bun run prisma migrate dev",
     "db:migrate:prod": "bun --bun run prisma migrate deploy",
     "db:reset": "bun --bun run prisma migrate reset",
+    "db:seed": "bun prisma/seed.ts",
     "db:studio": "bun --bun run prisma studio"
   },
   "dependencies": {

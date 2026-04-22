@@ -4,6 +4,7 @@ import type { AuthModel } from "./model";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { signPreAuthToken, verifyPreAuthToken } from "../../lib/pre-auth";
 import { decryptSecret } from "../../lib/mfa-crypto";
+import { issueEmailVerification } from "../../lib/email-verification";
 import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from "otplib";
 
 const totp = new TOTP({
@@ -102,6 +103,7 @@ export abstract class Auth {
       console.error(err);
       throw status("Internal Server Error", {});
     }
+    await issueEmailVerification(userId, email);
     const session = await db.session.create({ data: { userId } });
     const token = await signToken({ sub: userId, jti: session.id });
     return { token } satisfies AuthModel["signUpResponse"];

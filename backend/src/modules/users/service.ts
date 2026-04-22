@@ -4,16 +4,33 @@ import { join } from "node:path";
 import { db } from "../../db";
 import type { UsersModel } from "./model";
 import { encryptSecret, decryptSecret } from "../../lib/mfa-crypto";
+import {
+  issueEmailVerification,
+  verifyEmailCode
+} from "../../lib/email-verification";
+import { assertImageFileSize } from "../../lib/images";
 import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from "otplib";
 import QRCode from "qrcode";
+import { MemoriesService } from "../memories/service";
 
 const AVATARS_DIR = join(import.meta.dir, "../../../public/avatars");
 const DELETE_ACCOUNT_CONFIRMATION = "delete my account";
+const TREE_STAGES = [
+  { min: 88, stage: 8, label: "Paradise Tree" },
+  { min: 76, stage: 7, label: "Blooming Tree" },
+  { min: 63, stage: 6, label: "Flourishing Tree" },
+  { min: 51, stage: 5, label: "Strong Sapling" },
+  { min: 38, stage: 4, label: "Young Plant" },
+  { min: 26, stage: 3, label: "Fragile Sprout" },
+  { min: 13, stage: 2, label: "New Seedling" },
+  { min: 0, stage: 1, label: "Dormant Seed" }
+] as const;
 
 const SELF_USER_SELECT = {
   id: true,
   username: true,
   email: true,
+  emailVerifiedAt: true,
   displayName: true,
   avatarUrl: true,
   notificationSettings: true,
@@ -64,6 +81,7 @@ type SelfUserRecord = {
   id: string;
   username: string;
   email: string;
+  emailVerifiedAt: Date | null;
   displayName: string | null;
   avatarUrl: string | null;
   notificationSettings: unknown;
@@ -71,15 +89,28 @@ type SelfUserRecord = {
   mfaSecret: string | null;
 };
 
+function getLocalDayStart(reference = new Date()) {
+  const start = new Date(reference);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function getDaysSinceLocalDate(date: Date) {
+  const diffMs =
+    getLocalDayStart().getTime() - getLocalDayStart(date).getTime();
+  return Math.max(0, Math.round(diffMs / (24 * 60 * 60 * 1000)));
+}
+
 export abstract class UsersService {
   private static normalizeNotificationSettings(value: unknown) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
   }
 
   private static toSelfProfile(user: SelfUserRecord) {
-    const { mfaSecret, notificationSettings, ...rest } = user;
+    const { mfaSecret, notificationSettings, emailVerifiedAt, ...rest } = user;
     return {
       ...rest,
+      emailVerified: !!emailVerifiedAt,
       notificationSettings: UsersService.normalizeNotificationSettings(notificationSettings),
       hasMfa: !!mfaSecret
     };
@@ -154,13 +185,23 @@ export abstract class UsersService {
 
   static async changeEmail(id: string, data: UsersModel["changeEmailBody"]) {
     const user = await db.user.findUniqueOrThrow({ where: { id } });
+    if (data.email === user.email) {
+      return UsersService.findSelfById(id);
+    }
     if (!(await Bun.password.verify(data.password, user.passwordHash)))
       throw status(422, { message: "Password is incorrect" });
     const updatedUser = await db.user.update({
       where: { id },
-      data: { email: data.email },
+      data: {
+        email: data.email,
+        emailVerifiedAt: null,
+        emailVerificationCodeHash: null,
+        emailVerificationExpiresAt: null,
+        emailVerificationSentAt: null
+      },
       select: SELF_USER_SELECT
     });
+    await issueEmailVerification(id, updatedUser.email);
     return UsersService.toSelfProfile(updatedUser);
   }
 
@@ -187,6 +228,7 @@ export abstract class UsersService {
   }
 
   static async uploadAvatar(id: string, file: File) {
+    assertImageFileSize(file);
     const ext = file.name.split(".").pop() ?? "bin";
     const filename = `${crypto.randomUUID()}.${ext}`;
     mkdirSync(AVATARS_DIR, { recursive: true });
@@ -212,20 +254,64 @@ export abstract class UsersService {
   }
 
   static async getTree(id: string) {
-    const { treeState } = await db.user.findUniqueOrThrow({
-      where: { id },
-      select: { treeState: true }
-    });
-    return treeState;
+    const [stats, latestMemory] = await Promise.all([
+      MemoriesService.getStats(id),
+      db.memory.findFirst({
+        where: { userId: id },
+        orderBy: { date: "desc" },
+        select: { date: true }
+      })
+    ]);
+
+    if (!latestMemory) {
+      return {
+        lifeForce: 0,
+        isDecreasing: false,
+        stage: 1,
+        stageLabel: "Dormant Seed",
+        lastMemoryDate: null
+      } satisfies UsersModel["treeResponse"];
+    }
+
+    const daysSinceLastMemory = getDaysSinceLocalDate(latestMemory.date);
+    const recentScore = Math.max(0, 45 - daysSinceLastMemory * 12);
+    const streakScore = Math.min(25, stats.dayStreak * 5);
+    const memoryScore = Math.min(20, stats.totalCapsuls * 1.5);
+    const wordsScore = Math.min(10, stats.wordsWritten / 200);
+    const lifeForce = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(recentScore + streakScore + memoryScore + wordsScore)
+      )
+    );
+    const stage =
+      TREE_STAGES.find((item) => lifeForce >= item.min) ??
+      TREE_STAGES[TREE_STAGES.length - 1];
+
+    return {
+      lifeForce,
+      isDecreasing: daysSinceLastMemory >= 1,
+      stage: stage.stage,
+      stageLabel: stage.label,
+      lastMemoryDate: latestMemory.date.toISOString().split("T")[0]
+    } satisfies UsersModel["treeResponse"];
   }
 
-  static async updateTree(id: string, data: UsersModel["treeBody"]) {
-    const { treeState } = await db.user.update({
+  static async requestEmailVerification(id: string) {
+    const user = await db.user.findUniqueOrThrow({
       where: { id },
-      data: { treeState: data as object },
-      select: { treeState: true }
+      select: { email: true }
     });
-    return treeState;
+    return issueEmailVerification(id, user.email);
+  }
+
+  static async confirmEmailVerification(
+    id: string,
+    data: UsersModel["emailVerificationBody"]
+  ) {
+    await verifyEmailCode(id, data.code.trim());
+    return UsersService.findSelfById(id);
   }
 
   // ── MFA ────────────────────────────────────────────────────────────

@@ -2,9 +2,9 @@ import { status } from "elysia";
 import { mkdir } from "node:fs/promises";
 import { db } from "../../db";
 import type { ContributionsModel } from "./model";
+import { assertImageByteSize } from "../../lib/images";
 
 const UPLOAD_DIR = "/app/uploads";
-const MAX_INLINE_IMAGE_BYTES = 5 * 1024 * 1024;
 const CONTRIBUTION_INCLUDE = {
   contributor: { select: { username: true, avatarUrl: true } }
 } as const;
@@ -25,9 +25,7 @@ async function storeInlineImage(imageUrl?: string) {
 
   const [, mimeType, base64] = match;
   const bytes = Buffer.from(base64, "base64");
-  if (bytes.byteLength > MAX_INLINE_IMAGE_BYTES) {
-    throw status(413, { message: "Image is too large" });
-  }
+  assertImageByteSize(bytes.byteLength);
 
   await mkdir(UPLOAD_DIR, { recursive: true });
   const filename = `${crypto.randomUUID()}.${extensionForMime(mimeType)}`;

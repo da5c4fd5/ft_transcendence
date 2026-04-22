@@ -19,14 +19,9 @@ export const users = new Elysia({
     },
     (app) =>
       app
-        // ── Profile ──────────────────────────────────────────────────
         .get("/me", ({ user }) => UsersService.findSelfById(user!.id), {
           response: { 200: UsersModel.selfProfileResponse },
           detail: { description: "Return the authenticated user's profile." }
-        })
-        .get("/:id", ({ params }) => UsersService.findPublicById(params.id), {
-          response: { 200: UsersModel.publicProfileResponse },
-          detail: { description: "Return a public profile by user ID." }
         })
         .get(
           "/search",
@@ -52,8 +47,6 @@ export const users = new Elysia({
             }
           }
         )
-
-        // ── Password / Email ──────────────────────────────────────────
         .patch(
           "/me/password",
           ({ user, body }) => UsersService.changePassword(user!.id, body),
@@ -78,7 +71,31 @@ export const users = new Elysia({
             response: { 200: UsersModel.selfProfileResponse },
             detail: {
               description:
-                "Change the account email. Requires the current password for confirmation."
+                "Change the account email. Requires the current password for confirmation and resets email verification."
+            }
+          }
+        )
+        .post(
+          "/me/email/verify/resend",
+          ({ user }) => UsersService.requestEmailVerification(user!.id),
+          {
+            response: { 200: UsersModel.emailVerificationRequestResponse },
+            detail: {
+              description:
+                "Issue a fresh 6-digit email verification code for the authenticated user."
+            }
+          }
+        )
+        .post(
+          "/me/email/verify",
+          ({ user, body }) =>
+            UsersService.confirmEmailVerification(user!.id, body),
+          {
+            body: UsersModel.emailVerificationBody,
+            response: { 200: UsersModel.selfProfileResponse },
+            detail: {
+              description:
+                "Verify the authenticated user's email with a 6-digit code."
             }
           }
         )
@@ -98,8 +115,6 @@ export const users = new Elysia({
             }
           }
         )
-
-        // ── Avatar ────────────────────────────────────────────────────
         .post(
           "/me/avatar",
           ({ user, body }) => UsersService.uploadAvatar(user!.id, body.file),
@@ -112,8 +127,6 @@ export const users = new Elysia({
             }
           }
         )
-
-        // ── Notifications ─────────────────────────────────────────────
         .patch(
           "/me/notifications",
           ({ user, body }) =>
@@ -126,21 +139,13 @@ export const users = new Elysia({
             }
           }
         )
-
-        // ── Tree ──────────────────────────────────────────────────────
         .get("/me/tree", ({ user }) => UsersService.getTree(user!.id), {
-          detail: { description: "Return the gamification tree state." }
-        })
-        .patch(
-          "/me/tree",
-          ({ user, body }) => UsersService.updateTree(user!.id, body),
-          {
-            body: UsersModel.treeBody,
-            detail: { description: "Persist an updated tree state." }
+          response: { 200: UsersModel.treeResponse },
+          detail: {
+            description:
+              "Return the computed tree health, stage, and trend for the authenticated user."
           }
-        )
-
-        // ── MFA ───────────────────────────────────────────────────────
+        })
         .post(
           "/me/mfa",
           ({ user }) => UsersService.setupMfa(user!.id, user!.email),
@@ -176,8 +181,6 @@ export const users = new Elysia({
             }
           }
         )
-
-        // ── Achievements ──────────────────────────────────────────────
         .get(
           "/me/achievements",
           ({ user }) => UsersService.getAchievements(user!.id),
@@ -189,4 +192,8 @@ export const users = new Elysia({
             }
           }
         )
+        .get("/:id", ({ params }) => UsersService.findPublicById(params.id), {
+          response: { 200: UsersModel.publicProfileResponse },
+          detail: { description: "Return a public profile by user ID." }
+        })
   );

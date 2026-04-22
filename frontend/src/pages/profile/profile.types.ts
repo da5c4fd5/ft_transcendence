@@ -2,6 +2,7 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  emailVerified: boolean;
   avatarUrl: string | null;
   isAdmin: boolean;
   hasMfa?: boolean;

@@ -4,6 +4,15 @@ export const MemoriesModel = {
   promptResponse: t.Object({
     prompt: t.String()
   }),
+  gameQuery: t.Object({
+    count: t.Optional(t.Number({ minimum: 1, maximum: 5, default: 5 }))
+  }),
+  gameMemoryResponse: t.Object({
+    id: t.String(),
+    date: t.String({ format: "date" }),
+    content: t.String(),
+    mediaUrl: t.Union([t.String(), t.Null()])
+  }),
 
   createBody: t.Object({
     content: t.String({ minLength: 1, maxLength: 2000 }),

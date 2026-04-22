@@ -31,6 +31,10 @@ model Session {
 model User {
   id                   String    @id @default(cuid())
   email                String    @unique
+  emailVerifiedAt      DateTime?
+  emailVerificationCodeHash String? @db.Text
+  emailVerificationExpiresAt DateTime?
+  emailVerificationSentAt DateTime?
   passwordHash         String
   username             String    @unique
   displayName          String?

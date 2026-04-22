@@ -1,32 +1,27 @@
-import { useState, useEffect } from 'preact/hooks';
-import { Zap, Sparkles, Sprout, ChevronRight, ChevronLeft } from 'lucide-preact';
-import { clsx as cn } from 'clsx';
+import { useEffect, useState } from 'preact/hooks';
+import { Zap, Sparkles, Sprout } from 'lucide-preact';
 import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { TreeData, Achievement } from './tree.types';
 import type { MemoryStats } from '../memories/memories.types';
 import { api } from '../../lib/api';
+import { getFormattedDate } from '../../lib/date';
 
-// Static achievement definitions — backend only returns unlocked IDs
 const ALL_ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_memory',      emoji: '🌱', title: 'First Memory',      description: 'Create your first memory',          unlocked: false },
-  { id: 'week_warrior',      emoji: '🔥', title: 'Week Warrior',      description: 'Write memories 7 days in a row',    unlocked: false },
-  { id: 'memory_keeper',     emoji: '📚', title: 'Memory Keeper',     description: 'Collect 30 memories',               unlocked: false },
-  { id: 'social_butterfly',  emoji: '🦋', title: 'Social Butterfly',  description: 'Have 5 friends',                    unlocked: false },
-  { id: 'open_book',         emoji: '📖', title: 'Open Book',         description: 'Share a memory with someone',       unlocked: false },
-  { id: 'contributor',       emoji: '✍️', title: 'Contributor',       description: 'Contribute to 5 memories',          unlocked: false },
+  { id: 'first_memory', emoji: '🌱', title: 'First Memory', description: 'Create your first memory', unlocked: false },
+  { id: 'week_warrior', emoji: '🔥', title: 'Week Warrior', description: 'Write memories 7 days in a row', unlocked: false },
+  { id: 'memory_keeper', emoji: '📚', title: 'Memory Keeper', description: 'Collect 30 memories', unlocked: false },
+  { id: 'social_butterfly', emoji: '🦋', title: 'Social Butterfly', description: 'Have 5 friends', unlocked: false },
+  { id: 'open_book', emoji: '📖', title: 'Open Book', description: 'Share a memory with someone', unlocked: false },
+  { id: 'contributor', emoji: '✍️', title: 'Contributor', description: 'Contribute to 5 memories', unlocked: false },
 ];
 
-
-const DEMO_STAGES: Array<{ health: number; name: string }> = [
-  { health:  5, name: 'Stage 1 — Dormant Seed'   },
-  { health: 18, name: 'Stage 2 — New Seedling'   },
-  { health: 31, name: 'Stage 3 — Fragile Sprout' },
-  { health: 44, name: 'Stage 4 — Young Plant'    },
-  { health: 56, name: 'Stage 5 — Strong Sapling' },
-  { health: 68, name: 'Stage 6 — Flourishing Tree' },
-  { health: 80, name: 'Stage 7 — Blooming Tree'  },
-  { health: 94, name: 'Stage 8 — Paradise Tree'  },
-];
+const EMPTY_TREE: TreeData = {
+  lifeForce: 0,
+  isDecreasing: false,
+  stage: 1,
+  stageLabel: 'Dormant Seed',
+  lastMemoryDate: null,
+};
 
 function StatCard({ icon, value, label, sublabel, color }: {
   icon: preact.ComponentChildren;
@@ -72,97 +67,74 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
   );
 }
 
-function DemoBar({ stageIndex, onPrev, onNext, isDecreasing, onToggleDecreasing }: {
-  stageIndex: number;
-  onPrev: () => void;
-  onNext: () => void;
-  isDecreasing: boolean;
-  onToggleDecreasing: () => void;
-}) {
-  const current = DEMO_STAGES[stageIndex];
-  return (
-    <div className="bg-purple/40 rounded-3xl px-5 py-4 flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-bold text-darkgrey/60 tracking-widest uppercase shrink-0">Demo</span>
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={stageIndex === 0}
-          className="w-8 h-8 rounded-full bg-white/60 flex items-center justify-center disabled:opacity-30 hover:bg-white transition-colors shrink-0"
-        >
-          <ChevronLeft size={16} className="text-darkgrey" />
-        </button>
-        <div className="flex-1 text-center">
-          <p className="text-sm font-bold text-darkgrey">{current.name}</p>
-          <p className="text-xs text-darkgrey/50">Life Force: {current.health}%</p>
-        </div>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={stageIndex === DEMO_STAGES.length - 1}
-          className="w-8 h-8 rounded-full bg-white/60 flex items-center justify-center disabled:opacity-30 hover:bg-white transition-colors shrink-0"
-        >
-          <ChevronRight size={16} className="text-darkgrey" />
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={onToggleDecreasing}
-        className={cn(
-          'w-full rounded-2xl px-4 py-2 text-xs font-bold transition-colors',
-          isDecreasing ? 'bg-blue/60 text-darkgrey' : 'bg-white/40 text-mediumgrey hover:bg-white/60',
-        )}
-      >
-        {isDecreasing ? '😢 Decreasing (on)' : '😢 Simulate decreasing'}
-      </button>
-    </div>
-  );
-}
-
 export function TreePage() {
-  const [tree, setTree]                   = useState<TreeData | null>(null);
-  const [stats, setStats]                 = useState<MemoryStats | null>(null);
-  const [achievements, setAchievements]   = useState<Achievement[]>([]);
-  const [demoIndex, setDemoIndex]         = useState(0);
-  const [demoDecreasing, setDemoDecreasing] = useState(false);
+  const [tree, setTree] = useState<TreeData | null>(null);
+  const [stats, setStats] = useState<MemoryStats | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
     async function load() {
-      const [t, s, unlockedIds] = await Promise.all([
+      const [treeData, memoryStats, unlockedIds] = await Promise.all([
         api.get<TreeData | null>('/users/me/tree').catch(() => null),
         api.get<MemoryStats>('/memories/stats').catch(() => null),
         api.get<string[]>('/users/me/achievements').catch(() => [] as string[]),
       ]);
-      setTree(t ?? { lifeForce: 0, isDecreasing: false });
-      setStats(s);
-      setAchievements(ALL_ACHIEVEMENTS.map(a => ({ ...a, unlocked: unlockedIds.includes(a.id) })));
+
+      setTree(treeData ?? EMPTY_TREE);
+      setStats(memoryStats);
+      setAchievements(ALL_ACHIEVEMENTS.map((achievement) => ({
+        ...achievement,
+        unlocked: unlockedIds.includes(achievement.id),
+      })));
     }
+
     load();
   }, []);
 
   if (!tree) return null;
 
-  const displayHealth = DEMO_STAGES[demoIndex].health;
-
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
-
       <div className="text-center">
         <h1 className="text-4xl font-black text-darkgrey">My Tree</h1>
         <p className="text-mediumgrey mt-1 text-sm">Watch it grow with your daily presence</p>
       </div>
 
-      <DemoBar
-        stageIndex={demoIndex}
-        onPrev={() => setDemoIndex(i => Math.max(0, i - 1))}
-        onNext={() => setDemoIndex(i => Math.min(DEMO_STAGES.length - 1, i + 1))}
-        isDecreasing={demoDecreasing}
-        onToggleDecreasing={() => setDemoDecreasing(v => !v)}
-      />
+      <div className="bg-purple/40 rounded-3xl px-6 py-5 flex flex-col gap-2 text-center">
+        <p className="text-xs font-bold text-darkgrey/60 tracking-widest uppercase">Current Stage</p>
+        <p className="text-xl font-black text-darkgrey">{tree.stageLabel}</p>
+        <p className="text-sm text-darkgrey/70">
+          {tree.isDecreasing
+            ? 'Your tree is losing momentum until you write again.'
+            : 'Your tree is stable and fed by your recent memories.'}
+        </p>
+        <p className="text-xs text-darkgrey/55">
+          {tree.lastMemoryDate
+            ? `Last memory: ${getFormattedDate(tree.lastMemoryDate, { format: 'long', uppercase: false })}`
+            : 'No memories yet'}
+        </p>
+      </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm">
         <div className="bg-linear-to-b from-blue/40 via-blue/20 to-blue/5 rounded-2xl p-6 flex flex-col items-center gap-4">
-          <TreeVisual health={displayHealth} size="large" showDetails isDecreasing={demoDecreasing} />
+          <TreeVisual
+            health={tree.lifeForce}
+            size="large"
+            showDetails
+            isDecreasing={tree.isDecreasing}
+          />
+          <div className="w-full max-w-sm flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs font-bold text-darkgrey">
+              <span>Life Force</span>
+              <span className="text-pink">{tree.lifeForce}%</span>
+            </div>
+            <div className="h-2 bg-white/70 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-pink rounded-full transition-all duration-1000"
+                style={{ width: `${tree.lifeForce}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -196,12 +168,11 @@ export function TreePage() {
           <h2 className="text-lg font-black text-darkgrey">Achievements</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {achievements.map(a => (
-            <AchievementCard key={a.id} achievement={a} />
+          {achievements.map((achievement) => (
+            <AchievementCard key={achievement.id} achievement={achievement} />
           ))}
         </div>
       </div>
-
     </div>
   );
 }

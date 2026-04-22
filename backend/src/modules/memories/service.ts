@@ -4,6 +4,7 @@ import { db } from "../../db";
 import type { MemoriesModel } from "./model";
 import { consumePromptSuggestion, refreshPromptSuggestionCache } from "../../lib/prompt-suggestions";
 import { enqueueMoodClassification } from "../../lib/mood-classifier";
+import { assertImageFileSize } from "../../lib/images";
 
 const REMINDER_CACHE_TTL_MS = 5 * 60 * 1000;
 const REMINDER_POOL_LIMIT = 24;
@@ -13,6 +14,13 @@ type ReminderMemory = {
   date: Date;
   content: string;
   mood: string | null;
+};
+
+type GameMemory = {
+  id: string;
+  date: Date;
+  content: string;
+  media: { url: string }[];
 };
 
 const reminderCache = new Map<
@@ -188,6 +196,7 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
+    assertImageFileSize(file);
 
     // Delete any existing media record so the new one becomes the single reference
     await db.media.deleteMany({ where: { memoryId: id } });
@@ -218,6 +227,27 @@ export abstract class MemoriesService {
     query: { page: number; limit: number }
   ) {
     return MemoriesService.list(userId, query);
+  }
+
+  static async getGameMemories(userId: string, count: number) {
+    const memories = await db.memory.findMany({
+      where: { userId },
+      include: {
+        media: {
+          orderBy: { createdAt: "asc" },
+          take: 1
+        }
+      }
+    });
+
+    return shuffle(memories as GameMemory[])
+      .slice(0, count)
+      .map((memory) => ({
+        id: memory.id,
+        date: memory.date.toISOString().split("T")[0],
+        content: memory.content,
+        mediaUrl: memory.media[0]?.url ?? null
+      }));
   }
 
   static async getLifeCalendar(userId: string) {

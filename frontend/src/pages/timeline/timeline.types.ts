@@ -11,3 +11,17 @@ export interface TimelineStats {
   shared: number;
   dayStreak: number;
 }
+
+export interface TimelineGameMemory {
+  id: string;
+  date: string;
+  content: string;
+  mediaUrl: string | null;
+}
+
+export interface TimelineGameRoundResult {
+  guessedDate: string;
+  actualDate: string;
+  daysOff: number;
+  score: number;
+}

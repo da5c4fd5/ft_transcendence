@@ -15,7 +15,7 @@ import { TreeVisual } from "../../components/TreeVisual/TreeVisual";
 import type { SavedMemory, PastMemory } from "./today.types";
 import type { TreeData } from "../tree/tree.types";
 import type { MemoryStats } from "../memories/memories.types";
-import { api, getApiErrorMessage } from "../../lib/api";
+import { api, getApiErrorMessage, validateImageFile } from "../../lib/api";
 import { getRelativeLabel, getFormattedDate } from "../../lib/date";
 
 const MAX_CHARS = 180;
@@ -79,6 +79,8 @@ function EntryCard({
   dateStr,
   content,
   media,
+  error,
+  saving,
   onContentChange,
   onMediaChange,
   onMediaRemove,
@@ -88,6 +90,8 @@ function EntryCard({
   dateStr: string;
   content: string;
   media: string | null;
+  error: string | null;
+  saving: boolean;
   onContentChange: (v: string) => void;
   onMediaChange: (e: Event) => void;
   onMediaRemove: () => void;
@@ -142,6 +146,8 @@ function EntryCard({
         </div>
       )}
 
+      {error && <p className="text-sm text-pink">{error}</p>}
+
       <div className="flex items-center gap-3 pt-2 border-t border-black/5">
         <input
           ref={fileInputRef}
@@ -173,10 +179,10 @@ function EntryCard({
         <Button
           variant="primary"
           size="sm"
-          disabled={!hasContent}
+          disabled={!hasContent || saving}
           onClick={onCapsul}
         >
-          Capsul it!
+          {saving ? "Saving…" : "Capsul it!"}
         </Button>
       </div>
     </div>
@@ -312,7 +318,11 @@ function TreeSidebar({
       </div>
 
       <div className="bg-linear-to-b from-blue/40 via-blue/20 to-blue/5 rounded-2xl p-4 flex items-center justify-center">
-        <TreeVisual health={tree?.lifeForce ?? 0} size="medium" />
+        <TreeVisual
+          health={tree?.lifeForce ?? 0}
+          size="medium"
+          isDecreasing={tree?.isDecreasing ?? false}
+        />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -320,6 +330,10 @@ function TreeSidebar({
           <span>Life Force</span>
           <span className="text-pink">{tree?.lifeForce ?? 0}%</span>
         </div>
+        <p className="text-xs text-mediumgrey">
+          {tree?.stageLabel ?? "Dormant Seed"}
+          {tree?.isDecreasing ? " · Needs a new memory" : " · Growing steadily"}
+        </p>
         <div className="h-2 bg-lightgrey rounded-full overflow-hidden">
           <div
             className="h-full bg-pink rounded-full transition-all duration-1000"
@@ -421,6 +435,7 @@ export function TodayPage() {
   const [treeData, setTreeData] = useState<TreeData | null>(null);
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const mediaFileRef = useRef<File | null>(null);
   const promptRequestIdRef = useRef(0);
 
@@ -493,7 +508,15 @@ export function TodayPage() {
           ),
       ]);
 
-      setTreeData(tree ?? { lifeForce: 0, isDecreasing: false });
+      setTreeData(
+        tree ?? {
+          lifeForce: 0,
+          isDecreasing: false,
+          stage: 1,
+          stageLabel: "Dormant Seed",
+          lastMemoryDate: null,
+        },
+      );
       setStats(st);
 
       if (todayMem) {
@@ -551,52 +574,95 @@ export function TodayPage() {
   };
 
   const handleContentChange = (v: string) => {
-    if (v.length <= MAX_CHARS) setContent(v);
+    if (v.length <= MAX_CHARS) {
+      setContent(v);
+      if (saveError) setSaveError(null);
+    }
   };
 
   const handleMediaChange = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      mediaFileRef.current = null;
+      setSaveError(imageError);
+      setMedia(savedMemory?.media ?? null);
+      input.value = "";
+      return;
+    }
+    setSaveError(null);
     mediaFileRef.current = file;
     const reader = new FileReader();
     reader.onload = (ev) => setMedia(ev.target?.result as string);
     reader.readAsDataURL(file);
+    input.value = "";
   };
 
   const handleCapsul = async () => {
     if (!content.trim() || saving) return;
     setSaving(true);
+    setSaveError(null);
     try {
       let memId: string;
+      let mediaError: string | null = null;
       if (savedMemory?.id) {
-        // Editing an existing memory — use PATCH
         await api.patch(`/memories/${savedMemory.id}`, { content });
         memId = savedMemory.id;
       } else {
-        // Creating a new memory
         const mem = await api.post<RawMemory>("/memories", { content });
         memId = mem.id;
       }
       if (mediaFileRef.current) {
-        // New file selected — upload it (replaces any existing)
         const form = new FormData();
         form.append("file", mediaFileRef.current);
-        await api.upload(`/memories/${memId}/media`, form).catch(() => {});
+        try {
+          await api.upload(`/memories/${memId}/media`, form);
+        } catch (error) {
+          mediaError = getApiErrorMessage(error, "Failed to upload the image.");
+          mediaFileRef.current = null;
+        }
       } else if (savedMemory?.id && savedMemory.media && !media) {
-        // User removed the existing image — delete it from the backend
-        await api.delete(`/memories/${memId}/media`).catch(() => {});
+        try {
+          await api.delete(`/memories/${memId}/media`);
+        } catch (error) {
+          mediaError = getApiErrorMessage(error, "Failed to remove the image.");
+        }
       }
-      const [newTree, newStats] = await Promise.all([
+      const [newTree, newStats, refreshedMemory] = await Promise.all([
         api.get<TreeData | null>("/users/me/tree").catch(() => null),
         api.get<MemoryStats>("/memories/stats").catch(() => null),
+        api.get<RawMemory>(`/memories/${memId}`),
       ]);
-      setTreeData(newTree ?? { lifeForce: 0, isDecreasing: false });
+      setTreeData(
+        newTree ?? {
+          lifeForce: 0,
+          isDecreasing: false,
+          stage: 1,
+          stageLabel: "Dormant Seed",
+          lastMemoryDate: null,
+        },
+      );
       setStats(newStats);
-      setSavedMemory({ id: memId, content, media });
+      setSavedMemory({
+        id: refreshedMemory.id,
+        content: refreshedMemory.content,
+        media: refreshedMemory.media[0]?.url ?? null,
+      });
       await loadReminders();
+
+      if (mediaError) {
+        setContent(refreshedMemory.content);
+        setMedia(refreshedMemory.media[0]?.url ?? null);
+        setSaveError(mediaError);
+        setTodayState("prompt");
+        return;
+      }
+
       setTodayState("saved");
-    } catch {
-      // noop
+    } catch (error) {
+      setSaveError(getApiErrorMessage(error, "Failed to save your memory."));
     } finally {
       setSaving(false);
     }
@@ -604,14 +670,15 @@ export function TodayPage() {
 
   const handleEdit = () => {
     if (!savedMemory) return;
+    setSaveError(null);
     setContent(savedMemory.content);
     setMedia(savedMemory.media);
     mediaFileRef.current = null;
-    // Keep savedMemory (with its id) so handleCapsul can PATCH the right record
     setTodayState("prompt");
   };
 
   const handleCancel = () => {
+    setSaveError(null);
     setContent("");
     setMedia(null);
     mediaFileRef.current = null;
@@ -639,11 +706,14 @@ export function TodayPage() {
                 dateStr={dateStr}
                 content={content}
                 media={media}
+                error={saveError}
+                saving={saving}
                 onContentChange={handleContentChange}
                 onMediaChange={handleMediaChange}
                 onMediaRemove={() => {
                   setMedia(null);
                   mediaFileRef.current = null;
+                  setSaveError(null);
                 }}
                 onCapsul={handleCapsul}
                 onCancel={handleCancel}

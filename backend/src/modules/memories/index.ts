@@ -94,6 +94,19 @@ export const memories = new Elysia({
           }
         })
         .get(
+          "/game",
+          ({ user, query }) =>
+            MemoriesService.getGameMemories(user!.id, Number(query.count ?? 5)),
+          {
+            query: MemoriesModel.gameQuery,
+            response: { 200: t.Array(MemoriesModel.gameMemoryResponse) },
+            detail: {
+              description:
+                "Return up to 5 random memories for the timeline date guessing game."
+            }
+          }
+        )
+        .get(
           "/timeline",
           ({ user, query }) =>
             MemoriesService.getTimeline(user!.id, {
