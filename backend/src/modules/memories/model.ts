@@ -39,6 +39,7 @@ export const MemoriesModel = {
     after: t.Optional(t.String({ format: "date" })),
     before: t.Optional(t.String({ format: "date" })),
     sharedOnly: t.Optional(t.BooleanString()),
+    page: t.Optional(t.Number({ minimum: 1, default: 1 })),
     limit: t.Optional(t.Number({ minimum: 1, maximum: 100, default: 20 }))
   }),
 

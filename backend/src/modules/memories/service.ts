@@ -263,7 +263,29 @@ export abstract class MemoriesService {
     }));
   }
 
-  static async search(userId: string, query: MemoriesModel["searchQuery"]) {
+  static async search(
+    userId: string,
+    query: MemoriesModel["searchQuery"],
+    rawSearchParams?: URLSearchParams
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const hasMeaningfulFilter = rawSearchParams
+      ? ["mood", "period", "after", "before", "sharedOnly"].some((key) =>
+          rawSearchParams.has(key)
+        )
+      : Boolean(
+          query.mood ||
+            query.period ||
+            query.after ||
+            query.before ||
+            query.sharedOnly
+        );
+
+    if (!hasMeaningfulFilter) {
+      return MemoriesService.list(userId, { page, limit });
+    }
+
     let dateFilter: { gte?: Date; lte?: Date } | undefined;
 
     if (query.period && !query.after && !query.before) {
@@ -280,17 +302,24 @@ export abstract class MemoriesService {
       };
     }
 
-    return db.memory.findMany({
-      where: {
-        userId,
-        ...(query.mood ? { mood: query.mood } : {}),
-        ...(query.sharedOnly ? { isOpen: true } : {}),
-        ...(dateFilter ? { date: dateFilter } : {})
-      },
-      orderBy: { date: "desc" },
-      take: query.limit ?? 20,
-      include: { media: true }
-    });
+    const where = {
+      userId,
+      ...(query.mood ? { mood: query.mood } : {}),
+      ...(query.sharedOnly ? { isOpen: true } : {}),
+      ...(dateFilter ? { date: dateFilter } : {})
+    };
+    const [items, total] = await Promise.all([
+      db.memory.findMany({
+        where,
+        orderBy: { date: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { media: true }
+      }),
+      db.memory.count({ where })
+    ]);
+
+    return { items, total, page, limit };
   }
 
   static async getStats(userId: string) {

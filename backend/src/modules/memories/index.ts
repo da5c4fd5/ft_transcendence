@@ -65,7 +65,12 @@ export const memories = new Elysia({
         })
         .get(
           "/search",
-          ({ user, query }) => MemoriesService.search(user!.id, query),
+          ({ user, query, request }) =>
+            MemoriesService.search(
+              user!.id,
+              query,
+              new URL(request.url).searchParams
+            ),
           {
             query: MemoriesModel.searchQuery,
             detail: {

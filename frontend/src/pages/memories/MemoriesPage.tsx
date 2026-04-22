@@ -28,6 +28,13 @@ type RawContribution = {
   contributor: { username: string; avatarUrl: string | null } | null;
 };
 
+type RawMemoryPage = {
+  items: RawMemory[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
 function rawToCard(m: RawMemory): MemoryCard {
   return {
     id: m.id,
@@ -73,6 +80,14 @@ const EMPTY_FILTERS: CollectionFilters = {
   dateTo: '',
   sharedOnly: false,
 };
+
+function hasServerFilters(filters: CollectionFilters) {
+  return (
+    filters.mood !== 'all' ||
+    filters.period !== 'all' ||
+    filters.sharedOnly
+  );
+}
 
 function TimeCapsuleCard({ capsule, onClick }: { capsule: TimeCapsule; onClick: () => void }) {
   return (
@@ -573,28 +588,63 @@ export function MemoriesPage() {
   const [fetchedCards, setFetchedCards]   = useState<MemoryCard[]>([]);
   const [isLoading, setIsLoading]         = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadError, setLoadError]         = useState<string | null>(null);
   const [filters, setFilters]             = useState<CollectionFilters>(EMPTY_FILTERS);
   const [showFilters, setShowFilters]     = useState(false);
   const [visibleCount, setVisibleCount]   = useState(PAGE_SIZE);
   const [selectedEntry, setSelectedEntry] = useState<MemoryDetails | null>(null);
   const [selectedId, setSelectedId]       = useState<string | null>(null);
   const sentinelRef                       = useRef<HTMLDivElement>(null);
+  const loadRequestIdRef                  = useRef(0);
 
   const loadCollection = async (f: CollectionFilters) => {
     if (!hasValidCustomRange(f)) return;
 
+    const requestId = ++loadRequestIdRef.current;
     setIsLoading(true);
+    setLoadError(null);
+
     const params: Record<string, string | number | boolean | undefined | null> = { limit: 100 };
     if (f.mood !== 'all') params.mood = f.mood;
     if (f.period !== 'all' && f.period !== 'custom') params.period = f.period;
     if (f.period === 'custom' && f.dateFrom) params.after = f.dateFrom;
-    if (f.period === 'custom' && f.dateTo)   params.before = f.dateTo;
+    if (f.period === 'custom' && f.dateTo) params.before = f.dateTo;
     if (f.sharedOnly) params.sharedOnly = true;
+
     try {
-      const raw = await api.get<RawMemory[]>('/memories/search', params);
-      setFetchedCards(raw.map(rawToCard));
-    } catch { /* ignore */ } finally {
-      setIsLoading(false);
+      const items: RawMemory[] = [];
+      const useSearch = hasServerFilters(f);
+      let page = 1;
+      let total = Infinity;
+
+      while (items.length < total) {
+        if (loadRequestIdRef.current !== requestId) return;
+
+        if (useSearch) {
+          const response = await api.get<RawMemoryPage>('/memories/search', { ...params, page });
+          items.push(...response.items);
+          total = response.total;
+          if (response.items.length === 0 || response.items.length < response.limit) break;
+        } else {
+          const response = await api.get<RawMemoryPage>('/memories', { page, limit: 100 });
+          items.push(...response.items);
+          total = response.total;
+          if (response.items.length === 0 || response.items.length < response.limit) break;
+        }
+
+        page += 1;
+      }
+
+      if (loadRequestIdRef.current !== requestId) return;
+      setFetchedCards(items.map(rawToCard));
+    } catch {
+      if (loadRequestIdRef.current !== requestId) return;
+      setLoadError('Failed to load memories.');
+      setFetchedCards([]);
+    } finally {
+      if (loadRequestIdRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -789,6 +839,12 @@ export function MemoriesPage() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : loadError ? (
+          <div className="bg-white rounded-3xl p-16 flex flex-col items-center gap-3 text-center shadow-sm">
+            <Search size={32} className="text-lightgrey" />
+            <p className="font-bold text-darkgrey">Could not load memories</p>
+            <p className="text-sm text-mediumgrey">{loadError}</p>
           </div>
         ) : visibleItems.length === 0 ? (
           <div className="bg-white rounded-3xl p-16 flex flex-col items-center gap-3 text-center shadow-sm">
