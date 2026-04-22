@@ -3,10 +3,14 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { db } from "../../db";
 import type { AdminModel } from "./model";
 
-const USER_OMIT = {
-  passwordHash: true,
-  mfaSecret: true,
-  mfaPendingSecret: true
+const ADMIN_USER_SELECT = {
+  id: true,
+  username: true,
+  email: true,
+  avatarUrl: true,
+  isAdmin: true,
+  createdAt: true,
+  updatedAt: true
 } as const;
 
 export abstract class AdminService {
@@ -176,7 +180,7 @@ export abstract class AdminService {
   static async listUsers(page: number, limit: number) {
     const [items, total] = await Promise.all([
       db.user.findMany({
-        omit: USER_OMIT,
+        select: ADMIN_USER_SELECT,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit
@@ -197,7 +201,11 @@ export abstract class AdminService {
     const user = await db.user.findUnique({ where: { id } });
     if (!user) throw status(404, { message: "User not found" });
     try {
-      return await db.user.update({ where: { id }, data, omit: USER_OMIT });
+      return await db.user.update({
+        where: { id },
+        data,
+        select: ADMIN_USER_SELECT
+      });
     } catch (error) {
       if (
         error instanceof PrismaClientKnownRequestError &&
