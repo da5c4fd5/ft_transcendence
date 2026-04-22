@@ -1,6 +1,7 @@
 import { status } from "elysia";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { db } from "../../db";
 import type { UsersModel } from "./model";
 import { encryptSecret, decryptSecret } from "../../lib/mfa-crypto";
@@ -117,6 +118,16 @@ function getDaysSinceLocalDate(date: Date) {
 }
 
 export abstract class UsersService {
+  private static rethrowUniqueConstraint(error: unknown) {
+    if (
+      error instanceof PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw status(409, { message: "That value is already in use" });
+    }
+    throw error;
+  }
+
   private static normalizeNotificationSettings(value: unknown) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
   }
@@ -170,11 +181,16 @@ export abstract class UsersService {
     id: string,
     data: UsersModel["updateProfileBody"]
   ) {
-    const user = await db.user.update({
-      where: { id },
-      data,
-      select: SELF_USER_SELECT
-    });
+    let user: SelfUserRecord;
+    try {
+      user = await db.user.update({
+        where: { id },
+        data,
+        select: SELF_USER_SELECT
+      });
+    } catch (error) {
+      UsersService.rethrowUniqueConstraint(error);
+    }
     return UsersService.toSelfProfile(user);
   }
 
@@ -217,17 +233,22 @@ export abstract class UsersService {
     }
     if (!(await Bun.password.verify(data.password, user.passwordHash)))
       throw status(422, { message: "Password is incorrect" });
-    const updatedUser = await db.user.update({
-      where: { id },
-      data: {
-        email: data.email,
-        emailVerifiedAt: null,
-        emailVerificationCodeHash: null,
-        emailVerificationExpiresAt: null,
-        emailVerificationSentAt: null
-      },
-      select: SELF_USER_SELECT
-    });
+    let updatedUser: SelfUserRecord;
+    try {
+      updatedUser = await db.user.update({
+        where: { id },
+        data: {
+          email: data.email,
+          emailVerifiedAt: null,
+          emailVerificationCodeHash: null,
+          emailVerificationExpiresAt: null,
+          emailVerificationSentAt: null
+        },
+        select: SELF_USER_SELECT
+      });
+    } catch (error) {
+      UsersService.rethrowUniqueConstraint(error);
+    }
     try {
       await issueEmailVerification(id, updatedUser.email);
     } catch (error) {

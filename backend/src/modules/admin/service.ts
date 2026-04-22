@@ -1,4 +1,5 @@
 import { status } from "elysia";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { db } from "../../db";
 import type { AdminModel } from "./model";
 
@@ -195,6 +196,16 @@ export abstract class AdminService {
   static async updateUser(id: string, data: AdminModel["updateUserBody"]) {
     const user = await db.user.findUnique({ where: { id } });
     if (!user) throw status(404, { message: "User not found" });
-    return db.user.update({ where: { id }, data, omit: USER_OMIT });
+    try {
+      return await db.user.update({ where: { id }, data, omit: USER_OMIT });
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw status(409, { message: "That value is already in use" });
+      }
+      throw error;
+    }
   }
 }
