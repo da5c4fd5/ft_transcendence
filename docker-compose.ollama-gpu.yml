@@ -1,0 +1,17 @@
+services:
+  ollama:
+    devices:
+      - "/dev/nvidia0:/dev/nvidia0"
+      - "/dev/nvidiactl:/dev/nvidiactl"
+      - "/dev/nvidia-uvm:/dev/nvidia-uvm"
+      - "/dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools"
+    environment:
+      OLLAMA_LLM_LIBRARY: cuda_v12
+      LD_LIBRARY_PATH: /usr/lib64:/usr/lib/ollama/cuda_v12:/usr/lib/ollama/cuda_v13
+    security_opt:
+      - label=disable
+    volumes:
+      - /usr/lib64/libcuda.so:/usr/lib64/libcuda.so:ro
+      - /usr/lib64/libcuda.so.1:/usr/lib64/libcuda.so.1:ro
+      - /usr/lib64/libnvidia-ml.so:/usr/lib64/libnvidia-ml.so:ro
+      - /usr/lib64/libnvidia-ml.so.1:/usr/lib64/libnvidia-ml.so.1:ro

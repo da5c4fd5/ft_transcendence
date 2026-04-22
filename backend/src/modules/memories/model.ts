@@ -1,15 +1,17 @@
 import { t, type UnwrapSchema } from "elysia";
 
 export const MemoriesModel = {
+  promptResponse: t.Object({
+    prompt: t.String()
+  }),
+
   createBody: t.Object({
     content: t.String({ minLength: 1, maxLength: 2000 }),
     date: t.Optional(t.String({ format: "date" })),
-    mood: t.Optional(t.String({ maxLength: 32 })),
     isOpen: t.Optional(t.Boolean())
   }),
   updateBody: t.Object({
     content: t.Optional(t.String({ minLength: 1, maxLength: 2000 })),
-    mood: t.Optional(t.String({ maxLength: 32 })),
     isOpen: t.Optional(t.Boolean())
   }),
   mediaBody: t.Object({ file: t.File({ type: "image/*" }) }),

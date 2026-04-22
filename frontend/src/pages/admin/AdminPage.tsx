@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from 'preact/hooks';
-import { Users, Sparkles, ShieldCheck, Trash2, Search, TriangleAlert } from 'lucide-preact';
+import { Users, Sparkles, ShieldCheck, Trash2, Search, TriangleAlert, BrainCircuit, Activity, BotMessageSquare } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../../components/Avatar/Avatar';
-import type { AdminUser, AdminStats, AdminPageProps } from './admin.types';
+import type { AdminUser, AdminStats, AdminPageProps, AdminAiOverview } from './admin.types';
 import { api } from '../../lib/api';
 
 type RawAdminStats = { userCount: number; memoryCount: number; sessionCount: number };
@@ -148,6 +148,7 @@ function RoleBadge({ isAdmin, onClick }: { isAdmin: boolean; onClick?: () => voi
 export function AdminPage({ currentUserId }: AdminPageProps) {
   const [stats, setStats]   = useState<AdminStats>({ totalUsers: 0, totalMemories: 0, totalAdmins: 0 });
   const [users, setUsers]   = useState<AdminUser[]>([]);
+  const [aiOverview, setAiOverview] = useState<AdminAiOverview | null>(null);
   const [search, setSearch] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [roleConfirmId, setRoleConfirmId]     = useState<string | null>(null);
@@ -158,6 +159,9 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
     })).catch(() => {});
     api.get<{ items: RawAdminUser[]; total: number }>('/admin/users', { page: 1, limit: 100 })
       .then(r => setUsers(r.items.map(rawToAdminUser)))
+      .catch(() => {});
+    api.get<AdminAiOverview>('/admin/ai/stats')
+      .then(setAiOverview)
       .catch(() => {});
   }, []);
 
@@ -208,6 +212,155 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
         <StatCard icon={<Sparkles size={22} className="text-darkgrey" />}  value={stats.totalMemories} label="Total Memories" color="bg-yellow/60" />
         <StatCard icon={<ShieldCheck size={22} className="text-darkgrey" />} value={totalAdmins}       label="Admins"         color="bg-purple/30" />
       </div>
+
+      {aiOverview && (
+        <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+          <div className="px-6 pt-6 pb-4 flex items-center gap-2.5">
+            <BrainCircuit size={17} className="text-pink" />
+            <h2 className="text-lg font-black text-darkgrey">AI Operations</h2>
+          </div>
+
+          <div className="px-6 pb-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="rounded-3xl bg-lightgrey/40 p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <BotMessageSquare size={16} className="text-darkgrey" />
+                <h3 className="font-bold text-darkgrey">Prompt Generation</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={<Sparkles size={18} className="text-darkgrey" />} value={aiOverview.promptSuggestions.totalStoredPrompts} label="Stored Prompts" color="bg-yellow/60" />
+                <StatCard icon={<Users size={18} className="text-darkgrey" />} value={aiOverview.promptSuggestions.usersWithStoredPrompts} label="Users With Queue" color="bg-blue/40" />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Idle</p>
+                  <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.promptSuggestions.generationStatusCounts.idle}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Generating</p>
+                  <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.promptSuggestions.generationStatusCounts.generating}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Ready</p>
+                  <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.promptSuggestions.generationStatusCounts.ready}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Error</p>
+                  <p className="mt-1 text-xl font-black text-pink">{aiOverview.promptSuggestions.generationStatusCounts.error}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-4">
+                <div className="flex items-center gap-2">
+                  <BotMessageSquare size={15} className="text-darkgrey" />
+                  <h4 className="font-semibold text-darkgrey">System Prompts</h4>
+                </div>
+                {aiOverview.promptSuggestions.systemPrompts.length === 0 ? (
+                  <p className="mt-3 text-sm text-mediumgrey">No system prompts recorded yet.</p>
+                ) : (
+                  <ul className="mt-3 space-y-3">
+                    {aiOverview.promptSuggestions.systemPrompts.map((item, index) => (
+                      <li key={`${item.model}-${item.updatedAt}-${index}`} className="rounded-2xl bg-lightgrey/40 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-darkgrey break-all">{item.model || 'Unknown model'}</p>
+                            <p className="text-[11px] text-mediumgrey mt-0.5">
+                              {item.usersCount} user{item.usersCount > 1 ? 's' : ''} · updated {new Date(item.updatedAt).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <pre className="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-darkgrey font-mono">
+                          {item.prompt}
+                        </pre>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="rounded-2xl bg-white p-4">
+                <div className="flex items-center gap-2">
+                  <Activity size={15} className="text-darkgrey" />
+                  <h4 className="font-semibold text-darkgrey">Recent Prompt Errors</h4>
+                </div>
+                {aiOverview.promptSuggestions.recentErrors.length === 0 ? (
+                  <p className="mt-3 text-sm text-mediumgrey">No recent prompt-generation errors.</p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {aiOverview.promptSuggestions.recentErrors.map((item) => (
+                      <li key={`${item.userId}-${item.updatedAt}`} className="rounded-2xl bg-lightgrey/40 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold text-darkgrey">{item.username}</span>
+                          <span className="text-[11px] text-mediumgrey whitespace-nowrap">
+                            {new Date(item.updatedAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-pink break-words">{item.lastError}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-lightgrey/40 p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <BrainCircuit size={16} className="text-darkgrey" />
+                <h3 className="font-bold text-darkgrey">Mood Classification</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={<BrainCircuit size={18} className="text-darkgrey" />} value={aiOverview.moodClassification.totalJobs} label="Total Jobs" color="bg-purple/30" />
+                <StatCard icon={<Activity size={18} className="text-darkgrey" />} value={aiOverview.moodClassification.statusCounts.processing} label="Processing Now" color="bg-orange/80" />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Queued</p>
+                  <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.moodClassification.statusCounts.queued}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Processing</p>
+                  <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.moodClassification.statusCounts.processing}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Completed</p>
+                  <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.moodClassification.statusCounts.completed}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Failed</p>
+                  <p className="mt-1 text-xl font-black text-pink">{aiOverview.moodClassification.statusCounts.failed}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-4">
+                <div className="flex items-center gap-2">
+                  <TriangleAlert size={15} className="text-pink" />
+                  <h4 className="font-semibold text-darkgrey">Recent Mood Failures</h4>
+                </div>
+                {aiOverview.moodClassification.recentFailures.length === 0 ? (
+                  <p className="mt-3 text-sm text-mediumgrey">No recent mood-classification failures.</p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {aiOverview.moodClassification.recentFailures.map((item) => (
+                      <li key={item.jobId} className="rounded-2xl bg-lightgrey/40 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold text-darkgrey">{item.username}</span>
+                          <span className="text-[11px] text-mediumgrey whitespace-nowrap">
+                            {new Date(item.updatedAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-pink break-words">{item.lastError}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
 

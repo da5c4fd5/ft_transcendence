@@ -9,6 +9,7 @@ import { memories } from "./modules/memories";
 import { contributions } from "./modules/contributions";
 import { admin } from "./modules/admin";
 import { realtime } from "./modules/realtime";
+import { bootstrapMoodClassificationWorker } from "./lib/mood-classifier";
 
 const hostname = process.env.HOST ?? "0.0.0.0";
 const port = Number(process.env.PORT ?? 4242);
@@ -95,3 +96,4 @@ const app = new Elysia()
 
 const protocol = tls ? "https" : "http";
 console.log(`API running at ${protocol}://${app.server?.hostname}:${app.server?.port}`);
+void bootstrapMoodClassificationWorker();

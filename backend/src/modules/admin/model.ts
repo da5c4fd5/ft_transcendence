@@ -7,6 +7,54 @@ export const AdminModel = {
     sessionCount: t.Number()
   }),
 
+  aiOverviewResponse: t.Object({
+    promptSuggestions: t.Object({
+      totalStoredPrompts: t.Number(),
+      usersWithStoredPrompts: t.Number(),
+      generationStatusCounts: t.Object({
+        idle: t.Number(),
+        generating: t.Number(),
+        ready: t.Number(),
+        error: t.Number()
+      }),
+      systemPrompts: t.Array(
+        t.Object({
+          model: t.String(),
+          prompt: t.String(),
+          usersCount: t.Number(),
+          updatedAt: t.String()
+        })
+      ),
+      recentErrors: t.Array(
+        t.Object({
+          userId: t.String(),
+          username: t.String(),
+          lastError: t.String(),
+          updatedAt: t.String()
+        })
+      )
+    }),
+    moodClassification: t.Object({
+      totalJobs: t.Number(),
+      statusCounts: t.Object({
+        queued: t.Number(),
+        processing: t.Number(),
+        completed: t.Number(),
+        failed: t.Number()
+      }),
+      recentFailures: t.Array(
+        t.Object({
+          jobId: t.String(),
+          memoryId: t.String(),
+          userId: t.String(),
+          username: t.String(),
+          lastError: t.String(),
+          updatedAt: t.String()
+        })
+      )
+    })
+  }),
+
   updateUserBody: t.Object({
     isAdmin: t.Optional(t.Boolean()),
     username: t.Optional(t.String({ minLength: 2, maxLength: 32 })),

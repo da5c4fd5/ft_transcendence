@@ -1,6 +1,8 @@
-COMPOSE := docker compose -p capsul
+GPU_COMPOSE := $(if $(filter 1 true yes,$(GPU)),-f docker-compose.ollama-gpu.yml)
+COMPOSE := podman-compose --in-pod=false -p capsul -f docker-compose.yml $(GPU_COMPOSE)
 PROD := $(COMPOSE)
-DEV := $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
+DEV := $(COMPOSE) -f docker-compose.dev.yml
+DATA_ROOT := $${ROOT_DIR:-./.capsul}
 
 all: start
 
@@ -11,6 +13,11 @@ dev: generate
 	$(DEV) up --build
 
 generate:
+	@mkdir -p "$(DATA_ROOT)"/certs
+	@mkdir -p "$(DATA_ROOT)"/database
+	@mkdir -p "$(DATA_ROOT)"/media
+	@mkdir -p "$(DATA_ROOT)"/ollama
+	@mkdir -p "$(DATA_ROOT)"/mood-classifier
 	@sh docker/secrets.sh
 
 stop:
@@ -20,6 +27,11 @@ clean: stop
 
 fclean:
 	$(PROD) down --volumes --remove-orphans
+	podman image prune -a -f
+	podman builder prune -a -f
+	podman volume prune -f
+	podman network prune -f
+	podman system prune -a -f --volumes
 
 restart: stop start
 

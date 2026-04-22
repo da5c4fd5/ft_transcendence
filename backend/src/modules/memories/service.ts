@@ -2,6 +2,8 @@ import { status } from "elysia";
 import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../db";
 import type { MemoriesModel } from "./model";
+import { consumePromptSuggestion, refreshPromptSuggestionCache } from "../../lib/prompt-suggestions";
+import { enqueueMoodClassification } from "../../lib/mood-classifier";
 
 const REMINDER_CACHE_TTL_MS = 5 * 60 * 1000;
 const REMINDER_POOL_LIMIT = 24;
@@ -51,6 +53,10 @@ export abstract class MemoriesService {
     reminderCache.delete(userId);
   }
 
+  static getPromptSuggestions(userId: string) {
+    return consumePromptSuggestion(userId);
+  }
+
   static async list(userId: string, query: { page: number; limit: number }) {
     const [items, total] = await Promise.all([
       db.memory.findMany({
@@ -92,11 +98,12 @@ export abstract class MemoriesService {
         content: data.content,
         isOpen: data.isOpen ?? false,
         date,
-        mood: data.mood,
         ...(data.isOpen ? { shareToken: createId() } : {})
       }
     });
     MemoriesService.invalidateReminderCache(userId);
+    void refreshPromptSuggestionCache(userId);
+    void enqueueMoodClassification(userId, memory.id, memory.content);
     return memory;
   }
 
@@ -115,12 +122,25 @@ export abstract class MemoriesService {
       data.isOpen === true && !memory.shareToken
         ? createId()
         : undefined;
+    const updateData: Parameters<typeof db.memory.update>[0]["data"] = {
+      ...data,
+      ...(shareToken ? { shareToken } : {})
+    };
+
+    if (data.content !== undefined) {
+      updateData.mood = null;
+      updateData.moodSource = null;
+    }
 
     const updated = await db.memory.update({
       where: { id },
-      data: { ...data, ...(shareToken ? { shareToken } : {}) }
+      data: updateData
     });
     MemoriesService.invalidateReminderCache(userId);
+    void refreshPromptSuggestionCache(userId);
+    if (data.content !== undefined) {
+      void enqueueMoodClassification(userId, id, updated.content);
+    }
     return updated;
   }
 
@@ -160,6 +180,7 @@ export abstract class MemoriesService {
     assertMemoryCanBeModifiedToday(memory.date);
     await db.memory.delete({ where: { id } });
     MemoriesService.invalidateReminderCache(userId);
+    void refreshPromptSuggestionCache(userId);
     return status(204);
   }
 
@@ -190,14 +211,6 @@ export abstract class MemoriesService {
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
     await db.media.deleteMany({ where: { memoryId: id } });
     MemoriesService.invalidateReminderCache(userId);
-  }
-
-  static async getPromptSuggestions() {
-    return [
-      "What made you smile today?",
-      "Describe a moment you want to remember forever.",
-      "What are you grateful for this week?"
-    ];
   }
 
   static async getTimeline(

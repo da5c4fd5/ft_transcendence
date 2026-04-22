@@ -18,6 +18,160 @@ export abstract class AdminService {
     return { userCount, memoryCount, sessionCount };
   }
 
+  static async getAiOverview() {
+    const [
+      totalStoredPrompts,
+      usersWithStoredPromptRows,
+      idlePromptStates,
+      generatingPromptStates,
+      readyPromptStates,
+      errorPromptStates,
+      promptStateSystemPrompts,
+      recentPromptErrors,
+      totalMoodJobs,
+      queuedMoodJobs,
+      processingMoodJobs,
+      completedMoodJobs,
+      failedMoodJobs,
+      recentMoodFailures
+    ] = await Promise.all([
+      db.promptSuggestion.count(),
+      db.promptSuggestion.groupBy({
+        by: ["userId"]
+      }),
+      db.promptSuggestionState.count({
+        where: { generationStatus: "IDLE" }
+      }),
+      db.promptSuggestionState.count({
+        where: { generationStatus: "GENERATING" }
+      }),
+      db.promptSuggestionState.count({
+        where: { generationStatus: "READY" }
+      }),
+      db.promptSuggestionState.count({
+        where: { generationStatus: "ERROR" }
+      }),
+      db.promptSuggestionState.findMany({
+        where: { systemPrompt: { not: null } },
+        select: {
+          userId: true,
+          model: true,
+          systemPrompt: true,
+          updatedAt: true
+        }
+      }),
+      db.promptSuggestionState.findMany({
+        where: { lastError: { not: null } },
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        select: {
+          userId: true,
+          lastError: true,
+          updatedAt: true,
+          user: {
+            select: { username: true }
+          }
+        }
+      }),
+      db.moodClassificationJob.count(),
+      db.moodClassificationJob.count({
+        where: { status: "QUEUED" }
+      }),
+      db.moodClassificationJob.count({
+        where: { status: "PROCESSING" }
+      }),
+      db.moodClassificationJob.count({
+        where: { status: "COMPLETED" }
+      }),
+      db.moodClassificationJob.count({
+        where: { status: "FAILED" }
+      }),
+      db.moodClassificationJob.findMany({
+        where: { status: "FAILED" },
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        select: {
+          id: true,
+          memoryId: true,
+          userId: true,
+          lastError: true,
+          updatedAt: true,
+          user: {
+            select: { username: true }
+          }
+        }
+      })
+    ]);
+
+    const promptSystemPromptMap = new Map<string, {
+      model: string;
+      prompt: string;
+      usersCount: number;
+      updatedAt: string;
+    }>();
+
+    for (const item of promptStateSystemPrompts) {
+      if (!item.systemPrompt) continue;
+      const key = `${item.model ?? ""}\u0000${item.systemPrompt}`;
+      const existing = promptSystemPromptMap.get(key);
+      if (!existing) {
+        promptSystemPromptMap.set(key, {
+          model: item.model ?? "",
+          prompt: item.systemPrompt,
+          usersCount: 1,
+          updatedAt: item.updatedAt.toISOString()
+        });
+        continue;
+      }
+
+      existing.usersCount += 1;
+      if (item.updatedAt.toISOString() > existing.updatedAt) {
+        existing.updatedAt = item.updatedAt.toISOString();
+      }
+    }
+
+    const systemPrompts = [...promptSystemPromptMap.values()].sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt)
+    );
+
+    return {
+      promptSuggestions: {
+        totalStoredPrompts,
+        usersWithStoredPrompts: usersWithStoredPromptRows.length,
+        generationStatusCounts: {
+          idle: idlePromptStates,
+          generating: generatingPromptStates,
+          ready: readyPromptStates,
+          error: errorPromptStates
+        },
+        systemPrompts,
+        recentErrors: recentPromptErrors.map((item) => ({
+          userId: item.userId,
+          username: item.user.username,
+          lastError: item.lastError ?? "",
+          updatedAt: item.updatedAt.toISOString()
+        }))
+      },
+      moodClassification: {
+        totalJobs: totalMoodJobs,
+        statusCounts: {
+          queued: queuedMoodJobs,
+          processing: processingMoodJobs,
+          completed: completedMoodJobs,
+          failed: failedMoodJobs
+        },
+        recentFailures: recentMoodFailures.map((item) => ({
+          jobId: item.id,
+          memoryId: item.memoryId,
+          userId: item.userId,
+          username: item.user.username,
+          lastError: item.lastError ?? "",
+          updatedAt: item.updatedAt.toISOString()
+        }))
+      }
+    };
+  }
+
   static async listUsers(page: number, limit: number) {
     const [items, total] = await Promise.all([
       db.user.findMany({
