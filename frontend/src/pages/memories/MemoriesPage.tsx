@@ -4,7 +4,7 @@ import { Calendar, ChevronLeft, ChevronRight, Clock, Heart, Search, SlidersHoriz
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
 import type { Mood, MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
-import type { TimeCapsule, MemoryCard, MoodFilter, PeriodFilter, CollectionFilters } from './memories.types';
+import type { TimeCapsule, MemoryCard, MoodFilter, PeriodFilter, SortFilter, CollectionFilters } from './memories.types';
 import { api } from '../../lib/api';
 import { getRelativeLabel, getFormattedDate } from '../../lib/date';
 
@@ -76,6 +76,7 @@ const EMPTY_FILTERS: CollectionFilters = {
   search: '',
   mood: 'all',
   period: 'all',
+  sort: 'newest',
   dateFrom: '',
   dateTo: '',
   sharedOnly: false,
@@ -151,6 +152,11 @@ const PERIOD_OPTIONS: { value: PeriodFilter; label: string }[] = [
   { value: 'month',  label: 'This month' },
   { value: 'year',   label: 'This year'  },
   { value: 'custom', label: 'Custom…'    },
+];
+
+const SORT_OPTIONS: { value: SortFilter; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
 ];
 
 function parseDateString(dateStr: string): Date | null {
@@ -528,6 +534,26 @@ function FilterPanel({ filters, onChange }: {
       </div>
 
       <div className="flex flex-col gap-2">
+        <span className="text-[10px] font-bold text-mediumgrey tracking-widest uppercase">Sort</span>
+        <div className="flex flex-wrap gap-2">
+          {SORT_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => set({ sort: value })}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                filters.sort === value
+                  ? 'bg-darkgrey text-white'
+                  : 'bg-lightgrey text-mediumgrey hover:text-darkgrey'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <span className="text-[10px] font-bold text-mediumgrey tracking-widest uppercase">Mood</span>
         <div className="flex flex-wrap gap-2">
           <button
@@ -655,10 +681,20 @@ export function MemoriesPage() {
 
   // Text search applied client-side (no backend search param)
   const filtered = useMemo(() => {
-    if (!filters.search.trim()) return fetchedCards;
-    const q = filters.search.toLowerCase();
-    return fetchedCards.filter(c => c.content.toLowerCase().includes(q));
-  }, [fetchedCards, filters.search]);
+    const q = filters.search.trim().toLowerCase();
+    const searched = q
+      ? fetchedCards.filter(c => c.content.toLowerCase().includes(q))
+      : fetchedCards;
+
+    const sorted = [...searched].sort((left, right) => {
+      if (filters.sort === 'oldest') {
+        return left.date.localeCompare(right.date);
+      }
+      return right.date.localeCompare(left.date);
+    });
+
+    return sorted;
+  }, [fetchedCards, filters.search, filters.sort]);
 
   const visibleItems = filtered.slice(0, visibleCount);
   const hasMore      = visibleCount < filtered.length;
@@ -741,6 +777,7 @@ export function MemoriesPage() {
   const hasFilterState =
     filters.mood !== 'all' ||
     filters.period !== 'all' ||
+    filters.sort !== 'newest' ||
     filters.sharedOnly;
 
   return (

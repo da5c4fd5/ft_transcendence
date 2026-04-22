@@ -20,11 +20,13 @@ export interface MemoryCard {
 
 export type MoodFilter = Mood | 'all';
 export type PeriodFilter = 'all' | 'week' | 'month' | 'year' | 'custom';
+export type SortFilter = 'newest' | 'oldest';
 
 export interface CollectionFilters {
   search: string;
   mood: MoodFilter;
   period: PeriodFilter;
+  sort: SortFilter;
   dateFrom: string;
   dateTo: string;
   sharedOnly: boolean;
