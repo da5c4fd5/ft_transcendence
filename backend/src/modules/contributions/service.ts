@@ -34,9 +34,12 @@ async function storeInlineImage(imageUrl?: string) {
 }
 
 export abstract class ContributionsService {
-  static async listByMemory(memoryId: string) {
+  static async listByMemory(memoryId: string, requesterId?: string) {
     const memory = await db.memory.findUnique({ where: { id: memoryId } });
     if (!memory) throw status(404, { message: "Memory not found" });
+    if (!memory.isOpen && memory.userId !== requesterId) {
+      throw status(403, { message: "Forbidden" });
+    }
     return db.contribution.findMany({
       where: { memoryId },
       orderBy: { createdAt: "asc" },

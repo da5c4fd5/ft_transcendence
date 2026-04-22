@@ -11,7 +11,7 @@ export const contributions = new Elysia({
   }
 })
   .use(authPlugin)
-  .get("/", ({ params }) => ContributionsService.listByMemory(params.memoryId), {
+  .get("/", ({ params, user }) => ContributionsService.listByMemory(params.memoryId, user?.id), {
     detail: {
       security: [],
       description: "List contributions for a memory. Public (the memory itself controls visibility via isOpen)."
