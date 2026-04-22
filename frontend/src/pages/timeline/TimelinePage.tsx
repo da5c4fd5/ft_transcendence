@@ -4,6 +4,7 @@ import { clsx as cn } from 'clsx';
 import { Button } from '../../components/Button/Button';
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
+import { MediaPreview } from '../../components/MediaPreview/MediaPreview';
 import type {
   Mood,
   DaySummary,
@@ -354,7 +355,7 @@ function TimelineGameModal({
 
             <div className="bg-verylightorange rounded-3xl p-5 flex flex-col gap-4">
               {currentMemory.mediaUrl && (
-                <img
+                <MediaPreview
                   src={currentMemory.mediaUrl}
                   alt="Memory clue"
                   className="w-full max-h-72 object-cover rounded-2xl"

@@ -3,6 +3,7 @@ import { ArrowLeft, Camera, Heart, Send, User, Pencil, X } from 'lucide-preact';
 import { AppLogo } from '../../components/AppLogo/AppLogo';
 import { Avatar } from '../../components/Avatar/Avatar';
 import { Button } from '../../components/Button/Button';
+import { MediaPreview } from '../../components/MediaPreview/MediaPreview';
 import type { FriendContribution, SharedMemory, GuestPageProps } from './guest.types';
 import { api, getApiErrorMessage, validateImageFile } from '../../lib/api';
 
@@ -263,7 +264,7 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
           <p className="text-xs font-bold text-mediumgrey tracking-widest">{memory.date}</p>
           <p className="text-darkgrey text-base font-semibold leading-relaxed">"{memory.content}"</p>
           {memory.media && (
-            <img src={memory.media} alt="Memory" className="w-full rounded-2xl object-cover max-h-64" />
+            <MediaPreview src={memory.media} alt="Memory" className="w-full rounded-2xl object-cover max-h-64" />
           )}
           <div className="flex items-center gap-2 pt-1 border-t border-black/5">
             <Heart size={13} className="text-pink" />
@@ -315,7 +316,7 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
                       <p className="text-[11px] text-mediumgrey px-1">{editContent.length}/{MAX_CONTENT_LENGTH}</p>
                       {editMedia && (
                         <div className="relative w-fit">
-                          <img src={editMedia} alt="" className="rounded-xl w-40 object-cover" />
+                          <MediaPreview src={editMedia} alt="" className="rounded-xl w-40 object-cover" />
                           <button
                             type="button"
                             onClick={() => setEditMedia(null)}
@@ -353,7 +354,7 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
                     <>
                       <p className="text-sm text-darkgrey leading-relaxed">{contrib.content}</p>
                       {contrib.media && (
-                        <img src={contrib.media} alt="" className="rounded-xl w-40 object-cover mt-1" />
+                        <MediaPreview src={contrib.media} alt="" className="rounded-xl w-40 object-cover mt-1" />
                       )}
                     </>
                   )}
@@ -394,7 +395,7 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
           <p className="text-[11px] text-mediumgrey px-1">{contributionContent.length}/{MAX_CONTENT_LENGTH}</p>
 
           {contributionMedia && (
-            <img src={contributionMedia} alt="" className="rounded-2xl w-40 object-cover" />
+            <MediaPreview src={contributionMedia} alt="" className="rounded-2xl w-40 object-cover" />
           )}
 
           {submitError && <p className="text-xs text-pink px-1">{submitError}</p>}

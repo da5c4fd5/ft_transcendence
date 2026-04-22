@@ -11,11 +11,12 @@ import {
 } from "lucide-preact";
 import { clsx as cn } from "clsx";
 import { Button } from "../../components/Button/Button";
+import { MediaPreview } from "../../components/MediaPreview/MediaPreview";
 import { TreeVisual } from "../../components/TreeVisual/TreeVisual";
 import type { SavedMemory, PastMemory } from "./today.types";
 import type { TreeData } from "../tree/tree.types";
 import type { MemoryStats } from "../memories/memories.types";
-import { api, getApiErrorMessage, validateImageFile } from "../../lib/api";
+import { api, getApiErrorMessage, validateMemoryMediaFile } from "../../lib/api";
 import { getRelativeLabel, getFormattedDate } from "../../lib/date";
 
 const MAX_CHARS = 180;
@@ -81,6 +82,7 @@ function EntryCard({
   media,
   error,
   saving,
+  uploadProgress,
   onContentChange,
   onMediaChange,
   onMediaRemove,
@@ -92,6 +94,7 @@ function EntryCard({
   media: string | null;
   error: string | null;
   saving: boolean;
+  uploadProgress: number | null;
   onContentChange: (v: string) => void;
   onMediaChange: (e: Event) => void;
   onMediaRemove: () => void;
@@ -131,10 +134,10 @@ function EntryCard({
 
       {media && (
         <div className="relative rounded overflow-hidden">
-          <img
+          <MediaPreview
             src={media}
             alt="Attached"
-            className="w-full max-h-64 object-cover"
+            className="w-full max-h-64 rounded object-cover"
           />
           <button
             type="button"
@@ -146,13 +149,28 @@ function EntryCard({
         </div>
       )}
 
+      {uploadProgress !== null && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between text-xs font-bold text-darkgrey">
+            <span>Uploading media</span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-lightgrey overflow-hidden">
+            <div
+              className="h-full rounded-full bg-pink transition-all"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-sm text-pink">{error}</p>}
 
       <div className="flex items-center gap-3 pt-2 border-t border-black/5">
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,audio/*"
           className="hidden"
           onChange={onMediaChange}
         />
@@ -219,7 +237,7 @@ function SavedEntryCard({
       </p>
 
       {memory.media && (
-        <img
+        <MediaPreview
           src={memory.media}
           alt="Memory"
           className="rounded-2xl w-full max-h-64 object-cover"
@@ -436,6 +454,7 @@ export function TodayPage() {
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const mediaFileRef = useRef<File | null>(null);
   const promptRequestIdRef = useRef(0);
 
@@ -584,10 +603,10 @@ export function TodayPage() {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const imageError = validateImageFile(file);
-    if (imageError) {
+    const mediaError = validateMemoryMediaFile(file);
+    if (mediaError) {
       mediaFileRef.current = null;
-      setSaveError(imageError);
+      setSaveError(mediaError);
       setMedia(savedMemory?.media ?? null);
       input.value = "";
       return;
@@ -618,9 +637,13 @@ export function TodayPage() {
         const form = new FormData();
         form.append("file", mediaFileRef.current);
         try {
-          await api.upload(`/memories/${memId}/media`, form);
+          setUploadProgress(0);
+          await api.upload(`/memories/${memId}/media`, form, {
+            onProgress: setUploadProgress,
+          });
+          setUploadProgress(100);
         } catch (error) {
-          mediaError = getApiErrorMessage(error, "Failed to upload the image.");
+          mediaError = getApiErrorMessage(error, "Failed to upload the file.");
           mediaFileRef.current = null;
         }
       } else if (savedMemory?.id && savedMemory.media && !media) {
@@ -664,6 +687,7 @@ export function TodayPage() {
     } catch (error) {
       setSaveError(getApiErrorMessage(error, "Failed to save your memory."));
     } finally {
+      setUploadProgress(null);
       setSaving(false);
     }
   };
@@ -708,11 +732,13 @@ export function TodayPage() {
                 media={media}
                 error={saveError}
                 saving={saving}
+                uploadProgress={uploadProgress}
                 onContentChange={handleContentChange}
                 onMediaChange={handleMediaChange}
                 onMediaRemove={() => {
                   setMedia(null);
                   mediaFileRef.current = null;
+                  setUploadProgress(null);
                   setSaveError(null);
                 }}
                 onCapsul={handleCapsul}

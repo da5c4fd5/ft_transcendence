@@ -27,7 +27,7 @@ export const MemoriesModel = {
     ),
     isOpen: t.Optional(t.Boolean())
   }),
-  mediaBody: t.Object({ file: t.File({ type: "image/*" }) }),
+  mediaBody: t.Object({ file: t.File() }),
 
   searchQuery: t.Object({
     mood: t.Optional(t.String({ maxLength: 32 })),

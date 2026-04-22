@@ -1,6 +1,8 @@
 import cors from "@elysiajs/cors";
 import swagger from "@elysiajs/swagger";
 import { Elysia } from "elysia";
+import { db } from "./db";
+import { authPlugin } from "./plugins/auth.plugin";
 import { errorHandlerPlugin } from "./plugins/error-handler.plugin";
 import { auth } from "./modules/auth";
 import { users } from "./modules/users";
@@ -47,6 +49,7 @@ const app = new Elysia()
     }
   })
   .use(errorHandlerPlugin)
+  .use(authPlugin)
   .use(auth)
   .use(users)
   .use(friends)
@@ -57,16 +60,73 @@ const app = new Elysia()
   .get("/", () => ({ status: "ok" }), { detail: { hide: true } })
   .get(
     "/media/:filename",
-    async ({ params }: { params: { filename: string } }) => {
+    async ({
+      params,
+      user
+    }: {
+      params: { filename: string };
+      user: { id: string } | null;
+    }) => {
       const { filename } = params;
       if (filename.includes("/") || filename.includes("..")) {
         return new Response(JSON.stringify({ error: "Invalid filename" }), { status: 400 });
       }
+
+      const url = `/api/media/${filename}`;
+      const memoryMedia = await db.media.findFirst({
+        where: { url },
+        select: {
+          mimeType: true,
+          memory: {
+            select: {
+              isOpen: true,
+              userId: true
+            }
+          }
+        }
+      });
+
+      if (memoryMedia && !memoryMedia.memory.isOpen && memoryMedia.memory.userId !== user?.id) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+      }
+
+      const contributionMedia = memoryMedia
+        ? null
+        : await db.contribution.findFirst({
+            where: {
+              OR: [{ mediaUrl: url }, { guestAvatarUrl: url }]
+            },
+            select: {
+              memory: {
+                select: {
+                  isOpen: true,
+                  userId: true
+                }
+              }
+            }
+          });
+
+      if (
+        contributionMedia &&
+        !contributionMedia.memory.isOpen &&
+        contributionMedia.memory.userId !== user?.id
+      ) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+      }
+
+      if (!memoryMedia && !contributionMedia) {
+        return new Response(JSON.stringify({ error: "Not found" }), { status: 404 });
+      }
+
       const file = Bun.file(`/app/uploads/${filename}`);
       if (!(await file.exists())) {
         return new Response(JSON.stringify({ error: "Not found" }), { status: 404 });
       }
-      return new Response(file);
+      return new Response(file, {
+        headers: memoryMedia?.mimeType
+          ? { "Content-Type": memoryMedia.mimeType }
+          : undefined
+      });
     },
     { detail: { hide: true } }
   )

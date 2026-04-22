@@ -13,16 +13,62 @@ export type ApiError = {
 };
 
 export const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const MAX_MEDIA_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const IMAGE_TOO_LARGE_MESSAGE = 'That image is too large. Please choose an image up to 10 MB.';
+export const FILE_TOO_LARGE_MESSAGE = 'That file is too large. Please choose a file up to 10 MB.';
+export const INVALID_MEDIA_TYPE_MESSAGE = 'Unsupported file format. Please choose an image or audio file.';
+
+const SUPPORTED_MEMORY_MEDIA_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/ogg',
+  'audio/webm',
+  'audio/mp4',
+  'audio/aac',
+  'audio/x-m4a',
+]);
+
+const SUPPORTED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+]);
 
 export function validateImageFile(file: File): string | null {
-  return file.size > MAX_IMAGE_UPLOAD_BYTES ? IMAGE_TOO_LARGE_MESSAGE : null;
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+    return IMAGE_TOO_LARGE_MESSAGE;
+  }
+  if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+    return 'Unsupported image format. Please choose a JPG, PNG, GIF, WebP, or SVG image.';
+  }
+  return null;
+}
+
+export function validateMemoryMediaFile(file: File): string | null {
+  if (file.size > MAX_MEDIA_UPLOAD_BYTES) {
+    return FILE_TOO_LARGE_MESSAGE;
+  }
+  if (!SUPPORTED_MEMORY_MEDIA_TYPES.has(file.type)) {
+    return INVALID_MEDIA_TYPE_MESSAGE;
+  }
+  return null;
 }
 
 export function getApiErrorMessage(err: unknown, fallback = 'Something went wrong.'): string {
   const apiErr = err as Partial<ApiError>;
   if (apiErr?.status === 413) {
-    return IMAGE_TOO_LARGE_MESSAGE;
+    return apiErr.message === FILE_TOO_LARGE_MESSAGE
+      ? FILE_TOO_LARGE_MESSAGE
+      : IMAGE_TOO_LARGE_MESSAGE;
   }
   if (typeof apiErr?.message === 'string' && apiErr.message.trim()) {
     return apiErr.message;
@@ -39,6 +85,10 @@ export function setUnauthorizedHandler(cb: () => void) {
 
 export function getToken(): string | null {
   return localStorage.getItem('capsul_token');
+}
+
+export function isAudioMediaUrl(url: string): boolean {
+  return /^data:audio\//i.test(url) || /\.(mp3|wav|ogg|m4a|aac|webm|mp4)(\?.*)?$/i.test(url);
 }
 
 export function getWebSocketUrl(
@@ -124,18 +174,53 @@ export const api = {
   delete<T = void>(path: string, body?: unknown): Promise<T> {
     return request<T>('DELETE', path, body);
   },
-  async upload<T>(path: string, form: FormData): Promise<T> {
+  async upload<T>(
+    path: string,
+    form: FormData,
+    options?: { onProgress?: (percent: number) => void },
+  ): Promise<T> {
     const urlStr = `${BASE_URL}${path}`;
-    const headers: Record<string, string> = {};
     const token = getToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(urlStr, { method: 'POST', headers, body: form });
-    if (res.status === 401) { _onUnauthorized?.(); throw { status: 401, message: 'Unauthorized' } satisfies ApiError; }
-    if (!res.ok) {
-      let message = res.statusText;
-      try { const j = await res.json() as { error?: string; message?: string }; message = j.error ?? j.message ?? message; } catch { /* */ }
-      throw { status: res.status, message } satisfies ApiError;
-    }
-    return res.json() as Promise<T>;
+    return await new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', urlStr);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+      xhr.upload.onprogress = (event) => {
+        if (!options?.onProgress || !event.lengthComputable) return;
+        options.onProgress(Math.round((event.loaded / event.total) * 100));
+      };
+
+      xhr.onerror = () => {
+        reject({ status: 0, message: 'Network error' } satisfies ApiError);
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 401) {
+          _onUnauthorized?.();
+          reject({ status: 401, message: 'Unauthorized' } satisfies ApiError);
+          return;
+        }
+
+        if (xhr.status < 200 || xhr.status >= 300) {
+          let message = xhr.statusText;
+          try {
+            const parsed = JSON.parse(xhr.responseText) as { error?: string; message?: string };
+            message = parsed.error ?? parsed.message ?? message;
+          } catch { /* ignore parse errors */ }
+          reject({ status: xhr.status, message } satisfies ApiError);
+          return;
+        }
+
+        if (xhr.status === 204 || !xhr.responseText.trim()) {
+          resolve(undefined as T);
+          return;
+        }
+
+        resolve(JSON.parse(xhr.responseText) as T);
+      };
+
+      xhr.send(form);
+    });
   },
 };

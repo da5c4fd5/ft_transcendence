@@ -4,7 +4,7 @@ import { db } from "../../db";
 import type { MemoriesModel } from "./model";
 import { consumePromptSuggestion, refreshPromptSuggestionCache } from "../../lib/prompt-suggestions";
 import { enqueueMoodClassification } from "../../lib/mood-classifier";
-import { assertImageFileSize } from "../../lib/images";
+import { assertMemoryMediaFile } from "../../lib/images";
 
 const REMINDER_CACHE_TTL_MS = 5 * 60 * 1000;
 const REMINDER_POOL_LIMIT = 24;
@@ -45,6 +45,11 @@ function shuffle<T>(items: T[]) {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
+}
+
+function extensionForMime(mimeType: string) {
+  const subtype = mimeType.split("/")[1] ?? "bin";
+  return subtype.replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "") || "bin";
 }
 
 function assertMemoryCanBeModifiedToday(memoryDate: Date) {
@@ -196,12 +201,12 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
-    assertImageFileSize(file);
+    assertMemoryMediaFile(file);
 
     // Delete any existing media record so the new one becomes the single reference
     await db.media.deleteMany({ where: { memoryId: id } });
 
-    const ext = (file.type.split("/")[1] ?? "bin").replace("jpeg", "jpg");
+    const ext = extensionForMime(file.type);
     const filename = `${crypto.randomUUID()}.${ext}`;
     const uploadDir = "/app/uploads";
     await Bun.write(`${uploadDir}/${filename}`, await file.arrayBuffer());

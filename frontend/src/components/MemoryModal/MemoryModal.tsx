@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { X, Users, Lock, Link2, Copy, Heart } from 'lucide-preact';
 import { Button } from '../Button/Button';
 import { Avatar } from '../Avatar/Avatar';
+import { MediaPreview } from '../MediaPreview/MediaPreview';
 import type { Mood, MemoryModalProps } from './MemoryModal.types';
 import { getFormattedDate } from '../../lib/date';
 import { api } from '../../lib/api';
@@ -81,7 +82,7 @@ export function MemoryModal({ entry, onClose, onDelete }: MemoryModalProps) {
           <p className="text-darkgrey text-base font-semibold leading-relaxed">{entry.content}</p>
 
           {entry.media && (
-            <img
+            <MediaPreview
               src={entry.media}
               alt="Memory"
               className="w-full rounded object-contain"
@@ -104,7 +105,7 @@ export function MemoryModal({ entry, onClose, onDelete }: MemoryModalProps) {
                     </div>
                     <p className="text-sm text-darkgrey leading-relaxed">{contrib.content}</p>
                     {contrib.media && (
-                      <img src={contrib.media} alt="" className="rounded-xl w-40 object-cover mt-1" />
+                      <MediaPreview src={contrib.media} alt="" className="rounded-xl w-40 object-cover mt-1" />
                     )}
                   </div>
                 </div>

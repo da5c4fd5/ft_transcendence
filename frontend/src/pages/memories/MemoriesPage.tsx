@@ -3,6 +3,7 @@ import { clsx as cn } from 'clsx';
 import { Calendar, ChevronLeft, ChevronRight, Clock, Heart, Search, SlidersHorizontal, Share2 } from 'lucide-preact';
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
 import { MOOD_EMOJI } from '../../components/MemoryModal/MemoryModal';
+import { MediaPreview } from '../../components/MediaPreview/MediaPreview';
 import type { Mood, MemoryDetails } from '../../components/MemoryModal/MemoryModal.types';
 import type { TimeCapsule, MemoryCard, MoodFilter, PeriodFilter, SortFilter, CollectionFilters } from './memories.types';
 import { api } from '../../lib/api';
@@ -102,7 +103,7 @@ function TimeCapsuleCard({ capsule, onClick }: { capsule: TimeCapsule; onClick: 
       </span>
       <div className={`bg-white rounded-2xl p-4 shadow-sm flex-1 ${capsule.media ? 'flex flex-col gap-3' : 'flex items-center justify-center'}`}>
         {capsule.media && (
-          <img src={capsule.media} alt="" className="w-full h-32 object-cover rounded" />
+          <MediaPreview src={capsule.media} alt="" className="w-full h-32 object-cover rounded" />
         )}
         <p className="text-darkgrey text-sm leading-relaxed text-center">
           {capsule.content}
@@ -120,7 +121,7 @@ function MemoryCardItem({ card, onClick }: { card: MemoryCard; onClick: () => vo
       className="bg-white rounded-3xl shadow-sm overflow-hidden flex flex-col text-left hover:shadow-md transition-shadow w-full"
     >
       {card.media && (
-        <img src={card.media} alt="" className="w-full object-cover" />
+        <MediaPreview src={card.media} alt="" className="w-full object-cover" />
       )}
       <div className="p-4 flex flex-col gap-2 flex-1">
         <div>

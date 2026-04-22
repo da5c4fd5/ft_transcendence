@@ -66,6 +66,7 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
   const [currentPw, setCurrentPw]       = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile]     = useState<File | null>(null);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState<number | null>(null);
   const [error, setError]               = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -110,7 +111,11 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
       if (avatarFile) {
         const form = new FormData();
         form.append('file', avatarFile);
-        await api.upload('/users/me/avatar', form);
+        setAvatarUploadProgress(0);
+        await api.upload('/users/me/avatar', form, {
+          onProgress: setAvatarUploadProgress,
+        });
+        setAvatarUploadProgress(100);
       }
       const updated = await api.get<UserType>('/users/me');
       onUserUpdate(updated);
@@ -121,6 +126,7 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save changes.'));
     } finally {
+      setAvatarUploadProgress(null);
       setSaving(false);
     }
   };
@@ -132,6 +138,7 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
     setCurrentPw('');
     setAvatarPreview(null);
     setAvatarFile(null);
+    setAvatarUploadProgress(null);
     setError(null);
   };
 
@@ -181,6 +188,21 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
                 value={currentPw}
                 onChange={(v) => { setCurrentPw(v); setError(null); }}
               />
+            </div>
+          )}
+
+          {avatarUploadProgress !== null && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs font-bold text-darkgrey px-1">
+                <span>Uploading avatar</span>
+                <span>{avatarUploadProgress}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-lightgrey overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-pink transition-all"
+                  style={{ width: `${avatarUploadProgress}%` }}
+                />
+              </div>
             </div>
           )}
 

@@ -171,7 +171,7 @@ export const memories = new Elysia({
             MemoriesService.attachMedia(params.memoryId, user!.id, body.file),
           {
             body: MemoriesModel.mediaBody,
-            detail: { description: "Attach a media file to a memory." }
+            detail: { description: "Attach an image or audio file to a memory." }
           }
         )
         .delete(
