@@ -53,6 +53,9 @@ model User {
   recvRequests  Friend[]       @relation("Recipient")
   memories      Memory[]
   contributions Contribution[]
+  promptSuggestionState PromptSuggestionState? @relation("UserPromptSuggestionState")
+  promptSuggestions     PromptSuggestion[]
+  moodClassificationJobs MoodClassificationJob[]
 
   @@map("users")
 }
@@ -93,6 +96,7 @@ model Memory {
   /// The calendar day this memory belongs to (time portion is ignored)
   date      DateTime @default(now()) @db.Date
   mood      String?  @db.VarChar(32)
+  moodSource MemoryMoodSource?
   /// When true, anyone with the link can add a contribution
   isOpen     Boolean  @default(false)
   /// Unique token used for share links. Generated when isOpen is set to true.
@@ -103,6 +107,7 @@ model Memory {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   media         Media[]
   contributions Contribution[]
+  moodClassificationJob MoodClassificationJob?
 
   @@index([userId, date(sort: Desc)])
   @@map("memories")
@@ -141,4 +146,84 @@ model Contribution {
 
   @@index([memoryId])
   @@map("contributions")
+}
+
+enum PromptSuggestionStatus {
+  IDLE
+  GENERATING
+  READY
+  ERROR
+}
+
+enum MemoryMoodSource {
+  MANUAL
+  CLASSIFIED
+}
+
+enum MoodClassificationJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model MoodClassificationJob {
+  id              String                      @id @default(cuid())
+  memoryId        String                      @unique
+  userId          String
+  content         String                      @db.Text
+  status          MoodClassificationJobStatus @default(QUEUED)
+  attempts        Int                         @default(0)
+  availableAt     DateTime                    @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  classifierModel String?                     @db.VarChar(128)
+  rawLabel        String?                     @db.VarChar(64)
+  rawScore        Float?
+  mood            String?                     @db.VarChar(32)
+  labelsJson      Json?
+  lastError       String?                     @db.Text
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  memory Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt, createdAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("mood_classification_jobs")
+}
+
+model PromptSuggestionState {
+  userId               String                 @id
+  contextHash          String?
+  generationToken      String?
+  model                String?                @db.VarChar(128)
+  systemPrompt         String?                @db.Text
+  requestPrompt        String?                @db.Text
+  generationStatus     PromptSuggestionStatus @default(IDLE)
+  lastError            String?                @db.Text
+  expiresAt            DateTime?
+  generationStartedAt  DateTime?
+  generationFinishedAt DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  user User @relation("UserPromptSuggestionState", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("prompt_suggestion_states")
+}
+
+model PromptSuggestion {
+  id        String   @id @default(cuid())
+  userId    String
+  prompt    String   @db.Text
+  position  Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, position])
+  @@index([userId, position])
+  @@map("prompt_suggestions")
 }

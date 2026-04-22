@@ -28,6 +28,13 @@ export const admin = new Elysia({
               "Return platform-wide counts: total users, memories, and active sessions."
           }
         })
+        .get("/ai/stats", () => AdminService.getAiOverview(), {
+          response: { 200: AdminModel.aiOverviewResponse },
+          detail: {
+            description:
+              "Return global AI usage and health metrics for prompt generation and mood classification."
+          }
+        })
         .get(
           "/users",
           ({ query }) =>

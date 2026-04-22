@@ -1,4 +1,4 @@
-FROM nginx:1.27-alpine
+FROM docker.io/library/nginx:1.27-alpine
 
 RUN apk add --no-cache bash bind-tools curl gettext jq openssl \
 	&& curl -fsSL \

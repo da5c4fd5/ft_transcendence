@@ -12,12 +12,6 @@ export const memories = new Elysia({
   }
 })
   .use(authPlugin)
-  .get("/prompts", () => MemoriesService.getPromptSuggestions(), {
-    detail: {
-      security: [],
-      description: "Return a list of writing prompt suggestions. Public."
-    }
-  })
   .get(
     "/shared/:memoryId/:shareToken",
     ({ params }) => MemoriesService.findByShareToken(params.memoryId, params.shareToken),
@@ -37,7 +31,13 @@ export const memories = new Elysia({
     },
     (app) =>
       app
-        // ── Today ─────────────────────────────────────────────────────
+        .get("/prompts", ({ user }) => MemoriesService.getPromptSuggestions(user!.id), {
+          response: { 200: MemoriesModel.promptResponse, 503: t.Any() },
+          detail: {
+            description:
+              "Return the next cached AI-generated writing prompt for the authenticated user. Refills the cache automatically when it runs low."
+          }
+        })
         .get("/today", ({ user }) => MemoriesService.today(user!.id), {
           response: { 200: t.Any(), 404: t.Any() },
           detail: {
@@ -45,8 +45,6 @@ export const memories = new Elysia({
               "Return the authenticated user's memory for today, if one exists. 404 if none."
           }
         })
-
-        // ── Collection ────────────────────────────────────────────────
         .get(
           "/",
           ({ user, query }) =>
@@ -65,8 +63,6 @@ export const memories = new Elysia({
           body: MemoriesModel.createBody,
           detail: { description: "Create a new memory." }
         })
-
-        // ── Search / Stats / Capsuls ──────────────────────────────────
         .get(
           "/search",
           ({ user, query }) => MemoriesService.search(user!.id, query),
@@ -97,8 +93,6 @@ export const memories = new Elysia({
               "Return a cached pool of past memories for the Today reminder card, excluding today's entry."
           }
         })
-
-        // ── Timeline / Calendar ───────────────────────────────────────
         .get(
           "/timeline",
           ({ user, query }) =>
@@ -121,8 +115,6 @@ export const memories = new Elysia({
               "Return the dates of all memories for rendering a life-calendar heatmap."
           }
         })
-
-        // ── Single memory ─────────────────────────────────────────────
         .get("/:memoryId", ({ user, params }) =>
           MemoriesService.findById(params.memoryId, user!.id), {
           detail: {
@@ -139,7 +131,7 @@ export const memories = new Elysia({
             response: { 403: t.Any(), 404: t.Any() },
             detail: {
               description:
-                "Update a memory's content or mood. Only today's memory can be updated."
+                "Update a memory's content. Only today's memory can be updated."
             }
           }
         )
@@ -155,8 +147,6 @@ export const memories = new Elysia({
             }
           }
         )
-
-        // ── Media ─────────────────────────────────────────────────────
         .post(
           "/:memoryId/media",
           ({ user, params, body }) =>
