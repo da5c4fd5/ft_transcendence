@@ -78,8 +78,6 @@ services:
     depends_on:
       certificate:
         condition: service_completed_successfully
-      mailpit:
-        condition: service_started
       mood-classifier:
         condition: service_healthy
       ollama:
@@ -102,9 +100,10 @@ services:
       MOOD_CLASSIFIER_MODEL_ID: ${MOOD_CLASSIFIER_MODEL_ID:-AnasAlokla/multilingual_go_emotions_V1.2}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-alibayram/smollm3}
-      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_URL: ${SMTP_URL:-}
       SMTP_PORT: ${SMTP_PORT:-1025}
-      SMTP_FROM: ${SMTP_FROM:-no-reply@capsul.local}
+      SMTP_EMAIL: ${SMTP_EMAIL:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       PGSSLMODE: verify-full
       PGSSLROOTCERT: /run/certs/internal/ca.crt
       NODE_EXTRA_CA_CERTS: /run/certs/internal/ca.crt
@@ -142,14 +141,6 @@ services:
       timeout: 5s
       retries: 60
       start_period: 5s
-    networks:
-      - capsul_net
-
-  mailpit:
-    image: ghcr.io/axllent/mailpit:latest
-    expose:
-      - "1025"
-      - "8025"
     networks:
       - capsul_net
 

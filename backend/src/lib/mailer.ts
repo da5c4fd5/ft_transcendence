@@ -1,9 +1,10 @@
 import nodemailer from "nodemailer";
 import { status } from "elysia";
 
-const smtpHost = process.env.SMTP_HOST;
+const smtpHost = process.env.SMTP_URL;
 const smtpPort = Number(process.env.SMTP_PORT ?? 1025);
-const smtpFrom = process.env.SMTP_FROM ?? "no-reply@capsul.local";
+const smtpEmail = process.env.SMTP_EMAIL;
+const smtpPassword = process.env.SMTP_PASSWORD;
 
 let transporter:
   | ReturnType<typeof nodemailer.createTransport>
@@ -15,7 +16,7 @@ function getTransporter() {
     return transporter;
   }
 
-  if (!smtpHost) {
+  if (!smtpHost || !smtpEmail) {
     transporter = null;
     return transporter;
   }
@@ -23,7 +24,14 @@ function getTransporter() {
   transporter = nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
-    secure: false
+    secure: smtpPort === 465,
+    auth:
+      smtpEmail && smtpPassword
+        ? {
+            user: smtpEmail,
+            pass: smtpPassword
+          }
+        : undefined
   });
 
   return transporter;
@@ -41,7 +49,7 @@ export async function sendMail(options: {
 
   try {
     await transport.sendMail({
-      from: smtpFrom,
+      from: smtpEmail,
       to: options.to,
       subject: options.subject,
       text: options.text
