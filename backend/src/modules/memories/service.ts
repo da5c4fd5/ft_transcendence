@@ -201,6 +201,7 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
+    assertMemoryCanBeModifiedToday(memory.date);
     assertMemoryMediaFile(file);
 
     // Delete any existing media record so the new one becomes the single reference
@@ -223,6 +224,7 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
+    assertMemoryCanBeModifiedToday(memory.date);
     await db.media.deleteMany({ where: { memoryId: id } });
     MemoriesService.invalidateReminderCache(userId);
   }
