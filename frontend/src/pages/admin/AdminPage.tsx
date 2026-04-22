@@ -253,34 +253,6 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
 
               <div className="rounded-2xl bg-white p-4">
                 <div className="flex items-center gap-2">
-                  <BotMessageSquare size={15} className="text-darkgrey" />
-                  <h4 className="font-semibold text-darkgrey">System Prompts</h4>
-                </div>
-                {aiOverview.promptSuggestions.systemPrompts.length === 0 ? (
-                  <p className="mt-3 text-sm text-mediumgrey">No system prompts recorded yet.</p>
-                ) : (
-                  <ul className="mt-3 space-y-3">
-                    {aiOverview.promptSuggestions.systemPrompts.map((item, index) => (
-                      <li key={`${item.model}-${item.updatedAt}-${index}`} className="rounded-2xl bg-lightgrey/40 px-4 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-darkgrey break-all">{item.model || 'Unknown model'}</p>
-                            <p className="text-[11px] text-mediumgrey mt-0.5">
-                              {item.usersCount} user{item.usersCount > 1 ? 's' : ''} · updated {new Date(item.updatedAt).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                        <pre className="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-darkgrey font-mono">
-                          {item.prompt}
-                        </pre>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="rounded-2xl bg-white p-4">
-                <div className="flex items-center gap-2">
                   <Activity size={15} className="text-darkgrey" />
                   <h4 className="font-semibold text-darkgrey">Recent Prompt Errors</h4>
                 </div>
