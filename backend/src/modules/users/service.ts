@@ -13,6 +13,11 @@ import { buildUserDataExport } from "../../lib/data-export";
 import { isMailConfigured, sendMail } from "../../lib/mailer";
 import { assertImageFileSize } from "../../lib/images";
 import {
+  collectUserOwnedFileUrls,
+  deleteStoredFileIfUnused,
+  deleteStoredFilesIfUnused
+} from "../../lib/stored-files";
+import {
   createPublicApiKey,
   revokePublicApiKey as revokeStoredPublicApiKey
 } from "../../lib/public-api";
@@ -270,6 +275,7 @@ export abstract class UsersService {
     data: UsersModel["deleteAccountBody"]
   ) {
     const user = await db.user.findUniqueOrThrow({ where: { id } });
+    const ownedFileUrls = await collectUserOwnedFileUrls(id);
 
     if (!(await Bun.password.verify(data.password, user.passwordHash))) {
       throw status(401, {
@@ -303,6 +309,7 @@ export abstract class UsersService {
     }
 
     await db.user.delete({ where: { id } });
+    await deleteStoredFilesIfUnused(ownedFileUrls);
     return status(204);
   }
 
@@ -336,6 +343,10 @@ export abstract class UsersService {
   }
 
   static async uploadAvatar(id: string, file: File) {
+    const currentUser = await db.user.findUniqueOrThrow({
+      where: { id },
+      select: { avatarUrl: true }
+    });
     assertImageFileSize(file);
     const ext = extensionForMime(file.type);
     const filename = `${crypto.randomUUID()}.${ext}`;
@@ -346,6 +357,7 @@ export abstract class UsersService {
       data: { avatarUrl: `/avatars/${filename}` },
       select: SELF_USER_SELECT
     });
+    await deleteStoredFileIfUnused(currentUser.avatarUrl);
     return UsersService.toSelfProfile(updatedUser);
   }
 

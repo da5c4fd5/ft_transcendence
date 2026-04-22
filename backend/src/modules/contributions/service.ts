@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { db } from "../../db";
 import type { ContributionsModel } from "./model";
 import { assertImageByteSize, assertImageMimeType } from "../../lib/images";
+import { deleteStoredFilesIfUnused } from "../../lib/stored-files";
 
 const UPLOAD_DIR = "/app/uploads";
 const CONTRIBUTION_INCLUDE = {
@@ -87,7 +88,7 @@ export abstract class ContributionsService {
       throw status(403, { message: "Forbidden" });
     const mediaUrl =
       data.mediaUrl === undefined ? undefined : await storeInlineImage(data.mediaUrl);
-    return db.contribution.update({
+    const updated = await db.contribution.update({
       where: { id },
       data: {
         content: data.content,
@@ -95,6 +96,10 @@ export abstract class ContributionsService {
       },
       include: CONTRIBUTION_INCLUDE
     });
+    if (mediaUrl !== undefined) {
+      await deleteStoredFilesIfUnused([contribution.mediaUrl]);
+    }
+    return updated;
   }
 
   static async remove(id: string, requesterId: string) {
@@ -107,6 +112,10 @@ export abstract class ContributionsService {
     const isContributor = contribution.contributorId === requesterId;
     if (!isOwner && !isContributor) throw status(403, { message: "Forbidden" });
     await db.contribution.delete({ where: { id } });
+    await deleteStoredFilesIfUnused([
+      contribution.mediaUrl,
+      contribution.guestAvatarUrl
+    ]);
     return status(204);
   }
 }

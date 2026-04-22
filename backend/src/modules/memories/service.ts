@@ -5,6 +5,10 @@ import type { MemoriesModel } from "./model";
 import { consumePromptSuggestion, refreshPromptSuggestionCache } from "../../lib/prompt-suggestions";
 import { enqueueMoodClassification } from "../../lib/mood-classifier";
 import { assertMemoryMediaFile } from "../../lib/images";
+import {
+  collectMemoryFileUrls,
+  deleteStoredFilesIfUnused
+} from "../../lib/stored-files";
 
 const REMINDER_CACHE_TTL_MS = 5 * 60 * 1000;
 const REMINDER_POOL_LIMIT = 24;
@@ -191,7 +195,9 @@ export abstract class MemoriesService {
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
     assertMemoryCanBeModifiedToday(memory.date);
+    const memoryFileUrls = await collectMemoryFileUrls(id);
     await db.memory.delete({ where: { id } });
+    await deleteStoredFilesIfUnused(memoryFileUrls);
     MemoriesService.invalidateReminderCache(userId);
     void refreshPromptSuggestionCache(userId);
     return status(204);
@@ -205,6 +211,10 @@ export abstract class MemoriesService {
     assertMemoryMediaFile(file);
 
     // Delete any existing media record so the new one becomes the single reference
+    const previousMedia = await db.media.findMany({
+      where: { memoryId: id },
+      select: { url: true }
+    });
     await db.media.deleteMany({ where: { memoryId: id } });
 
     const ext = extensionForMime(file.type);
@@ -216,6 +226,7 @@ export abstract class MemoriesService {
     const media = await db.media.create({
       data: { memoryId: id, url, mimeType: file.type }
     });
+    await deleteStoredFilesIfUnused(previousMedia.map((item) => item.url));
     MemoriesService.invalidateReminderCache(userId);
     return media;
   }
@@ -225,7 +236,12 @@ export abstract class MemoriesService {
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
     assertMemoryCanBeModifiedToday(memory.date);
+    const previousMedia = await db.media.findMany({
+      where: { memoryId: id },
+      select: { url: true }
+    });
     await db.media.deleteMany({ where: { memoryId: id } });
+    await deleteStoredFilesIfUnused(previousMedia.map((item) => item.url));
     MemoriesService.invalidateReminderCache(userId);
     return status(204);
   }

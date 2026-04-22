@@ -1,6 +1,10 @@
 import { status } from "elysia";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { db } from "../../db";
+import {
+  collectUserOwnedFileUrls,
+  deleteStoredFilesIfUnused
+} from "../../lib/stored-files";
 import type { AdminModel } from "./model";
 
 const ADMIN_USER_SELECT = {
@@ -207,7 +211,9 @@ export abstract class AdminService {
     const user = await db.user.findUnique({ where: { id } });
     if (!user) throw status(404, { message: "User not found" });
     await AdminService.assertNotRemovingLastAdmin(id);
+    const ownedFileUrls = await collectUserOwnedFileUrls(id);
     await db.user.delete({ where: { id } });
+    await deleteStoredFilesIfUnused(ownedFileUrls);
     return status(204);
   }
 
