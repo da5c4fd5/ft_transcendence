@@ -40,14 +40,17 @@ export abstract class Auth {
       } satisfies AuthModel["logInMfaRequired"];
     }
 
-    const session = await db.session.create({ data: { userId: user.id } });
+    const session = await db.session.create({
+      data: { userId: user.id, userAgent: userAgent ?? null }
+    });
     const token = await signToken({ sub: user.id, jti: session.id });
     return { token } satisfies AuthModel["logInResponse"];
   }
 
   static async verifyMfaLogin(
     { mfaToken, code }: AuthModel["mfaLoginBody"],
-    signToken: TokenSigner
+    signToken: TokenSigner,
+    userAgent?: string
   ) {
     let userId: string;
     try {
@@ -71,7 +74,9 @@ export abstract class Auth {
         error: "Invalid or expired MFA code"
       } satisfies AuthModel["mfaLoginInvalid"]);
 
-    const session = await db.session.create({ data: { userId: user.id } });
+    const session = await db.session.create({
+      data: { userId: user.id, userAgent: userAgent ?? null }
+    });
     const token = await signToken({ sub: user.id, jti: session.id });
     return { token } satisfies AuthModel["logInResponse"];
   }
@@ -104,7 +109,9 @@ export abstract class Auth {
       throw status("Internal Server Error", {});
     }
     await issueEmailVerification(userId, email);
-    const session = await db.session.create({ data: { userId } });
+    const session = await db.session.create({
+      data: { userId, userAgent: userAgent ?? null }
+    });
     const token = await signToken({ sub: userId, jti: session.id });
     return { token } satisfies AuthModel["signUpResponse"];
   }
@@ -127,7 +134,16 @@ export abstract class Auth {
     return status(204);
   }
 
-  static async revokeOtherSession(sessionId: string, userId: string) {
+  static async revokeOtherSession(
+    sessionId: string,
+    userId: string,
+    currentSessionId: string
+  ) {
+    if (sessionId === currentSessionId) {
+      throw status(400, {
+        message: "Use logout to revoke the current session"
+      });
+    }
     await db.session.deleteMany({ where: { id: sessionId, userId } });
     return new Response(null, { status: 204 });
   }

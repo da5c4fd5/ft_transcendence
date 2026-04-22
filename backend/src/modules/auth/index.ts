@@ -49,10 +49,11 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
   )
   .post(
     "/mfa",
-    async ({ body, jwt, cookie: { session } }) => {
+    async ({ body, jwt, cookie: { session }, request }) => {
       const response = await Auth.verifyMfaLogin(
         body,
-        (payload) => jwt.sign(payload)
+        (payload) => jwt.sign(payload),
+        request.headers.get("user-agent") ?? undefined
       );
       session!.value = response.token;
       return response;
@@ -101,10 +102,14 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
         })
         .delete(
           "/sessions/:id",
-          ({ user, params }) => Auth.revokeOtherSession(params.id, user!.id),
+          ({ user, params }) =>
+            Auth.revokeOtherSession(params.id, user!.id, user!.sessionId),
           {
-            response: { 204: t.Any(), 401: t.Any() },
-            detail: { description: "Revoke a specific session (cannot revoke your current session — use POST /auth/logout for that)." }
+            response: { 204: t.Any(), 400: t.Any(), 401: t.Any() },
+            detail: {
+              description:
+                "Revoke a specific session except the current one. Use POST /auth/logout to revoke the active session."
+            }
           }
         )
   );
