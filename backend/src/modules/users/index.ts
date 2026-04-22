@@ -132,6 +132,17 @@ export const users = new Elysia({
             }
           }
         )
+        .get(
+          "/me/export",
+          ({ user }) => UsersService.exportSelf(user!.id),
+          {
+            response: { 200: t.Any() },
+            detail: {
+              description:
+                "Download a readable JSON export of the authenticated user's data and send a confirmation email."
+            }
+          }
+        )
         .delete(
           "/me",
           ({ user, body }) => UsersService.deleteSelf(user!.id, body),

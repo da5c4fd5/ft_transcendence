@@ -158,6 +158,20 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+function getDownloadFilename(contentDisposition: string | null, fallback: string) {
+  if (!contentDisposition) return fallback;
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const simpleMatch = contentDisposition.match(/filename="([^"]+)"/i);
+  return simpleMatch?.[1] ?? fallback;
+}
+
 export const api = {
   get<T>(path: string, params?: Record<string, string | number | boolean | undefined | null>): Promise<T> {
     return request<T>('GET', path, undefined, params);
@@ -173,6 +187,47 @@ export const api = {
   },
   delete<T = void>(path: string, body?: unknown): Promise<T> {
     return request<T>('DELETE', path, body);
+  },
+  async download(
+    path: string,
+    options?: {
+      method?: 'GET' | 'POST';
+      body?: unknown;
+      fallbackFilename?: string;
+    },
+  ): Promise<{ blob: Blob; filename: string }> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (options?.body !== undefined) headers['Content-Type'] = 'application/json';
+
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: options?.method ?? 'GET',
+      headers,
+      body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+
+    if (res.status === 401) {
+      _onUnauthorized?.();
+      throw { status: 401, message: 'Unauthorized' } satisfies ApiError;
+    }
+
+    if (!res.ok) {
+      let message = res.statusText;
+      try {
+        const json = await res.json() as { error?: string; message?: string };
+        message = json.error ?? json.message ?? message;
+      } catch { /* ignore parse errors */ }
+      throw { status: res.status, message } satisfies ApiError;
+    }
+
+    return {
+      blob: await res.blob(),
+      filename: getDownloadFilename(
+        res.headers.get('Content-Disposition'),
+        options?.fallbackFilename ?? 'download.json',
+      ),
+    };
   },
   async upload<T>(
     path: string,

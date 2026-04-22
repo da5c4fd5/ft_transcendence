@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Copy, CheckCheck, Mail } from 'lucide-preact';
+import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Copy, CheckCheck, Download, Mail } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
@@ -1437,6 +1437,65 @@ function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void 
   );
 }
 
+function DataExportCard() {
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const handleExport = async () => {
+    setDownloading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { blob, filename } = await api.download('/users/me/export', {
+        fallbackFilename: 'capsul-data-export.json',
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setMessage('Your data export was downloaded. A confirmation email was also sent.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to export your data.'));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className={cn(cardBase, 'border border-blue/20 bg-blue/5')}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2">
+          <Download size={18} className="text-blue mt-0.5 shrink-0" />
+          <div>
+            <h2 className="text-lg font-black text-darkgrey">Data Export</h2>
+            <p className="text-sm text-mediumgrey mt-1 leading-relaxed">
+              Download a readable JSON export of your account data, memories, chat messages, and related records.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={downloading}
+          className="shrink-0 px-4 py-2 rounded-full bg-blue text-white text-sm font-bold hover:bg-blue/80 transition-colors disabled:opacity-50"
+        >
+          {downloading ? 'Preparing…' : 'Download'}
+        </button>
+      </div>
+
+      <p className="text-xs text-mediumgrey">
+        Each export request also triggers a confirmation email for GDPR traceability.
+      </p>
+
+      {message && <p className="text-xs text-blue">{message}</p>}
+      {error && <p className="text-xs text-pink">{error}</p>}
+    </div>
+  );
+}
+
 export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }: ProfilePageProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
@@ -1465,6 +1524,7 @@ export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }:
       <PasswordCard />
       <MfaCard initialHasMfa={user.hasMfa ?? false} />
       <SessionsCard />
+      <DataExportCard />
       <DeleteAccountCard onAccountDeleted={onLogout} />
 
     </div>

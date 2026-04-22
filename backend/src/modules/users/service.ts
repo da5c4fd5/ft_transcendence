@@ -8,7 +8,9 @@ import {
   issueEmailVerification,
   verifyEmailCode
 } from "../../lib/email-verification";
+import { buildUserDataExport } from "../../lib/data-export";
 import { assertImageFileSize } from "../../lib/images";
+import { sendMail } from "../../lib/mailer";
 import {
   createPublicApiKey,
   revokePublicApiKey as revokeStoredPublicApiKey
@@ -243,8 +245,43 @@ export abstract class UsersService {
       } satisfies UsersModel["deleteAccountInvalidConfirmation"]);
     }
 
+    await sendMail({
+      to: user.email,
+      subject: "Your Capsul account was deleted",
+      text:
+        `Hello ${user.username},\n\n` +
+        `This is a confirmation that your Capsul account and related data were deleted on ${new Date().toISOString()}.\n`
+    });
+
     await db.user.delete({ where: { id } });
     return status(204);
+  }
+
+  static async exportSelf(id: string) {
+    const user = await db.user.findUniqueOrThrow({
+      where: { id },
+      select: {
+        email: true,
+        username: true
+      }
+    });
+
+    const payload = await buildUserDataExport(id);
+    await sendMail({
+      to: user.email,
+      subject: "Your Capsul data export",
+      text:
+        `Hello ${user.username},\n\n` +
+        `This is a confirmation that a readable export of your Capsul data was requested on ${new Date().toISOString()}.\n`
+    });
+
+    const filename = `capsul-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+    return new Response(JSON.stringify(payload, null, 2), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`
+      }
+    });
   }
 
   static async uploadAvatar(id: string, file: File) {
