@@ -1,13 +1,39 @@
 import nodemailer from "nodemailer";
 import { status } from "elysia";
 
-const smtpHost = process.env.SMTP_URL;
-const smtpPort = Number(process.env.SMTP_PORT ?? 1025);
+const smtpUrl = process.env.SMTP_URL?.trim();
 const smtpEmail = process.env.SMTP_EMAIL;
 const smtpPassword = process.env.SMTP_PASSWORD;
 
+function resolveSmtpConfig() {
+  if (!smtpUrl) return null;
+
+  if (!smtpUrl.includes("://")) {
+    return {
+      host: smtpUrl,
+      port: Number(process.env.SMTP_PORT ?? 1025),
+      secure: Number(process.env.SMTP_PORT ?? 1025) === 465,
+      authUser: smtpEmail,
+      authPass: smtpPassword
+    };
+  }
+
+  const parsed = new URL(smtpUrl);
+  const port = parsed.port
+    ? Number(parsed.port)
+    : Number(process.env.SMTP_PORT ?? (parsed.protocol === "smtps:" ? 465 : 1025));
+
+  return {
+    host: parsed.hostname,
+    port,
+    secure: parsed.protocol === "smtps:" || port === 465,
+    authUser: (smtpEmail ?? parsed.username) || undefined,
+    authPass: (smtpPassword ?? parsed.password) || undefined
+  };
+}
+
 export function isMailConfigured() {
-  return !!smtpHost && !!smtpEmail;
+  return !!smtpUrl && !!smtpEmail;
 }
 
 let transporter:
@@ -25,15 +51,21 @@ function getTransporter() {
     return transporter;
   }
 
+  const smtp = resolveSmtpConfig();
+  if (!smtp) {
+    transporter = null;
+    return transporter;
+  }
+
   transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
     auth:
-      smtpEmail && smtpPassword
+      smtp.authUser && smtp.authPass
         ? {
-            user: smtpEmail,
-            pass: smtpPassword
+            user: smtp.authUser,
+            pass: smtp.authPass
           }
         : undefined
   });
