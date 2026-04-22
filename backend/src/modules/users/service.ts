@@ -99,6 +99,11 @@ type SelfUserRecord = {
   mfaSecret: string | null;
 };
 
+function extensionForMime(mimeType: string) {
+  const subtype = mimeType.split("/")[1] ?? "bin";
+  return subtype.replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "") || "bin";
+}
+
 function getLocalDayStart(reference = new Date()) {
   const start = new Date(reference);
   start.setHours(0, 0, 0, 0);
@@ -290,7 +295,7 @@ export abstract class UsersService {
 
   static async uploadAvatar(id: string, file: File) {
     assertImageFileSize(file);
-    const ext = file.name.split(".").pop() ?? "bin";
+    const ext = extensionForMime(file.type);
     const filename = `${crypto.randomUUID()}.${ext}`;
     mkdirSync(AVATARS_DIR, { recursive: true });
     await Bun.write(join(AVATARS_DIR, filename), file);
