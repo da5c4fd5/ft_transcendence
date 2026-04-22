@@ -25,7 +25,13 @@ export const errorHandlerPlugin = new Elysia({ name: "error-handler" }).onError(
     switch (code) {
       case "VALIDATION": {
         set.status = 422;
-        const parsed = JSON.parse((error as Error).message);
+        let parsed: { errors?: Array<{ path: string; summary?: string; message: string }> } =
+          {};
+        try {
+          parsed = JSON.parse((error as Error).message);
+        } catch {
+          return { message: "Validation error" };
+        }
         return {
           message: "Validation error",
           errors: (parsed.errors ?? []).map(
