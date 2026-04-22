@@ -4,6 +4,7 @@ export interface FriendContribution {
   id: string;
   guestName: string;
   avatarURL: string | null;
+  contributorId?: string | null;
   date: string;
   content: string;
   media: string | null;

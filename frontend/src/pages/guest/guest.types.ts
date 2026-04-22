@@ -11,6 +11,7 @@ export interface SharedMemory {
 }
 
 export interface GuestUser {
+  id: string;
   username: string;
   avatarUrl: string | null;
 }

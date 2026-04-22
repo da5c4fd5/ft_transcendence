@@ -16,7 +16,7 @@ type RawContribution = {
   guestAvatarUrl: string | null;
   mediaUrl: string | null;
   createdAt: string;
-  contributor: { username: string; avatarUrl: string | null } | null;
+  contributor: { id: string; username: string; avatarUrl: string | null } | null;
 };
 
 function rawToFriendContribution(c: RawContribution): FriendContribution {
@@ -24,6 +24,7 @@ function rawToFriendContribution(c: RawContribution): FriendContribution {
     id: c.id,
     guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
     avatarURL: c.contributor?.avatarUrl ?? c.guestAvatarUrl ?? null,
+    contributorId: c.contributor?.id ?? null,
     date: c.createdAt.slice(0, 10),
     content: c.content,
     media: c.mediaUrl ?? null,
@@ -112,13 +113,14 @@ function JoinStep({ onJoin }: { onJoin: (username: string, avatarURL: string | n
   );
 }
 
-function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigateToWelcome, isLoggedIn }: {
+function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigateToWelcome, isLoggedIn, currentUserId }: {
   memory: SharedMemory;
   guestName: string;
   guestAvatarURL: string | null;
   onBack: () => void;
   onNavigateToWelcome?: () => void;
   isLoggedIn: boolean;
+  currentUserId?: string;
 }) {
   const [contributionContent, setContributionContent] = useState('');
   const [contributionMedia, setContributionMedia] = useState<string | null>(null);
@@ -136,7 +138,8 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
   const editFileRef = useRef<HTMLInputElement>(null);
 
   const canEdit = (contrib: FriendContribution) =>
-    mySessionIds.has(contrib.id) || (isLoggedIn && contrib.guestName === guestName);
+    mySessionIds.has(contrib.id) ||
+    (isLoggedIn && !!contrib.contributorId && contrib.contributorId === currentUserId);
 
   const handleMediaChange = (e: Event) => {
     const input = e.target as HTMLInputElement;
@@ -460,6 +463,7 @@ export function GuestPage({ memory, onBack, onNavigateToWelcome, currentUser }: 
       onBack={handleBack}
       onNavigateToWelcome={onNavigateToWelcome}
       isLoggedIn={isLoggedIn}
+      currentUserId={currentUser?.id}
     />
   );
 }

@@ -33,7 +33,7 @@ type RawShared = {
     guestAvatarUrl: string | null;
     mediaUrl: string | null;
     createdAt: string;
-    contributor: { username: string; avatarUrl: string | null } | null;
+    contributor: { id: string; username: string; avatarUrl: string | null } | null;
   }[];
   user: { username: string };
   shareToken: string;
@@ -62,6 +62,7 @@ function SharedMemoryRoute({ memoryId, shareToken, user, onNavigateToWelcome }: 
           id: c.id,
           guestName: c.guestName ?? c.contributor?.username ?? 'Anonymous',
           avatarURL: c.contributor?.avatarUrl ?? c.guestAvatarUrl ?? null,
+          contributorId: c.contributor?.id ?? null,
           date: c.createdAt.slice(0, 10),
           content: c.content,
           media: c.mediaUrl ?? null,
@@ -80,7 +81,7 @@ function SharedMemoryRoute({ memoryId, shareToken, user, onNavigateToWelcome }: 
   return (
     <GuestPage
       memory={sharedMemory}
-      currentUser={user ? { username: user.username, avatarUrl: user.avatarUrl } : undefined}
+      currentUser={user ? { id: user.id, username: user.username, avatarUrl: user.avatarUrl } : undefined}
       onBack={() => user ? navigate('/today') : window.history.back()}
       onNavigateToWelcome={onNavigateToWelcome}
     />
