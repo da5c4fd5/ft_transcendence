@@ -24,6 +24,7 @@ export const authPlugin = new Elysia({ name: "auth-plugin" })
 
     const session = await db.session.findUnique({ where: { id: payload.jti } });
     if (!session) return { user: null };
+    if (session.userId !== payload.sub) return { user: null };
 
     const userRecord = await db.user.findUnique({ where: { id: payload.sub } });
     if (!userRecord) return { user: null };
