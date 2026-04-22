@@ -6,7 +6,7 @@ export const FILE_TOO_LARGE_MESSAGE =
 export const IMAGE_TOO_LARGE_MESSAGE =
   "That image is too large. Please choose an image up to 10 MB.";
 export const INVALID_IMAGE_TYPE_MESSAGE =
-  "Unsupported image format. Please choose a JPG, PNG, GIF, WebP, or SVG image.";
+  "Unsupported image format. Please choose a JPG, PNG, GIF, or WebP image.";
 export const INVALID_MEDIA_TYPE_MESSAGE =
   "Unsupported file format. Please choose an image or audio file.";
 
@@ -14,8 +14,7 @@ const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/gif",
-  "image/webp",
-  "image/svg+xml"
+  "image/webp"
 ]);
 
 const ALLOWED_MEMORY_MEDIA_TYPES = new Set([
@@ -43,6 +42,12 @@ export function assertImageFileSize(file: File) {
 export function assertImageByteSize(size: number) {
   if (size > MAX_UPLOAD_BYTES) {
     throw status(413, { message: IMAGE_TOO_LARGE_MESSAGE });
+  }
+}
+
+export function assertImageMimeType(mimeType: string) {
+  if (!ALLOWED_IMAGE_TYPES.has(mimeType)) {
+    throw status(415, { message: INVALID_IMAGE_TYPE_MESSAGE });
   }
 }
 

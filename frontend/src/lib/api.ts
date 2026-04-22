@@ -23,7 +23,6 @@ const SUPPORTED_MEMORY_MEDIA_TYPES = new Set([
   'image/png',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
   'audio/mpeg',
   'audio/mp3',
   'audio/wav',
@@ -40,7 +39,6 @@ const SUPPORTED_IMAGE_TYPES = new Set([
   'image/png',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
 ]);
 
 export function validateImageFile(file: File): string | null {
@@ -48,7 +46,7 @@ export function validateImageFile(file: File): string | null {
     return IMAGE_TOO_LARGE_MESSAGE;
   }
   if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
-    return 'Unsupported image format. Please choose a JPG, PNG, GIF, WebP, or SVG image.';
+    return 'Unsupported image format. Please choose a JPG, PNG, GIF, or WebP image.';
   }
   return null;
 }

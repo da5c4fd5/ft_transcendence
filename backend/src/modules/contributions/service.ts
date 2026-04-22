@@ -2,7 +2,7 @@ import { status } from "elysia";
 import { mkdir } from "node:fs/promises";
 import { db } from "../../db";
 import type { ContributionsModel } from "./model";
-import { assertImageByteSize } from "../../lib/images";
+import { assertImageByteSize, assertImageMimeType } from "../../lib/images";
 
 const UPLOAD_DIR = "/app/uploads";
 const CONTRIBUTION_INCLUDE = {
@@ -25,6 +25,7 @@ async function storeInlineImage(imageUrl?: string) {
 
   const [, mimeType, base64] = match;
   const bytes = Buffer.from(base64, "base64");
+  assertImageMimeType(mimeType);
   assertImageByteSize(bytes.byteLength);
 
   await mkdir(UPLOAD_DIR, { recursive: true });
