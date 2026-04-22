@@ -4,6 +4,13 @@ import { authPlugin } from "../../plugins/auth.plugin";
 import { Auth } from "./service";
 import { AuthModel } from "./model";
 
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "Strict" as const,
+  path: "/"
+};
+
 export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
   .use(jwtPlugin)
   .use(authPlugin)
@@ -12,7 +19,10 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
     async ({ body, jwt, cookie: { session }, request }) => {
       const ua = request.headers.get("user-agent") ?? undefined;
       const response = await Auth.signUp(body, (payload) => jwt.sign(payload), ua);
-      session!.value = response.token;
+      session!.set({
+        value: response.token,
+        ...SESSION_COOKIE_OPTIONS
+      });
       return response;
     },
     {
@@ -32,7 +42,12 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
     async ({ body, jwt, cookie: { session }, request }) => {
       const ua = request.headers.get("user-agent") ?? undefined;
       const response = await Auth.logIn(body, (payload) => jwt.sign(payload), ua);
-      if ("token" in response) session!.value = response.token;
+      if ("token" in response) {
+        session!.set({
+          value: response.token,
+          ...SESSION_COOKIE_OPTIONS
+        });
+      }
       return response;
     },
     {
@@ -55,7 +70,10 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
         (payload) => jwt.sign(payload),
         request.headers.get("user-agent") ?? undefined
       );
-      session!.value = response.token;
+      session!.set({
+        value: response.token,
+        ...SESSION_COOKIE_OPTIONS
+      });
       return response;
     },
     {
@@ -89,7 +107,15 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
       app
         .post(
           "/logout",
-          async ({ user }) => Auth.revokeSession(user!.sessionId),
+          async ({ user, cookie: { session } }) => {
+            const response = await Auth.revokeSession(user!.sessionId);
+            session!.set({
+              value: "",
+              ...SESSION_COOKIE_OPTIONS,
+              maxAge: 0
+            });
+            return response;
+          },
           {
             response: { 401: t.Any(), 204: t.Any() },
             detail: { description: "Revoke the current session." }
