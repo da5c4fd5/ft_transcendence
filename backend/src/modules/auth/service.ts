@@ -108,7 +108,11 @@ export abstract class Auth {
       console.error(err);
       throw status("Internal Server Error", {});
     }
-    await issueEmailVerification(userId, email);
+    try {
+      await issueEmailVerification(userId, email);
+    } catch (error) {
+      console.error("Failed to send signup verification email", { userId, error });
+    }
     const session = await db.session.create({
       data: { userId, userAgent: userAgent ?? null }
     });

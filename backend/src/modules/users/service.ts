@@ -228,7 +228,14 @@ export abstract class UsersService {
       },
       select: SELF_USER_SELECT
     });
-    await issueEmailVerification(id, updatedUser.email);
+    try {
+      await issueEmailVerification(id, updatedUser.email);
+    } catch (error) {
+      console.error("Failed to send email verification after email change", {
+        userId: id,
+        error
+      });
+    }
     return UsersService.toSelfProfile(updatedUser);
   }
 
