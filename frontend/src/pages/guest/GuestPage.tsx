@@ -6,6 +6,8 @@ import { Button } from '../../components/Button/Button';
 import type { FriendContribution, SharedMemory, GuestPageProps } from './guest.types';
 import { api, getApiErrorMessage, validateImageFile } from '../../lib/api';
 
+const MAX_CONTENT_LENGTH = 180;
+
 type RawContribution = {
   id: string;
   content: string;
@@ -306,9 +308,11 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
                           setEditContent((e.target as HTMLTextAreaElement).value);
                           setEditError(null);
                         }}
+                        maxLength={MAX_CONTENT_LENGTH}
                         rows={3}
                         className="w-full bg-verylightorange rounded-2xl px-3 py-2 outline-none text-darkgrey text-sm resize-none border-2 border-transparent focus:border-yellow transition-colors"
                       />
+                      <p className="text-[11px] text-mediumgrey px-1">{editContent.length}/{MAX_CONTENT_LENGTH}</p>
                       {editMedia && (
                         <div className="relative w-fit">
                           <img src={editMedia} alt="" className="rounded-xl w-40 object-cover" />
@@ -381,10 +385,13 @@ function SharedMemoryView({ memory, guestName, guestAvatarURL, onBack, onNavigat
                 setSent(false);
                 setSubmitError(null);
               }}
+              maxLength={MAX_CONTENT_LENGTH}
               rows={3}
               className="flex-1 bg-verylightorange rounded-2xl px-4 py-3 outline-none text-darkgrey placeholder:text-mediumgrey text-sm resize-none border-2 border-transparent focus:border-yellow transition-colors"
             />
           </div>
+
+          <p className="text-[11px] text-mediumgrey px-1">{contributionContent.length}/{MAX_CONTENT_LENGTH}</p>
 
           {contributionMedia && (
             <img src={contributionMedia} alt="" className="rounded-2xl w-40 object-cover" />

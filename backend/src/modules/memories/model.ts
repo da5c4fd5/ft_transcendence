@@ -1,5 +1,7 @@
 import { t, type UnwrapSchema } from "elysia";
 
+const MAX_MEMORY_CONTENT_LENGTH = 180;
+
 export const MemoriesModel = {
   promptResponse: t.Object({
     prompt: t.String()
@@ -15,12 +17,14 @@ export const MemoriesModel = {
   }),
 
   createBody: t.Object({
-    content: t.String({ minLength: 1, maxLength: 2000 }),
+    content: t.String({ minLength: 1, maxLength: MAX_MEMORY_CONTENT_LENGTH }),
     date: t.Optional(t.String({ format: "date" })),
     isOpen: t.Optional(t.Boolean())
   }),
   updateBody: t.Object({
-    content: t.Optional(t.String({ minLength: 1, maxLength: 2000 })),
+    content: t.Optional(
+      t.String({ minLength: 1, maxLength: MAX_MEMORY_CONTENT_LENGTH })
+    ),
     isOpen: t.Optional(t.Boolean())
   }),
   mediaBody: t.Object({ file: t.File({ type: "image/*" }) }),
