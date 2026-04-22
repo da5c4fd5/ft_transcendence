@@ -70,6 +70,25 @@ const app = new Elysia()
     },
     { detail: { hide: true } }
   )
+  .get(
+    "/avatars/:filename",
+    async ({ params }: { params: { filename: string } }) => {
+      const { filename } = params;
+      if (filename.includes("/") || filename.includes("..")) {
+        return new Response(JSON.stringify({ error: "Invalid filename" }), {
+          status: 400
+        });
+      }
+      const file = Bun.file(`/app/public/avatars/${filename}`);
+      if (!(await file.exists())) {
+        return new Response(JSON.stringify({ error: "Not found" }), {
+          status: 404
+        });
+      }
+      return new Response(file);
+    },
+    { detail: { hide: true } }
+  )
   .use(
     swagger({
       path: "/docs",
