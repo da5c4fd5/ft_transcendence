@@ -6,7 +6,8 @@ import {
   deleteStoredFilesIfUnused
 } from "../../lib/stored-files";
 import { isMailConfigured, sendMail } from "../../lib/mailer";
-import { renderInactivityReminderMail } from "../../lib/mail-templates";
+import { renderManualReminderMail } from "../../lib/mail-templates";
+import { consumePromptSuggestionsBatch } from "../../lib/prompt-suggestions";
 import type { AdminModel } from "./model";
 import { MemoriesService } from "../memories/service";
 
@@ -22,14 +23,6 @@ const ADMIN_USER_SELECT = {
 } as const;
 
 export abstract class AdminService {
-  private static getLocalDayBounds(reference = new Date()) {
-    const start = new Date(reference);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    return { start, end };
-  }
-
   private static async assertNotRemovingLastAdmin(userId: string) {
     const target = await db.user.findUnique({
       where: { id: userId },
@@ -206,93 +199,47 @@ export abstract class AdminService {
     };
   }
 
-  static async sendInactivityReminders() {
+  static async sendManualReminderEmail(userId: string) {
     if (!isMailConfigured()) {
       throw status(503, { message: "Email delivery is not configured" });
     }
 
-    const { start, end } = AdminService.getLocalDayBounds();
-    const users = await db.user.findMany({
-      where: {
-        emailVerifiedAt: { not: null },
-        createdAt: { lt: start },
-        memories: {
-          none: {
-            date: {
-              gte: start,
-              lt: end
-            }
-          }
-        }
-      },
+    const user = await db.user.findUnique({
+      where: { id: userId },
       select: {
         id: true,
         username: true,
         email: true,
-        createdAt: true,
-        notificationSettings: true,
-        memories: {
-          orderBy: { date: "desc" },
-          take: 1,
-          select: { date: true }
-        }
+        emailVerifiedAt: true
       }
     });
-
-    const targetUsers = users.filter((user) => {
-      const settings = (user.notificationSettings ?? {}) as {
-        emailDigest?: boolean;
-      };
-      return settings.emailDigest !== false;
-    });
-
-    let sent = 0;
-    let failed = 0;
-
-    for (const user of targetUsers) {
-
-      const lastMemoryDate = user.memories[0]?.date ?? null;
-      const missedDays = lastMemoryDate
-        ? Math.max(
-            1,
-            Math.floor(
-              (start.getTime() -
-                new Date(lastMemoryDate).setHours(0, 0, 0, 0)) /
-                86_400_000
-            )
-          )
-        : Math.max(
-            1,
-            Math.floor(
-              (start.getTime() -
-                new Date(user.createdAt).setHours(0, 0, 0, 0)) /
-                86_400_000
-            )
-          );
-
-      try {
-        const mail = renderInactivityReminderMail(user.username, missedDays);
-        await sendMail({
-          to: user.email,
-          subject: "Your Capsul is waiting for today",
-          text: mail.text,
-          html: mail.html
-        });
-        sent += 1;
-      } catch (error) {
-        failed += 1;
-        console.error("Failed to send inactivity reminder", {
-          userId: user.id,
-          error
-        });
-      }
+    if (!user) {
+      throw status(404, { message: "User not found" });
+    }
+    if (!user.emailVerifiedAt) {
+      throw status(409, { message: "User email is not verified" });
     }
 
+    const suggestions = (
+      await consumePromptSuggestionsBatch(userId, 2)
+    ).prompts;
+
+    const mail = renderManualReminderMail({
+      username: user.username,
+      suggestions
+    });
+    await sendMail({
+      to: user.email,
+      subject: "A new Capsul entry would fit today",
+      text: mail.text,
+      html: mail.html
+    });
+
     return {
-      eligibleUsers: targetUsers.length,
-      sent,
-      failed
-    } satisfies AdminModel["inactivityReminderResponse"];
+      userId: user.id,
+      email: user.email,
+      suggestionsCount: suggestions.length
+    } satisfies AdminModel["manualReminderResponse"];
   }
 
   static async listUsers(page: number, limit: number) {

@@ -36,13 +36,13 @@ export const admin = new Elysia({
           }
         })
         .post(
-          "/emails/inactivity-reminders",
-          () => AdminService.sendInactivityReminders(),
+          "/users/:id/reminder-email",
+          ({ params }) => AdminService.sendManualReminderEmail(params.id),
           {
-            response: { 200: AdminModel.inactivityReminderResponse },
+            response: { 200: AdminModel.manualReminderResponse },
             detail: {
               description:
-                "Manually send today's privacy-friendly inactivity reminder to verified users who still have not written a capsul."
+                "Manually send a reminder email to a specific verified user, including AI prompt suggestions taken from that user's prompt queue."
             }
           }
         )

@@ -3,7 +3,7 @@ import { Users, Sparkles, ShieldCheck, Trash2, Search, TriangleAlert, BrainCircu
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../../components/Avatar/Avatar';
 import { MediaPreview } from '../../components/MediaPreview/MediaPreview';
-import type { AdminUser, AdminStats, AdminPageProps, AdminAiOverview, AdminInactivityReminderResult } from './admin.types';
+import type { AdminUser, AdminStats, AdminPageProps, AdminAiOverview, AdminReminderEmailResult } from './admin.types';
 import { api, getApiErrorMessage, validateMemoryMediaFile } from '../../lib/api';
 
 type RawAdminStats = { userCount: number; memoryCount: number; sessionCount: number };
@@ -192,8 +192,8 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
   const [memoryUploadProgress, setMemoryUploadProgress] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [roleConfirmId, setRoleConfirmId]     = useState<string | null>(null);
-  const [sendingInactivityReminders, setSendingInactivityReminders] = useState(false);
-  const [inactivityReminderStatus, setInactivityReminderStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [sendingReminderForUserId, setSendingReminderForUserId] = useState<string | null>(null);
+  const [userReminderStatus, setUserReminderStatus] = useState<Record<string, { type: 'success' | 'error'; message: string }>>({});
 
   useEffect(() => {
     api.get<RawAdminStats>('/admin/stats').then(s => setStats({
@@ -330,25 +330,34 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
     setMemoryUploadProgress(null);
   };
 
-  const handleSendInactivityReminders = async () => {
-    setSendingInactivityReminders(true);
-    setInactivityReminderStatus(null);
+  const handleSendReminderEmail = async (user: AdminUser) => {
+    setSendingReminderForUserId(user.id);
+    setUserReminderStatus((prev) => {
+      const next = { ...prev };
+      delete next[user.id];
+      return next;
+    });
     try {
-      const result = await api.post<AdminInactivityReminderResult>('/admin/emails/inactivity-reminders');
-      setInactivityReminderStatus({
-        type: 'success',
-        message:
-          result.failed > 0
-            ? `Reminder run finished: ${result.sent} sent, ${result.failed} failed, ${result.eligibleUsers} eligible.`
-            : `Reminder run finished: ${result.sent} sent to ${result.eligibleUsers} eligible users.`
-      });
+      const result = await api.post<AdminReminderEmailResult>(`/admin/users/${user.id}/reminder-email`);
+      setUserReminderStatus((prev) => ({
+        ...prev,
+        [user.id]: {
+          type: 'success',
+          message: result.suggestionsCount > 0
+            ? `Reminder sent with ${result.suggestionsCount} AI suggestions.`
+            : 'Reminder sent.'
+        }
+      }));
     } catch (error) {
-      setInactivityReminderStatus({
-        type: 'error',
-        message: getApiErrorMessage(error, 'Failed to send inactivity reminders.')
-      });
+      setUserReminderStatus((prev) => ({
+        ...prev,
+        [user.id]: {
+          type: 'error',
+          message: getApiErrorMessage(error, 'Failed to send reminder email.')
+        }
+      }));
     } finally {
-      setSendingInactivityReminders(false);
+      setSendingReminderForUserId(null);
     }
   };
 
@@ -369,41 +378,6 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
         <StatCard icon={<Users size={22} className="text-darkgrey" />}     value={stats.totalUsers}    label="Total Users"    color="bg-blue/40"   />
         <StatCard icon={<Sparkles size={22} className="text-darkgrey" />}  value={stats.totalMemories} label="Total Memories" color="bg-yellow/60" />
         <StatCard icon={<ShieldCheck size={22} className="text-darkgrey" />} value={totalAdmins}       label="Admins"         color="bg-purple/30" />
-      </div>
-
-      <div className="bg-white rounded-3xl shadow-sm p-6 flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className={cn(iconBox, 'bg-yellow/40 w-10 h-10')}>
-              <Mail size={18} className="text-darkgrey" />
-            </div>
-            <div>
-              <h2 className="text-lg font-black text-darkgrey">Email Operations</h2>
-              <p className="text-xs text-mediumgrey mt-0.5">
-                Manually send today's inactivity reminder to verified users who still have not written a capsul.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleSendInactivityReminders}
-            disabled={sendingInactivityReminders}
-            className="shrink-0 px-4 py-2 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
-          >
-            {sendingInactivityReminders ? 'Sending…' : 'Send inactivity reminders'}
-          </button>
-        </div>
-        <p className="text-xs text-mediumgrey leading-relaxed">
-          Privacy-friendly by default: no tracking pixel, no open-rate tricks, just the message itself.
-        </p>
-        {inactivityReminderStatus && (
-          <p className={cn(
-            'text-xs px-1',
-            inactivityReminderStatus.type === 'success' ? 'text-blue' : 'text-pink'
-          )}>
-            {inactivityReminderStatus.message}
-          </p>
-        )}
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
@@ -703,6 +677,7 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
                 <th className={thCell}>Last Active</th>
                 <th className={thCell}>Memories</th>
                 <th className={thCell}>Friends</th>
+                <th className={thCell}>Email Ops</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -735,6 +710,27 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
                   <td className="px-4 py-4 text-sm font-bold text-darkgrey">{u.memoriesCount}</td>
                   <td className="px-4 py-4 text-sm font-bold text-darkgrey">{u.friendsCount}</td>
                   <td className="px-4 py-4">
+                    <div className="flex flex-col items-start gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleSendReminderEmail(u)}
+                        disabled={!u.emailVerified || sendingReminderForUserId === u.id}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-verylightorange px-3 py-2 text-xs font-bold text-darkgrey hover:bg-yellow/40 transition-colors disabled:opacity-50"
+                      >
+                        <Mail size={13} />
+                        {sendingReminderForUserId === u.id ? 'Sending…' : 'Send reminder'}
+                      </button>
+                      {userReminderStatus[u.id] && (
+                        <p className={cn(
+                          'text-[11px]',
+                          userReminderStatus[u.id].type === 'success' ? 'text-blue' : 'text-pink'
+                        )}>
+                          {userReminderStatus[u.id].message}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
                     {u.id !== currentUserId && (
                       <button
                         type="button"
@@ -749,7 +745,7 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-sm text-mediumgrey">
+                  <td colSpan={9} className="px-6 py-12 text-center text-sm text-mediumgrey">
                     No users found.
                   </td>
                 </tr>
@@ -775,6 +771,25 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
                     onClick={() => handleToggleEmailVerification(u.id)}
                   />
                   <span className="text-xs text-mediumgrey">{u.memoriesCount} memories</span>
+                </div>
+                <div className="mt-2 flex flex-col items-start gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSendReminderEmail(u)}
+                    disabled={!u.emailVerified || sendingReminderForUserId === u.id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-verylightorange px-3 py-2 text-xs font-bold text-darkgrey hover:bg-yellow/40 transition-colors disabled:opacity-50"
+                  >
+                    <Mail size={13} />
+                    {sendingReminderForUserId === u.id ? 'Sending…' : 'Send reminder'}
+                  </button>
+                  {userReminderStatus[u.id] && (
+                    <p className={cn(
+                      'text-[11px]',
+                      userReminderStatus[u.id].type === 'success' ? 'text-blue' : 'text-pink'
+                    )}>
+                      {userReminderStatus[u.id].message}
+                    </p>
+                  )}
                 </div>
               </div>
               {u.id !== currentUserId && (

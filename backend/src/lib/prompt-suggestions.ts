@@ -539,6 +539,48 @@ export async function consumePromptSuggestion(userId: string) {
   return { prompt: next.prompt };
 }
 
+export async function consumePromptSuggestionsBatch(
+  userId: string,
+  count: number
+) {
+  const state = await ensurePromptState(userId);
+
+  if (state.expiresAt && state.expiresAt <= new Date()) {
+    await deleteExpiredPromptQueue(userId);
+    void schedulePromptSuggestionGeneration(userId, "replace");
+    throw status(503, { message: "Prompt suggestions are still being generated" });
+  }
+
+  const limit = Math.max(1, Math.floor(count));
+  const nextPrompts = await db.promptSuggestion.findMany({
+    where: { userId },
+    orderBy: { position: "asc" },
+    take: limit
+  });
+
+  if (nextPrompts.length === 0) {
+    void schedulePromptSuggestionGeneration(userId, "replace");
+    throw status(503, { message: "Prompt suggestions are still being generated" });
+  }
+
+  await db.promptSuggestion.deleteMany({
+    where: {
+      id: {
+        in: nextPrompts.map((prompt) => prompt.id)
+      }
+    }
+  });
+
+  const remaining = await db.promptSuggestion.count({ where: { userId } });
+  if (remaining < PROMPT_PREEMPTIVE_THRESHOLD) {
+    void schedulePromptSuggestionGeneration(userId, "topup");
+  }
+
+  return {
+    prompts: nextPrompts.map((prompt) => prompt.prompt)
+  };
+}
+
 export async function getPromptSuggestionDebugState(userId: string) {
   const [state, prompts] = await Promise.all([
     ensurePromptState(userId),

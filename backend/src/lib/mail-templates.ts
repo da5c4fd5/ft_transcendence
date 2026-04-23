@@ -10,16 +10,15 @@ function escapeHtml(value: string) {
 function getAppUrl() {
   const domain = process.env.DOMAIN?.trim() || "transcen.dence.fr";
   const port = Number(process.env.HTTPS_PORT ?? 443);
-  const protocol = "https";
 
   if (!port || port === 443) {
-    return `${protocol}://${domain}`;
+    return `https://${domain}`;
   }
 
-  return `${protocol}://${domain}:${port}`;
+  return `https://${domain}:${port}`;
 }
 
-function renderLayout(options: {
+function renderShell(options: {
   eyebrow: string;
   title: string;
   intro: string;
@@ -29,42 +28,48 @@ function renderLayout(options: {
   footer?: string;
 }) {
   const appUrl = getAppUrl();
-  const footer =
-    options.footer ??
-    "Privacy-friendly by design: no tracking pixels, no hidden analytics, just the message itself.";
 
   return `<!doctype html>
 <html lang="en">
-  <body style="margin:0;padding:0;background:#fff8f1;font-family:Inter,Segoe UI,Arial,sans-serif;color:#2b2b2b;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff8f1;padding:24px 12px;">
+  <body style="margin:0;padding:0;background:#FFF6F0;font-family:Outfit,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#4A4A4A;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#FFF6F0;padding:24px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid #f1e3d0;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:32px;overflow:hidden;border:1px solid rgba(74,74,74,0.08);box-shadow:0 18px 40px rgba(74,74,74,0.08);">
             <tr>
-              <td style="padding:28px 32px 20px;background:linear-gradient(135deg,#ffe58f 0%,#ffd36a 100%);">
-                <div style="font-size:11px;line-height:1.4;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#7a5b00;">${escapeHtml(
-                  options.eyebrow
-                )}</div>
-                <div style="margin-top:10px;font-size:30px;line-height:1.1;font-weight:900;color:#2b2b2b;">${escapeHtml(
-                  options.title
-                )}</div>
-                <div style="margin-top:12px;font-size:15px;line-height:1.6;color:#4a4a4a;">${escapeHtml(
-                  options.intro
-                )}</div>
+              <td style="padding:0 0 18px;background:linear-gradient(180deg,#FFF6F0 0%,#FFF6F0 100%);">
+                <div style="padding:18px 24px 0;">
+                  <div style="height:14px;">
+                    <span style="display:inline-block;width:14px;height:14px;border-radius:999px;background:#FDE856;margin-right:8px;"></span>
+                    <span style="display:inline-block;width:14px;height:14px;border-radius:999px;background:#A0D2FF;margin-right:8px;"></span>
+                    <span style="display:inline-block;width:14px;height:14px;border-radius:999px;background:#EB6383;"></span>
+                  </div>
+                </div>
+                <div style="margin:18px 20px 0;padding:26px 28px;border-radius:28px;background:#FFF6F0;border:1px solid rgba(74,74,74,0.06);">
+                  <div style="font-size:11px;line-height:1.4;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#9A9A8E;">${escapeHtml(
+                    options.eyebrow
+                  )}</div>
+                  <div style="margin-top:10px;font-size:32px;line-height:1.05;font-weight:900;color:#4A4A4A;">${escapeHtml(
+                    options.title
+                  )}</div>
+                  <div style="margin-top:12px;font-size:16px;line-height:1.55;color:#4A4A4A;">${escapeHtml(
+                    options.intro
+                  )}</div>
+                </div>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px 32px 12px;">
+              <td style="padding:0 28px 6px;">
                 ${options.bodyHtml}
               </td>
             </tr>
             ${
               options.ctaLabel && options.ctaHref
                 ? `<tr>
-              <td style="padding:8px 32px 8px;">
+              <td style="padding:10px 28px 8px;">
                 <a href="${escapeHtml(
                   options.ctaHref
-                )}" style="display:inline-block;background:#ffcf4d;color:#2b2b2b;text-decoration:none;font-weight:800;font-size:14px;padding:14px 22px;border-radius:999px;">${escapeHtml(
+                )}" style="display:inline-block;background:#FDE856;color:#4A4A4A;text-decoration:none;font-weight:800;font-size:14px;padding:14px 22px;border-radius:999px;">${escapeHtml(
                   options.ctaLabel
                 )}</a>
               </td>
@@ -72,14 +77,9 @@ function renderLayout(options: {
                 : ""
             }
             <tr>
-              <td style="padding:20px 32px 30px;">
-                <div style="font-size:12px;line-height:1.6;color:#7a7a7a;">
-                  ${escapeHtml(footer)}
-                </div>
-                <div style="margin-top:10px;font-size:12px;line-height:1.6;color:#7a7a7a;">
-                  Capsul · <a href="${escapeHtml(
-                    appUrl
-                  )}" style="color:#2b2b2b;">${escapeHtml(appUrl)}</a>
+              <td style="padding:18px 28px 28px;">
+                <div style="font-size:12px;line-height:1.6;color:#9A9A8E;">
+                  ${escapeHtml(options.footer ?? `Capsul · ${appUrl}`)}
                 </div>
               </td>
             </tr>
@@ -96,19 +96,20 @@ export function renderVerificationCodeMail(username: string, code: string) {
   return {
     text:
       `Hello ${username},\n\n` +
-      `Your Capsul verification code is ${code}.\n` +
-      "It expires in 15 minutes.\n\n" +
-      `Open ${appUrl}/profile to confirm your email.`,
-    html: renderLayout({
+      `Use this code to verify your email: ${code}\n` +
+      "Valid for 15 minutes.\n\n" +
+      `Open ${appUrl}/profile`,
+    html: renderShell({
       eyebrow: "Email Verification",
-      title: "Confirm your email",
-      intro: `Hello ${username}, here is your 6-digit Capsul verification code.`,
+      title: "Verify your email",
+      intro: `Hello ${username}, use this code in your profile.`,
       bodyHtml: `
-        <div style="margin-bottom:18px;font-size:15px;line-height:1.6;color:#4a4a4a;">
-          Enter this code in your profile page. It expires in 15 minutes.
-        </div>
-        <div style="display:inline-block;padding:18px 22px;border-radius:22px;background:#fff8e1;border:1px solid #f4d786;font-size:34px;line-height:1;font-weight:900;letter-spacing:0.28em;color:#2b2b2b;">
-          ${escapeHtml(code)}
+        <div style="padding:22px 24px;border-radius:26px;background:#FFF6F0;border:1px solid rgba(74,74,74,0.06);">
+          <div style="font-size:12px;line-height:1.5;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#9A9A8E;">Verification code</div>
+          <div style="margin-top:12px;font-size:36px;line-height:1;font-weight:900;letter-spacing:0.28em;color:#4A4A4A;">${escapeHtml(
+            code
+          )}</div>
+          <div style="margin-top:12px;font-size:14px;line-height:1.6;color:#4A4A4A;">Valid for 15 minutes.</div>
         </div>
       `,
       ctaLabel: "Open profile",
@@ -123,19 +124,15 @@ export function renderWelcomeMail(username: string) {
     text:
       `Hello ${username},\n\n` +
       "Welcome to Capsul.\n" +
-      "Write one short memory each day and watch your timeline grow.\n\n" +
-      `Start here: ${appUrl}/today`,
-    html: renderLayout({
+      "Write one memory today and let the timeline begin.\n\n" +
+      `${appUrl}/today`,
+    html: renderShell({
       eyebrow: "Welcome",
       title: "Welcome to Capsul",
-      intro:
-        `Hello ${username}, your space is ready. One short memory a day is enough to start building your timeline.`,
+      intro: `Hello ${username}, your timeline is ready.`,
       bodyHtml: `
-        <div style="font-size:15px;line-height:1.7;color:#4a4a4a;">
-          Keep it simple: one honest line, one image, one moment worth keeping.
-        </div>
-        <div style="margin-top:16px;padding:16px 18px;border-radius:22px;background:#fff4f8;border:1px solid #f7d6e3;font-size:14px;line-height:1.7;color:#4a4a4a;">
-          No tracking gimmicks. No engagement traps. Just your memories, your pace, your archive.
+        <div style="padding:18px 20px;border-radius:24px;background:#A0D2FF1A;border:1px solid rgba(160,210,255,0.35);font-size:15px;line-height:1.65;color:#4A4A4A;">
+          One honest line is enough. Add a moment, an image, a detail worth keeping.
         </div>
       `,
       ctaLabel: "Write today's capsul",
@@ -144,32 +141,50 @@ export function renderWelcomeMail(username: string) {
   };
 }
 
-export function renderInactivityReminderMail(username: string, missedDays: number) {
+export function renderManualReminderMail(options: {
+  username: string;
+  suggestions: string[];
+}) {
   const appUrl = getAppUrl();
-  const line =
-    missedDays <= 1
-      ? "Your daily capsul is still waiting for you."
-      : `You have missed ${missedDays} daily capsuls in a row.`;
+  const suggestionsHtml =
+    options.suggestions.length > 0
+      ? `<div style="margin-top:18px;padding:18px 20px;border-radius:24px;background:#FFF6F0;border:1px solid rgba(74,74,74,0.06);">
+          <div style="font-size:12px;line-height:1.5;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#9A9A8E;">Start here</div>
+          <ul style="margin:12px 0 0;padding:0;list-style:none;">
+            ${options.suggestions
+              .map(
+                (suggestion) =>
+                  `<li style="margin-top:10px;padding:12px 14px;border-radius:18px;background:#ffffff;border:1px solid rgba(74,74,74,0.05);font-size:14px;line-height:1.55;color:#4A4A4A;">${escapeHtml(
+                    suggestion
+                  )}</li>`
+              )
+              .join("")}
+          </ul>
+        </div>`
+      : "";
+
+  const suggestionLines =
+    options.suggestions.length > 0
+      ? `\n\nA few ideas:\n- ${options.suggestions.join("\n- ")}`
+      : "";
 
   return {
     text:
-      `Hello ${username},\n\n` +
-      `${line}\n` +
-      "Write one short memory today to keep your timeline alive.\n\n" +
-      `Go to ${appUrl}/today`,
-    html: renderLayout({
-      eyebrow: "Daily Reminder",
-      title: "Your timeline misses you",
-      intro: `Hello ${username}, ${line.toLowerCase()}`,
+      `Hello ${options.username},\n\n` +
+      "Your timeline could use one more line today." +
+      suggestionLines +
+      `\n\n${appUrl}/today`,
+    html: renderShell({
+      eyebrow: "Daily Nudge",
+      title: "Your timeline wants a new entry",
+      intro: `Hello ${options.username}, drop one line in Capsul today.`,
       bodyHtml: `
-        <div style="font-size:15px;line-height:1.7;color:#4a4a4a;">
-          No guilt, no spying, no weird tracking pixel. Just a friendly nudge to drop one sentence in today's capsul.
+        <div style="padding:18px 20px;border-radius:24px;background:#EB638314;border:1px solid rgba(235,99,131,0.24);font-size:15px;line-height:1.65;color:#4A4A4A;">
+          Nothing long. Just enough to pin the day down before it slips.
         </div>
-        <div style="margin-top:16px;padding:16px 18px;border-radius:22px;background:#fff3ef;border:1px solid #f4d0c4;font-size:14px;line-height:1.7;color:#4a4a4a;">
-          Even one line counts. Keep the streak alive before the memories blur together.
-        </div>
+        ${suggestionsHtml}
       `,
-      ctaLabel: "Write today's capsul",
+      ctaLabel: "Open today",
       ctaHref: `${appUrl}/today`
     })
   };

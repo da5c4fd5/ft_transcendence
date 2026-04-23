@@ -55,10 +55,10 @@ export const AdminModel = {
     })
   }),
 
-  inactivityReminderResponse: t.Object({
-    eligibleUsers: t.Number(),
-    sent: t.Number(),
-    failed: t.Number()
+  manualReminderResponse: t.Object({
+    userId: t.String(),
+    email: t.String({ format: "email" }),
+    suggestionsCount: t.Number()
   }),
 
   updateUserBody: t.Object({
