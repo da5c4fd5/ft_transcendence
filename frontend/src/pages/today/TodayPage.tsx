@@ -43,6 +43,22 @@ function PromptSkeleton() {
   );
 }
 
+function WellnessSkeleton() {
+  return (
+    <div className="grid grid-rows-3 gap-3 h-full">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div
+          key={index}
+          className="h-14 rounded-2xl border border-blue/10 bg-linear-to-r from-blue/10 via-white to-blue/10 px-4 flex flex-col justify-center gap-2 animate-pulse"
+        >
+          <div className="h-3.5 w-11/12 rounded-full bg-white/90" />
+          <div className="h-3.5 w-8/12 rounded-full bg-white/70" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PromptCard({
   prompt,
   isLoading,
@@ -72,6 +88,63 @@ function PromptCard({
         <RefreshCw size={14} />
         {isLoading ? "Generating…" : "Need inspiration?"}
       </button>
+    </div>
+  );
+}
+
+function WellnessCard({
+  tips,
+  isLoading,
+  error,
+  onRefresh,
+}: {
+  tips: string[];
+  isLoading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="bg-white rounded-3xl p-7 flex flex-col gap-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold text-mediumgrey tracking-widest">
+            WELLNESS
+          </p>
+          <h3 className="text-2xl font-black text-darkgrey mt-1">
+            Gentle nudges for today
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="flex items-center gap-2 bg-blue/20 rounded-full px-4 py-2 text-sm font-semibold text-darkgrey shrink-0 hover:bg-blue/30 transition-colors disabled:opacity-60"
+        >
+          <RefreshCw size={14} />
+          {isLoading ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+
+      <div className="h-[12rem]">
+        {isLoading ? (
+          <WellnessSkeleton />
+        ) : error ? (
+          <p className="text-sm text-pink">{error}</p>
+        ) : (
+          <div className="grid grid-rows-3 gap-3 h-full">
+            {tips.map((tip, index) => (
+              <div
+                key={`${index}-${tip}`}
+                className="h-14 rounded-2xl bg-verylightorange px-4 flex items-center"
+              >
+                <p className="text-sm text-darkgrey font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                  {tip}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -429,6 +502,10 @@ type RawPromptResponse = {
   prompt: string;
 };
 
+type RawWellnessResponse = {
+  tips: string[];
+};
+
 function toPastMemory(raw: RawReminder): PastMemory {
   return {
     id: raw.id,
@@ -446,6 +523,9 @@ export function TodayPage() {
   const [prompt, setPrompt] = useState<string | null>(null);
   const [promptLoading, setPromptLoading] = useState(true);
   const [promptError, setPromptError] = useState<string | null>(null);
+  const [wellnessTips, setWellnessTips] = useState<string[]>([]);
+  const [wellnessLoading, setWellnessLoading] = useState(true);
+  const [wellnessError, setWellnessError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [savedMemory, setSavedMemory] = useState<SavedMemory | null>(null);
   const [capsuls, setCapsuls] = useState<PastMemory[]>([]);
@@ -457,12 +537,14 @@ export function TodayPage() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const mediaFileRef = useRef<File | null>(null);
   const promptRequestIdRef = useRef(0);
+  const wellnessRequestIdRef = useRef(0);
 
   const dateStr = getTodayString();
 
   useEffect(
     () => () => {
       promptRequestIdRef.current += 1;
+      wellnessRequestIdRef.current += 1;
     },
     [],
   );
@@ -515,6 +597,33 @@ export function TodayPage() {
     }
   };
 
+  const loadWellnessTips = async (refresh = false) => {
+    const requestId = ++wellnessRequestIdRef.current;
+    setWellnessLoading(true);
+    setWellnessError(null);
+
+    try {
+      const next = await api.get<RawWellnessResponse>("/memories/wellness", {
+        refresh,
+      });
+      if (wellnessRequestIdRef.current !== requestId) return;
+      setWellnessTips(next.tips);
+    } catch (error) {
+      if (wellnessRequestIdRef.current !== requestId) return;
+      setWellnessTips([]);
+      setWellnessError(
+        getApiErrorMessage(
+          error,
+          "We could not generate wellness tips right now.",
+        ),
+      );
+    } finally {
+      if (wellnessRequestIdRef.current === requestId) {
+        setWellnessLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     async function load() {
       const [tree, st, todayMem] = await Promise.all([
@@ -548,10 +657,12 @@ export function TodayPage() {
         await loadReminders();
         setTodayState("saved");
         setBootstrapped(true);
+        void loadWellnessTips();
         return;
       }
 
       await loadNextPrompt();
+      void loadWellnessTips();
       setBootstrapped(true);
     }
     void load();
@@ -674,6 +785,7 @@ export function TodayPage() {
         media: refreshedMemory.media[0]?.url ?? null,
       });
       await loadReminders();
+      void loadWellnessTips(true);
 
       if (mediaError) {
         setContent(refreshedMemory.content);
@@ -712,6 +824,11 @@ export function TodayPage() {
   const handleRefreshPrompt = async () => {
     if (promptLoading) return;
     await loadNextPrompt();
+  };
+
+  const handleRefreshWellness = async () => {
+    if (wellnessLoading) return;
+    await loadWellnessTips(true);
   };
 
   return (
@@ -762,6 +879,13 @@ export function TodayPage() {
               />
             </>
           )}
+
+          <WellnessCard
+            tips={wellnessTips}
+            isLoading={wellnessLoading}
+            error={wellnessError}
+            onRefresh={handleRefreshWellness}
+          />
         </div>
 
         <div className="lg:sticky lg:top-20">

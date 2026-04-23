@@ -98,7 +98,7 @@ services:
       MOOD_CLASSIFIER_URL: http://mood-classifier:8000
       MOOD_CLASSIFIER_MODEL_ID: ${MOOD_CLASSIFIER_MODEL_ID:-AnasAlokla/multilingual_go_emotions_V1.2}
       OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-alibayram/smollm3}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
       SMTP_URL: ${SMTP_URL:-}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_EMAIL: ${SMTP_EMAIL:-}
@@ -146,7 +146,7 @@ services:
     build:
       context: ./docker/ollama
     environment:
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-alibayram/smollm3}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:--1}
       CUDA_VISIBLE_DEVICES: ${OLLAMA_CUDA_VISIBLE_DEVICES:-}
     expose:
@@ -156,7 +156,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - ollama show "$${OLLAMA_MODEL:-alibayram/smollm3}" >/dev/null 2>&1
+        - ollama show "$${OLLAMA_MODEL:-qwen3:4b-instruct-2507-q4_K_M}" >/dev/null 2>&1
       interval: 5s
       timeout: 5s
       retries: 60

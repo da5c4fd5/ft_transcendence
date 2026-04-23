@@ -3,7 +3,7 @@ import { status } from "elysia";
 import { db } from "../db";
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://ollama:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "alibayram/smollm3";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "qwen3:4b-instruct-2507-q4_K_M";
 const PROMPT_QUEUE_TARGET = 18;
 const PROMPT_HISTORY_LIMIT = 24;
 const PROMPT_PREEMPTIVE_THRESHOLD = 10;
@@ -55,6 +55,7 @@ Forbidden unless clearly supported by the history:
 Hard rules:
 - Generate exactly ${targetCount} prompts.
 - Each prompt must be a single sentence in English.
+- English only. Do not output any other language.
 - Each prompt must be between ${PROMPT_MIN_CHARS} and ${PROMPT_UI_MAX_CHARS} characters.
 - Each prompt must be clear, natural, and useful.
 - Each prompt must be a real writing prompt, not a memory, quote, or statement.

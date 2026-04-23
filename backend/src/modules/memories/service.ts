@@ -3,6 +3,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../db";
 import type { MemoriesModel } from "./model";
 import { consumePromptSuggestion, refreshPromptSuggestionCache } from "../../lib/prompt-suggestions";
+import { getWellnessTips, invalidateWellnessTipCache } from "../../lib/wellness-tips";
 import { enqueueMoodClassification } from "../../lib/mood-classifier";
 import { assertMemoryMediaFile } from "../../lib/images";
 import {
@@ -74,6 +75,10 @@ export abstract class MemoriesService {
     return consumePromptSuggestion(userId);
   }
 
+  static getWellnessTips(userId: string, options?: { refresh?: boolean }) {
+    return getWellnessTips(userId, options);
+  }
+
   static async list(userId: string, query: { page: number; limit: number }) {
     const [items, total] = await Promise.all([
       db.memory.findMany({
@@ -125,6 +130,7 @@ export abstract class MemoriesService {
       }
     });
     MemoriesService.invalidateReminderCache(userId);
+    invalidateWellnessTipCache(userId);
     void refreshPromptSuggestionCache(userId);
     void enqueueMoodClassification(userId, memory.id, memory.content);
     return memory;
@@ -160,6 +166,7 @@ export abstract class MemoriesService {
       data: updateData
     });
     MemoriesService.invalidateReminderCache(userId);
+    invalidateWellnessTipCache(userId);
     void refreshPromptSuggestionCache(userId);
     if (data.content !== undefined) {
       void enqueueMoodClassification(userId, id, updated.content);
@@ -207,6 +214,7 @@ export abstract class MemoriesService {
     await db.memory.delete({ where: { id } });
     await deleteStoredFilesIfUnused(memoryFileUrls);
     MemoriesService.invalidateReminderCache(userId);
+    invalidateWellnessTipCache(userId);
     void refreshPromptSuggestionCache(userId);
     return status(204);
   }

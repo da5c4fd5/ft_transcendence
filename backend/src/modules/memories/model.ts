@@ -6,6 +6,9 @@ export const MemoriesModel = {
   promptResponse: t.Object({
     prompt: t.String()
   }),
+  wellnessTipsResponse: t.Object({
+    tips: t.Array(t.String())
+  }),
   gameQuery: t.Object({
     count: t.Optional(t.Number({ minimum: 1, maximum: 5, default: 5 }))
   }),

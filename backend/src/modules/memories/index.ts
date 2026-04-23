@@ -38,6 +38,23 @@ export const memories = new Elysia({
               "Return the next cached AI-generated writing prompt for the authenticated user. Refills the cache automatically when it runs low."
           }
         })
+        .get(
+          "/wellness",
+          ({ user, query }) =>
+            MemoriesService.getWellnessTips(user!.id, {
+              refresh: query.refresh === true || query.refresh === "true"
+            }),
+          {
+            query: t.Object({
+              refresh: t.Optional(t.BooleanString())
+            }),
+            response: { 200: MemoriesModel.wellnessTipsResponse, 503: t.Any() },
+            detail: {
+              description:
+                "Return a small set of AI-generated wellness tips based on the authenticated user's recent memories. Use refresh=true to force a new batch."
+            }
+          }
+        )
         .get("/today", ({ user }) => MemoriesService.today(user!.id), {
           response: { 200: t.Any(), 404: t.Any() },
           detail: {

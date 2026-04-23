@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-MODEL="${OLLAMA_MODEL:-alibayram/smollm3}"
+MODEL="${OLLAMA_MODEL:-qwen3:4b-instruct-2507-q4_K_M}"
 KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"
 
 if [ -z "${CUDA_VISIBLE_DEVICES:-}" ]; then
