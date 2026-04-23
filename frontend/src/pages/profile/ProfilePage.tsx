@@ -435,6 +435,7 @@ function PublicApiKeyCard({ user, onUserUpdate }: { user: UserType; onUserUpdate
   };
 
   const publicApiBase = `${window.location.origin}/api/public-api`;
+  const canIssuePublicApiKey = user.emailVerified;
 
   return (
     <div className={cardBase}>
@@ -464,6 +465,12 @@ function PublicApiKeyCard({ user, onUserUpdate }: { user: UserType; onUserUpdate
           </p>
         )}
       </div>
+
+      {!canIssuePublicApiKey && (
+        <p className="text-sm text-mediumgrey leading-relaxed">
+          Verify your email before generating a public API key.
+        </p>
+      )}
 
       {revealedKey && (
         <div className="rounded-2xl border border-blue/20 bg-blue/5 px-4 py-3 flex flex-col gap-3">
@@ -509,7 +516,7 @@ function PublicApiKeyCard({ user, onUserUpdate }: { user: UserType; onUserUpdate
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={issuing}
+          disabled={issuing || !canIssuePublicApiKey}
           className="flex-1 py-3 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
         >
           {issuing ? 'Generating…' : user.publicApi.enabled ? 'Rotate API key' : 'Generate API key'}

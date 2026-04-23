@@ -104,6 +104,9 @@ export const UsersModel = {
     preview: t.String(),
     createdAt: t.String({ format: "date-time" })
   }),
+  publicApiKeyVerificationRequired: t.Object({
+    message: t.Literal("Verify your email before generating a public API key")
+  }),
   emailVerificationBody: t.Object({
     code: t.String({ minLength: 6, maxLength: 6 })
   }),

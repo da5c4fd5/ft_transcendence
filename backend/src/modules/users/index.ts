@@ -114,10 +114,13 @@ export const users = new Elysia({
           "/me/public-api-key",
           ({ user }) => UsersService.issuePublicApiKey(user!.id),
           {
-            response: { 200: UsersModel.publicApiKeyIssueResponse },
+            response: {
+              200: UsersModel.publicApiKeyIssueResponse,
+              403: UsersModel.publicApiKeyVerificationRequired
+            },
             detail: {
               description:
-                "Generate a fresh public API key for the authenticated user. The raw key is only returned once."
+                "Generate a fresh public API key for the authenticated user. The raw key is only returned once. Email verification is required when SMTP is configured."
             }
           }
         )

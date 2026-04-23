@@ -450,7 +450,20 @@ export abstract class UsersService {
     };
   }
 
-  static issuePublicApiKey(id: string) {
+  static async issuePublicApiKey(id: string) {
+    if (isMailConfigured()) {
+      const user = await db.user.findUniqueOrThrow({
+        where: { id },
+        select: { emailVerifiedAt: true }
+      });
+
+      if (!user.emailVerifiedAt) {
+        throw status(403, {
+          message: "Verify your email before generating a public API key"
+        });
+      }
+    }
+
     return createPublicApiKey(id);
   }
 
