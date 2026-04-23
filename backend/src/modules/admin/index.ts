@@ -35,6 +35,17 @@ export const admin = new Elysia({
               "Return global AI usage and health metrics for prompt generation and mood classification."
           }
         })
+        .post(
+          "/emails/inactivity-reminders",
+          () => AdminService.sendInactivityReminders(),
+          {
+            response: { 200: AdminModel.inactivityReminderResponse },
+            detail: {
+              description:
+                "Manually send today's privacy-friendly inactivity reminder to verified users who still have not written a capsul."
+            }
+          }
+        )
         .post("/memories", ({ body }) => AdminService.createMemory(body), {
           body: AdminModel.createMemoryBody,
           response: { 200: t.Any(), 404: t.Any(), 409: t.Any() },

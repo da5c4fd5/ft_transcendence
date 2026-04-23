@@ -55,6 +55,12 @@ export const AdminModel = {
     })
   }),
 
+  inactivityReminderResponse: t.Object({
+    eligibleUsers: t.Number(),
+    sent: t.Number(),
+    failed: t.Number()
+  }),
+
   updateUserBody: t.Object({
     isAdmin: t.Optional(t.Boolean()),
     emailVerified: t.Optional(t.Boolean()),

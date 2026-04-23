@@ -5,6 +5,8 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { signPreAuthToken, verifyPreAuthToken } from "../../lib/pre-auth";
 import { decryptSecret } from "../../lib/mfa-crypto";
 import { issueEmailVerification } from "../../lib/email-verification";
+import { isMailConfigured, sendMail } from "../../lib/mailer";
+import { renderWelcomeMail } from "../../lib/mail-templates";
 import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from "otplib";
 
 const totp = new TOTP({
@@ -123,6 +125,19 @@ export abstract class Auth {
       await issueEmailVerification(userId, normalizedEmail);
     } catch (error) {
       console.error("Failed to send signup verification email", { userId, error });
+    }
+    if (isMailConfigured()) {
+      try {
+        const mail = renderWelcomeMail(username);
+        await sendMail({
+          to: normalizedEmail,
+          subject: "Welcome to Capsul",
+          text: mail.text,
+          html: mail.html
+        });
+      } catch (error) {
+        console.error("Failed to send welcome email", { userId, error });
+      }
     }
     const session = await db.session.create({
       data: { userId, userAgent: userAgent ?? null }

@@ -2,6 +2,7 @@ import { createHash, randomInt } from "crypto";
 import { status } from "elysia";
 import { db } from "../db";
 import { isMailConfigured, sendMail } from "./mailer";
+import { renderVerificationCodeMail } from "./mail-templates";
 
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 30 * 1000;
@@ -32,6 +33,7 @@ export async function issueEmailVerification(userId: string, email: string) {
   const current = await db.user.findUniqueOrThrow({
     where: { id: userId },
     select: {
+      username: true,
       emailVerifiedAt: true,
       emailVerificationSentAt: true
     }
@@ -64,12 +66,15 @@ export async function issueEmailVerification(userId: string, email: string) {
   });
 
   try {
+    const mail = renderVerificationCodeMail(
+      current.username,
+      code
+    );
     await sendMail({
       to: email,
       subject: "Your Capsul verification code",
-      text:
-        `Your Capsul verification code is ${code}.\n\n` +
-        "It expires in 15 minutes."
+      text: mail.text,
+      html: mail.html
     });
   } catch (error) {
     await db.user.update({

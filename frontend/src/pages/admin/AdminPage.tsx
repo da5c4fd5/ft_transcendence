@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'preact/hooks';
-import { Users, Sparkles, ShieldCheck, Trash2, Search, TriangleAlert, BrainCircuit, Activity, BotMessageSquare } from 'lucide-preact';
+import { Users, Sparkles, ShieldCheck, Trash2, Search, TriangleAlert, BrainCircuit, Activity, BotMessageSquare, Mail } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../../components/Avatar/Avatar';
 import { MediaPreview } from '../../components/MediaPreview/MediaPreview';
-import type { AdminUser, AdminStats, AdminPageProps, AdminAiOverview } from './admin.types';
+import type { AdminUser, AdminStats, AdminPageProps, AdminAiOverview, AdminInactivityReminderResult } from './admin.types';
 import { api, getApiErrorMessage, validateMemoryMediaFile } from '../../lib/api';
 
 type RawAdminStats = { userCount: number; memoryCount: number; sessionCount: number };
@@ -192,6 +192,8 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
   const [memoryUploadProgress, setMemoryUploadProgress] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [roleConfirmId, setRoleConfirmId]     = useState<string | null>(null);
+  const [sendingInactivityReminders, setSendingInactivityReminders] = useState(false);
+  const [inactivityReminderStatus, setInactivityReminderStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     api.get<RawAdminStats>('/admin/stats').then(s => setStats({
@@ -328,6 +330,28 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
     setMemoryUploadProgress(null);
   };
 
+  const handleSendInactivityReminders = async () => {
+    setSendingInactivityReminders(true);
+    setInactivityReminderStatus(null);
+    try {
+      const result = await api.post<AdminInactivityReminderResult>('/admin/emails/inactivity-reminders');
+      setInactivityReminderStatus({
+        type: 'success',
+        message:
+          result.failed > 0
+            ? `Reminder run finished: ${result.sent} sent, ${result.failed} failed, ${result.eligibleUsers} eligible.`
+            : `Reminder run finished: ${result.sent} sent to ${result.eligibleUsers} eligible users.`
+      });
+    } catch (error) {
+      setInactivityReminderStatus({
+        type: 'error',
+        message: getApiErrorMessage(error, 'Failed to send inactivity reminders.')
+      });
+    } finally {
+      setSendingInactivityReminders(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-12 flex flex-col gap-6">
 
@@ -345,6 +369,41 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
         <StatCard icon={<Users size={22} className="text-darkgrey" />}     value={stats.totalUsers}    label="Total Users"    color="bg-blue/40"   />
         <StatCard icon={<Sparkles size={22} className="text-darkgrey" />}  value={stats.totalMemories} label="Total Memories" color="bg-yellow/60" />
         <StatCard icon={<ShieldCheck size={22} className="text-darkgrey" />} value={totalAdmins}       label="Admins"         color="bg-purple/30" />
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm p-6 flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className={cn(iconBox, 'bg-yellow/40 w-10 h-10')}>
+              <Mail size={18} className="text-darkgrey" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-darkgrey">Email Operations</h2>
+              <p className="text-xs text-mediumgrey mt-0.5">
+                Manually send today's inactivity reminder to verified users who still have not written a capsul.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleSendInactivityReminders}
+            disabled={sendingInactivityReminders}
+            className="shrink-0 px-4 py-2 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
+          >
+            {sendingInactivityReminders ? 'Sending…' : 'Send inactivity reminders'}
+          </button>
+        </div>
+        <p className="text-xs text-mediumgrey leading-relaxed">
+          Privacy-friendly by default: no tracking pixel, no open-rate tricks, just the message itself.
+        </p>
+        {inactivityReminderStatus && (
+          <p className={cn(
+            'text-xs px-1',
+            inactivityReminderStatus.type === 'success' ? 'text-blue' : 'text-pink'
+          )}>
+            {inactivityReminderStatus.message}
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm overflow-hidden">

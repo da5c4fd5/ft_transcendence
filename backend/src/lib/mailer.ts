@@ -77,6 +77,7 @@ export async function sendMail(options: {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }) {
   const transport = getTransporter();
   if (!transport) {
@@ -88,9 +89,10 @@ export async function sendMail(options: {
       from: smtpEmail,
       to: options.to,
       subject: options.subject,
-      text: options.text
+      text: options.text,
+      html: options.html
     });
   } catch {
-    throw status(503, { message: "Failed to send confirmation email" });
+    throw status(503, { message: "Failed to send email" });
   }
 }

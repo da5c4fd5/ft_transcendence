@@ -59,6 +59,12 @@ export interface AdminAiOverview {
   };
 }
 
+export interface AdminInactivityReminderResult {
+  eligibleUsers: number;
+  sent: number;
+  failed: number;
+}
+
 export interface AdminPageProps {
   currentUserId: string;
 }
