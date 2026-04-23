@@ -476,7 +476,7 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
                 <StatCard icon={<Users size={18} className="text-darkgrey" />} value={aiOverview.promptSuggestions.usersWithStoredPrompts} label="Users With Queue" color="bg-blue/40" />
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-white px-4 py-3">
                   <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Idle</p>
                   <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.promptSuggestions.generationStatusCounts.idle}</p>
@@ -531,7 +531,7 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
                 <StatCard icon={<Activity size={18} className="text-darkgrey" />} value={aiOverview.moodClassification.statusCounts.processing} label="Processing Now" color="bg-orange/80" />
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-white px-4 py-3">
                   <p className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Queued</p>
                   <p className="mt-1 text-xl font-black text-darkgrey">{aiOverview.moodClassification.statusCounts.queued}</p>
