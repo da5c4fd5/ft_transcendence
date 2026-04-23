@@ -6,6 +6,7 @@ import {
   deleteStoredFilesIfUnused
 } from "../../lib/stored-files";
 import type { AdminModel } from "./model";
+import { MemoriesService } from "../memories/service";
 
 const ADMIN_USER_SELECT = {
   id: true,
@@ -238,5 +239,31 @@ export abstract class AdminService {
       }
       throw error;
     }
+  }
+
+  static async createMemory(data: AdminModel["createMemoryBody"]) {
+    const user = await db.user.findUnique({
+      where: { id: data.userId },
+      select: { id: true }
+    });
+    if (!user) throw status(404, { message: "User not found" });
+
+    return MemoriesService.createForUser(data.userId, {
+      content: data.content,
+      date: data.date,
+      isOpen: data.isOpen ?? false
+    });
+  }
+
+  static async attachMemoryMedia(memoryId: string, file: File) {
+    const memory = await db.memory.findUnique({
+      where: { id: memoryId },
+      select: { id: true, userId: true }
+    });
+    if (!memory) throw status(404, { message: "Memory not found" });
+
+    return MemoriesService.attachMediaForUser(memoryId, memory.userId, file, {
+      skipDateRestriction: true
+    });
   }
 }

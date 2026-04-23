@@ -35,6 +35,27 @@ export const admin = new Elysia({
               "Return global AI usage and health metrics for prompt generation and mood classification."
           }
         })
+        .post("/memories", ({ body }) => AdminService.createMemory(body), {
+          body: AdminModel.createMemoryBody,
+          response: { 200: t.Any(), 404: t.Any(), 409: t.Any() },
+          detail: {
+            description:
+              "Create a memory for any user on a specific date. Useful for admin backfilling or corrections."
+          }
+        })
+        .post(
+          "/memories/:memoryId/media",
+          ({ params, body }) =>
+            AdminService.attachMemoryMedia(params.memoryId, body.file),
+          {
+            body: AdminModel.memoryMediaBody,
+            response: { 200: t.Any(), 404: t.Any() },
+            detail: {
+              description:
+                "Attach an image or audio file to any memory as an admin, including backfilled memories."
+            }
+          }
+        )
         .get(
           "/users",
           ({ query }) =>

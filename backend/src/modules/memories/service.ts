@@ -100,6 +100,10 @@ export abstract class MemoriesService {
   }
 
   static async create(userId: string, data: MemoriesModel["createBody"]) {
+    return MemoriesService.createForUser(userId, data);
+  }
+
+  static async createForUser(userId: string, data: MemoriesModel["createBody"]) {
     const date = data.date ? new Date(data.date) : new Date();
     date.setHours(0, 0, 0, 0);
     const { end: nextDay } = getLocalDayRange(date);
@@ -107,7 +111,9 @@ export abstract class MemoriesService {
     const existing = await db.memory.findFirst({
       where: { userId, date: { gte: date, lt: nextDay } }
     });
-    if (existing) throw status(409, { message: "You already have a memory for today" });
+    if (existing) {
+      throw status(409, { message: "A memory already exists for that date" });
+    }
 
     const memory = await db.memory.create({
       data: {
@@ -206,10 +212,21 @@ export abstract class MemoriesService {
   }
 
   static async attachMedia(id: string, userId: string, file: File) {
+    return MemoriesService.attachMediaForUser(id, userId, file);
+  }
+
+  static async attachMediaForUser(
+    id: string,
+    userId: string,
+    file: File,
+    options?: { skipDateRestriction?: boolean }
+  ) {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
-    assertMemoryCanBeModifiedToday(memory.date);
+    if (!options?.skipDateRestriction) {
+      assertMemoryCanBeModifiedToday(memory.date);
+    }
     assertMemoryMediaFile(file);
 
     // Delete any existing media record so the new one becomes the single reference

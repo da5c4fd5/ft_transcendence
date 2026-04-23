@@ -2,11 +2,18 @@ import { useState, useMemo, useEffect } from 'preact/hooks';
 import { Users, Sparkles, ShieldCheck, Trash2, Search, TriangleAlert, BrainCircuit, Activity, BotMessageSquare } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../../components/Avatar/Avatar';
+import { MediaPreview } from '../../components/MediaPreview/MediaPreview';
 import type { AdminUser, AdminStats, AdminPageProps, AdminAiOverview } from './admin.types';
-import { api } from '../../lib/api';
+import { api, getApiErrorMessage, validateMemoryMediaFile } from '../../lib/api';
 
 type RawAdminStats = { userCount: number; memoryCount: number; sessionCount: number };
 type RawAdminUser  = { id: string; username: string; email: string; avatarUrl: string | null; isAdmin: boolean; createdAt: string; updatedAt: string };
+type AdminMemoryForm = {
+  userId: string;
+  date: string;
+  content: string;
+  isOpen: boolean;
+};
 
 function rawToAdminUser(u: RawAdminUser): AdminUser {
   const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -150,6 +157,17 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
   const [users, setUsers]   = useState<AdminUser[]>([]);
   const [aiOverview, setAiOverview] = useState<AdminAiOverview | null>(null);
   const [search, setSearch] = useState('');
+  const [memoryForm, setMemoryForm] = useState<AdminMemoryForm>({
+    userId: '',
+    date: new Date().toISOString().slice(0, 10),
+    content: '',
+    isOpen: false,
+  });
+  const [memoryFormStatus, setMemoryFormStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isSubmittingMemory, setIsSubmittingMemory] = useState(false);
+  const [memoryFile, setMemoryFile] = useState<File | null>(null);
+  const [memoryFilePreview, setMemoryFilePreview] = useState<string | null>(null);
+  const [memoryUploadProgress, setMemoryUploadProgress] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [roleConfirmId, setRoleConfirmId]     = useState<string | null>(null);
 
@@ -158,7 +176,13 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
       totalUsers: s.userCount, totalMemories: s.memoryCount, totalAdmins: 0,
     })).catch(() => {});
     api.get<{ items: RawAdminUser[]; total: number }>('/admin/users', { page: 1, limit: 100 })
-      .then(r => setUsers(r.items.map(rawToAdminUser)))
+      .then(r => {
+        setUsers(r.items.map(rawToAdminUser));
+        setMemoryForm((prev) => ({
+          ...prev,
+          userId: prev.userId || r.items[0]?.id || '',
+        }));
+      })
       .catch(() => {});
     api.get<AdminAiOverview>('/admin/ai/stats')
       .then(setAiOverview)
@@ -194,6 +218,84 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
     } catch { /* ignore */ }
   };
 
+  const handleCreateMemory = async (e: Event) => {
+    e.preventDefault();
+    if (!memoryForm.userId || !memoryForm.date || !memoryForm.content.trim()) {
+      setMemoryFormStatus({ type: 'error', message: 'Choose a user, a date, and a memory.' });
+      return;
+    }
+
+    setIsSubmittingMemory(true);
+    setMemoryFormStatus(null);
+    setMemoryUploadProgress(null);
+    try {
+      const created = await api.post<{ id: string }>('/admin/memories', {
+        userId: memoryForm.userId,
+        date: memoryForm.date,
+        content: memoryForm.content.trim(),
+        isOpen: memoryForm.isOpen,
+      });
+      if (memoryFile) {
+        const form = new FormData();
+        form.append('file', memoryFile);
+        await api.upload(`/admin/memories/${created.id}/media`, form, {
+          onProgress: setMemoryUploadProgress,
+        });
+      }
+      setStats((prev) => ({ ...prev, totalMemories: prev.totalMemories + 1 }));
+      setMemoryForm((prev) => ({ ...prev, content: '', isOpen: false }));
+      if (memoryFilePreview) {
+        URL.revokeObjectURL(memoryFilePreview);
+      }
+      setMemoryFile(null);
+      setMemoryFilePreview(null);
+      setMemoryUploadProgress(null);
+      setMemoryFormStatus({
+        type: 'success',
+        message: memoryFile
+          ? 'Memory and media created on the selected date.'
+          : 'Memory created on the selected date.',
+      });
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Failed to create the memory.');
+      setMemoryFormStatus({ type: 'error', message });
+      setMemoryUploadProgress(null);
+    } finally {
+      setIsSubmittingMemory(false);
+    }
+  };
+
+  const handleMemoryFileChange = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    if (!file) return;
+
+    const validationError = validateMemoryMediaFile(file);
+    if (validationError) {
+      setMemoryFormStatus({ type: 'error', message: validationError });
+      input.value = '';
+      return;
+    }
+
+    if (memoryFilePreview) {
+      URL.revokeObjectURL(memoryFilePreview);
+    }
+    setMemoryFile(file);
+    setMemoryFilePreview(URL.createObjectURL(file));
+    setMemoryFormStatus(null);
+    setMemoryUploadProgress(null);
+    input.value = '';
+  };
+
+  const removeMemoryFile = () => {
+    if (memoryFilePreview) {
+      URL.revokeObjectURL(memoryFilePreview);
+    }
+    setMemoryFile(null);
+    setMemoryFilePreview(null);
+    setMemoryUploadProgress(null);
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-12 flex flex-col gap-6">
 
@@ -211,6 +313,148 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
         <StatCard icon={<Users size={22} className="text-darkgrey" />}     value={stats.totalUsers}    label="Total Users"    color="bg-blue/40"   />
         <StatCard icon={<Sparkles size={22} className="text-darkgrey" />}  value={stats.totalMemories} label="Total Memories" color="bg-yellow/60" />
         <StatCard icon={<ShieldCheck size={22} className="text-darkgrey" />} value={totalAdmins}       label="Admins"         color="bg-purple/30" />
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+        <div className="px-6 pt-6 pb-4 flex items-center gap-2.5">
+          <Sparkles size={17} className="text-pink" />
+          <div>
+            <h2 className="text-lg font-black text-darkgrey">Add Memory For A User</h2>
+            <p className="text-xs text-mediumgrey mt-0.5">Backfill a memory on any specific date.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleCreateMemory} className="px-6 pb-6 flex flex-col gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_11rem] gap-4">
+            <label className="flex flex-col gap-2">
+              <span className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">User</span>
+              <select
+                value={memoryForm.userId}
+                onChange={(e) => setMemoryForm((prev) => ({ ...prev, userId: (e.target as HTMLSelectElement).value }))}
+                className="rounded-2xl bg-lightgrey/40 px-4 py-3 text-sm text-darkgrey outline-none border border-transparent focus:border-yellow"
+              >
+                <option value="" disabled>Select a user</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.username} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Date</span>
+              <input
+                type="date"
+                value={memoryForm.date}
+                onInput={(e) => setMemoryForm((prev) => ({ ...prev, date: (e.target as HTMLInputElement).value }))}
+                className="rounded-2xl bg-lightgrey/40 px-4 py-3 text-sm text-darkgrey outline-none border border-transparent focus:border-yellow"
+              />
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Memory</span>
+              <span className="text-xs text-mediumgrey">{memoryForm.content.length}/180</span>
+            </div>
+            <textarea
+              value={memoryForm.content}
+              onInput={(e) =>
+                setMemoryForm((prev) => ({
+                  ...prev,
+                  content: (e.target as HTMLTextAreaElement).value.slice(0, 180),
+                }))
+              }
+              rows={4}
+              placeholder="Write the memory that should exist on that date..."
+              className="rounded-3xl bg-lightgrey/40 px-4 py-3 text-sm text-darkgrey outline-none border border-transparent focus:border-yellow resize-none"
+            />
+          </label>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] font-bold tracking-widest text-mediumgrey uppercase">Media</span>
+              <label className="inline-flex items-center justify-center rounded-full bg-verylightorange px-4 py-2 text-sm font-semibold text-darkgrey hover:bg-orange/20 transition-colors cursor-pointer">
+                Add File
+                <input
+                  type="file"
+                  accept="image/*,audio/*"
+                  className="hidden"
+                  onChange={handleMemoryFileChange}
+                />
+              </label>
+            </div>
+
+            {memoryFilePreview && (
+              <div className="rounded-3xl bg-lightgrey/40 p-4 flex flex-col gap-3">
+                <MediaPreview
+                  src={memoryFilePreview}
+                  alt="Admin memory media preview"
+                  className="w-full max-h-64 rounded-2xl object-cover"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-darkgrey font-medium truncate">{memoryFile?.name}</p>
+                  <button
+                    type="button"
+                    onClick={removeMemoryFile}
+                    className="text-sm text-mediumgrey hover:text-darkgrey transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {memoryUploadProgress !== null && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs font-bold text-darkgrey">
+                  <span>Uploading media</span>
+                  <span>{memoryUploadProgress}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-lightgrey overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-pink transition-all"
+                    style={{ width: `${memoryUploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <label className="inline-flex items-center gap-3 text-sm text-darkgrey font-medium">
+            <input
+              type="checkbox"
+              checked={memoryForm.isOpen}
+              onChange={(e) => setMemoryForm((prev) => ({ ...prev, isOpen: (e.target as HTMLInputElement).checked }))}
+              className="w-4 h-4 rounded border-black/15"
+            />
+            Create it as a shared memory
+          </label>
+
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <button
+              type="submit"
+              disabled={isSubmittingMemory || users.length === 0}
+              className={cn(
+                'inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-bold transition-colors',
+                isSubmittingMemory || users.length === 0
+                  ? 'bg-lightgrey text-mediumgrey cursor-not-allowed'
+                  : 'bg-pink text-white hover:bg-pink/85',
+              )}
+            >
+              {isSubmittingMemory ? 'Creating…' : 'Create Memory'}
+            </button>
+            {memoryFormStatus && (
+              <p className={cn(
+                'text-sm',
+                memoryFormStatus.type === 'success' ? 'text-green-700' : 'text-pink',
+              )}>
+                {memoryFormStatus.message}
+              </p>
+            )}
+          </div>
+        </form>
       </div>
 
       {aiOverview && (

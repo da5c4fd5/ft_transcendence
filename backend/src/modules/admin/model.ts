@@ -65,6 +65,17 @@ export const AdminModel = {
       })
     ),
     displayName: t.Optional(t.String({ maxLength: 64 }))
+  }),
+
+  createMemoryBody: t.Object({
+    userId: t.String(),
+    date: t.String({ format: "date" }),
+    content: t.String({ minLength: 1, maxLength: 180 }),
+    isOpen: t.Optional(t.Boolean())
+  }),
+
+  memoryMediaBody: t.Object({
+    file: t.File()
   })
 } as const;
 
