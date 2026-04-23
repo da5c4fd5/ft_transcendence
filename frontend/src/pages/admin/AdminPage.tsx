@@ -7,7 +7,7 @@ import type { AdminUser, AdminStats, AdminPageProps, AdminAiOverview } from './a
 import { api, getApiErrorMessage, validateMemoryMediaFile } from '../../lib/api';
 
 type RawAdminStats = { userCount: number; memoryCount: number; sessionCount: number };
-type RawAdminUser  = { id: string; username: string; email: string; avatarUrl: string | null; isAdmin: boolean; createdAt: string; updatedAt: string };
+type RawAdminUser  = { id: string; username: string; email: string; emailVerifiedAt: string | null; avatarUrl: string | null; isAdmin: boolean; createdAt: string; updatedAt: string };
 type AdminMemoryForm = {
   userId: string;
   date: string;
@@ -19,6 +19,7 @@ function rawToAdminUser(u: RawAdminUser): AdminUser {
   const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   return {
     id: u.id, username: u.username, email: u.email,
+    emailVerified: !!u.emailVerifiedAt,
     avatarURL: u.avatarUrl, isAdmin: u.isAdmin,
     joinedDate: fmt(u.createdAt), lastActive: fmt(u.updatedAt),
     memoriesCount: 0, friendsCount: 0,
@@ -130,6 +131,7 @@ function StatCard({ icon, value, label, color }: {
 }
 
 const roleBtnBase = 'inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors';
+const verificationBtnBase = 'inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors';
 
 function RoleBadge({ isAdmin, onClick }: { isAdmin: boolean; onClick?: () => void }) {
   const interactive = !!onClick;
@@ -148,6 +150,26 @@ function RoleBadge({ isAdmin, onClick }: { isAdmin: boolean; onClick?: () => voi
     >
       {isAdmin && <ShieldCheck size={11} />}
       {isAdmin ? 'Admin' : 'User'}
+    </button>
+  );
+}
+
+function EmailVerificationBadge({ emailVerified, onClick }: { emailVerified: boolean; onClick?: () => void }) {
+  const interactive = !!onClick;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!interactive}
+      className={cn(
+        verificationBtnBase,
+        emailVerified
+          ? cn('bg-green-100 text-green-700', interactive && 'hover:bg-green-200 cursor-pointer')
+          : cn('bg-orange-100 text-orange-700', interactive && 'hover:bg-orange-200 cursor-pointer'),
+        !interactive && 'cursor-default',
+      )}
+    >
+      {emailVerified ? 'Verified' : 'Unverified'}
     </button>
   );
 }
@@ -215,6 +237,16 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
     try {
       await api.patch(`/admin/users/${id}`, { isAdmin: newIsAdmin });
       setUsers(prev => prev.map(u => u.id === id ? { ...u, isAdmin: newIsAdmin } : u));
+    } catch { /* ignore */ }
+  };
+
+  const handleToggleEmailVerification = async (id: string) => {
+    const user = users.find(u => u.id === id);
+    if (!user) return;
+    const nextEmailVerified = !user.emailVerified;
+    try {
+      await api.patch(`/admin/users/${id}`, { emailVerified: nextEmailVerified });
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, emailVerified: nextEmailVerified } : u));
     } catch { /* ignore */ }
   };
 
@@ -607,6 +639,7 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
               <tr className="border-t border-black/5">
                 <th className={cn(thCell, 'px-6')}>User</th>
                 <th className={thCell}>Role</th>
+                <th className={thCell}>Email</th>
                 <th className={thCell}>Joined</th>
                 <th className={thCell}>Last Active</th>
                 <th className={thCell}>Memories</th>
@@ -632,6 +665,12 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
                       onClick={u.id !== currentUserId ? () => setRoleConfirmId(u.id) : undefined}
                     />
                   </td>
+                  <td className="px-4 py-4">
+                    <EmailVerificationBadge
+                      emailVerified={u.emailVerified}
+                      onClick={() => handleToggleEmailVerification(u.id)}
+                    />
+                  </td>
                   <td className="px-4 py-4 text-sm text-mediumgrey whitespace-nowrap">{u.joinedDate}</td>
                   <td className="px-4 py-4 text-sm text-mediumgrey whitespace-nowrap">{u.lastActive}</td>
                   <td className="px-4 py-4 text-sm font-bold text-darkgrey">{u.memoriesCount}</td>
@@ -651,7 +690,7 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-sm text-mediumgrey">
+                  <td colSpan={8} className="px-6 py-12 text-center text-sm text-mediumgrey">
                     No users found.
                   </td>
                 </tr>
@@ -671,6 +710,10 @@ export function AdminPage({ currentUserId }: AdminPageProps) {
                   <RoleBadge
                     isAdmin={u.isAdmin}
                     onClick={u.id !== currentUserId ? () => setRoleConfirmId(u.id) : undefined}
+                  />
+                  <EmailVerificationBadge
+                    emailVerified={u.emailVerified}
+                    onClick={() => handleToggleEmailVerification(u.id)}
                   />
                   <span className="text-xs text-mediumgrey">{u.memoriesCount} memories</span>
                 </div>

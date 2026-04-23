@@ -12,6 +12,7 @@ const ADMIN_USER_SELECT = {
   id: true,
   username: true,
   email: true,
+  emailVerifiedAt: true,
   avatarUrl: true,
   isAdmin: true,
   createdAt: true,
@@ -224,10 +225,27 @@ export abstract class AdminService {
     if (data.isAdmin === false) {
       await AdminService.assertNotRemovingLastAdmin(id);
     }
+
+    const {
+      emailVerified,
+      ...rest
+    } = data;
+
+    const updateData: Parameters<typeof db.user.update>[0]["data"] = {
+      ...rest
+    };
+
+    if (emailVerified !== undefined) {
+      updateData.emailVerifiedAt = emailVerified ? new Date() : null;
+      updateData.emailVerificationCodeHash = null;
+      updateData.emailVerificationExpiresAt = null;
+      updateData.emailVerificationSentAt = null;
+    }
+
     try {
       return await db.user.update({
         where: { id },
-        data,
+        data: updateData,
         select: ADMIN_USER_SELECT
       });
     } catch (error) {

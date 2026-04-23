@@ -57,6 +57,7 @@ export const AdminModel = {
 
   updateUserBody: t.Object({
     isAdmin: t.Optional(t.Boolean()),
+    emailVerified: t.Optional(t.Boolean()),
     username: t.Optional(
       t.String({
         minLength: 2,

@@ -2,6 +2,7 @@ export interface AdminUser {
   id: string;
   username: string;
   email: string;
+  emailVerified: boolean;
   avatarURL: string | null;
   isAdmin: boolean;
   joinedDate: string;
