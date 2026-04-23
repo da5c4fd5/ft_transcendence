@@ -9,12 +9,7 @@ function escapeHtml(value: string) {
 
 function getAppUrl() {
   const domain = process.env.DOMAIN?.trim() || "transcen.dence.fr";
-  const port = Number(process.env.HTTPS_PORT ?? 443);
-
-  if (!port || port === 443) {
-    return `https://${domain}`;
-  }
-
+  const port = (process.env.HTTPS_PORT ?? "443").trim();
   return `https://${domain}:${port}`;
 }
 
