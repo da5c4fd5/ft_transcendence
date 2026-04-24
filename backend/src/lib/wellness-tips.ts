@@ -12,16 +12,9 @@ const WELLNESS_TIP_MIN_CHARS = 20;
 const WELLNESS_TIP_MAX_CHARS = 64;
 const WELLNESS_MAX_ATTEMPTS = 4;
 const WELLNESS_STYLE_LANES = [
-  "a tiny ritual",
-  "a playful constraint",
-  "a sensory reset",
-  "a social boundary",
-  "a body cue",
-  "an environmental tweak",
-  "an odd but harmless experiment",
-  "a reflective question turned into action",
-  "a quiet act of rebellion against overstimulation",
-  "a micro habit for difficult evenings"
+  "a grounding tip based on what felt good or safe",
+  "a reflective tip that helps carry today into tomorrow",
+  "a gentle behavioral tip for emotional balance"
 ] as const;
 const GENERIC_TIP_PATTERNS = [
   /\btake (a |some )?(short )?walks?\b/i,
@@ -39,7 +32,16 @@ const GENERIC_TIP_PATTERNS = [
   /\bquiet evening\b/i,
   /\breset your mood\b/i,
   /\breset your energy\b/i,
-  /\boverall well-being\b/i
+  /\boverall well-being\b/i,
+  /\btouch your\b/i,
+  /\bsmell\b/i,
+  /\blemon\b/i,
+  /\bplant\b/i,
+  /\bshoe\b/i,
+  /\bblink slowly\b/i,
+  /\bask someone\b/i,
+  /\bvisit your\b/i,
+  /\bcorner\b/i
 ] as const;
 const COMMON_HISTORY_WORDS = new Set([
   "about",
@@ -73,55 +75,20 @@ const COMMON_HISTORY_WORDS = new Set([
   "without"
 ]);
 const WELLNESS_FALLBACK_BANK: Record<(typeof WELLNESS_STYLE_LANES)[number], readonly string[]> = {
-  "a tiny ritual": [
-    "Pick one lamp tonight and let it set the whole tone.",
-    "Choose one mug and make it your evening anchor.",
-    "Open one window for exactly one quiet song."
+  "a grounding tip based on what felt good or safe": [
+    "Keep one good detail from today ready for tomorrow.",
+    "Return to the calmest moment of today before sleep.",
+    "Name what felt safe today and look for it again."
   ],
-  "a playful constraint": [
-    "Put your phone out of reach for three full songs.",
-    "Do tonight with one tab, one light, one drink.",
-    "Let one app stay unopened until after dinner."
+  "a reflective tip that helps carry today into tomorrow": [
+    "Write one line tonight about what you want to keep.",
+    "Hold onto the best part of today for tomorrow morning.",
+    "Ask what made today easier, then repeat just that."
   ],
-  "a sensory reset": [
-    "Cool your wrists under water before the evening starts.",
-    "Stand by a window until your jaw unclenches.",
-    "Trade ceiling light for one softer light tonight."
-  ],
-  "a social boundary": [
-    "Answer one message slower than your impulse wants.",
-    "Leave one conversation on read until tomorrow morning.",
-    "Keep one pocket of tonight unreachable to other people."
-  ],
-  "a body cue": [
-    "Drop your shoulders every time you cross a doorway.",
-    "Unclench your hands before you touch your phone again.",
-    "Let your exhale finish before replying to anything."
-  ],
-  "an environmental tweak": [
-    "Make one corner of the room noticeably dimmer tonight.",
-    "Move one noisy object out of your sightline.",
-    "Clear one small surface and defend it all evening."
-  ],
-  "an odd but harmless experiment": [
-    "Do one ordinary task tonight in complete silence.",
-    "Sit on the floor for five minutes before bed.",
-    "Try one evening hour without the brightest light on."
-  ],
-  "a reflective question turned into action": [
-    "When your mind speeds up, change rooms before the thought.",
-    "If the evening feels loud, shrink it to one next step.",
-    "When you feel scattered, choose one object and orbit it."
-  ],
-  "a quiet act of rebellion against overstimulation": [
-    "Let one notification expire without earning your attention.",
-    "Refuse one extra tab, light, or sound tonight.",
-    "Leave one thing undone on purpose and survive it."
-  ],
-  "a micro habit for difficult evenings": [
-    "Make the room smaller: one chair, one drink, one song.",
-    "Start your evening by dimming one light immediately.",
-    "Give tonight a border: pick one song to end it."
+  "a gentle behavioral tip for emotional balance": [
+    "Plan one small comforting thing before tomorrow begins.",
+    "Give tomorrow one easy win before anything demanding.",
+    "Protect the mood of today with one simple next step."
   ]
 };
 
@@ -243,7 +210,8 @@ Return JSON only with this exact shape:
 
 Your task:
 - generate exactly ${WELLNESS_TIP_COUNT} short wellness suggestions
-- keep them supportive, practical, and emotionally safe
+- act like a warm, thoughtful psychotherapist giving brief daily guidance
+- keep them supportive, practical, emotionally safe, and clearly linked to the memories
 - base them only on patterns that are explicit in the user's recent memories
 
 Hard rules:
@@ -253,13 +221,18 @@ Hard rules:
 - each tip must fit on a single short line
 - each tip must address only the user
 - each tip must be actionable, gentle, and concrete
-- each tip must feel slightly surprising, vivid, or unconventional
+- each tip must feel grounded and sincere, never whimsical
 - do not diagnose, label, or mention disorders
 - do not mention therapy, medication, trauma, abuse, or crisis services unless explicitly present
 - do not invent events, relationships, or problems
 - do not mention the memory history directly
 - do not use markdown, numbering, headings, or explanations
 - avoid duplicates and near-duplicates
+- prefer emotional carry-over, reflection, reassurance, or one realistic next step
+- it is good to reuse concrete details that are explicitly present in the memories
+- never invent random props, rituals, scents, clothing, plants, or body-part actions
+- never sound quirky, surreal, cute, or performative
+- never ask the user to do something bizarre just to seem original
 
 Required style lanes:
 - tip 1 should feel like ${styleLanes[0]}
@@ -275,12 +248,23 @@ Avoid bland phrasing such as:
 - drink water
 - get fresh air
 
+Bad examples:
+- Touch your left shoe corner when you feel a happy shift.
+- Smell lemon oil for one second, then blink slowly.
+- Ask someone you like: "Can I visit your plant later?"
+
+Good examples:
+- Keep one good part of today in mind before tomorrow starts.
+- If school feels big tomorrow, begin with one familiar comfort.
+- Let today's easy connection remind you that new places can soften.
+
 Before finalizing, reject any tip that:
 - assumes facts not present in the history
 - sounds alarming or overly clinical
 - feels generic enough to ignore the history
 - could fit almost anyone without changing a word
-- repeats another tip too closely`;
+- repeats another tip too closely
+- sounds like random AI-generated whimsy instead of real support`;
 }
 
 function buildRequestPrompt(memories: MemoryHistoryItem[], styleLanes: readonly string[]) {
@@ -307,11 +291,11 @@ function buildRequestPrompt(memories: MemoryHistoryItem[], styleLanes: readonly 
     "",
     "Silently identify the clearest recurring emotional and lifestyle patterns.",
     "Generate gentle wellness suggestions that fit those patterns.",
-    "Stay practical and supportive, not clinical.",
+    "Stay practical, supportive, and emotionally intelligent.",
     "Keep each tip immediately useful in everyday life.",
-    "Push for freshness and specificity over generic advice.",
+    "Focus on reassurance, emotional continuity, and one realistic next step.",
     "Do not simply repeat the obvious action already present in the memories.",
-    "Look sideways: propose adjacent, unexpected, harmless micro-actions.",
+    "Prefer grounded therapist-style advice over quirky creativity.",
     prominentWords.length > 0
       ? `Avoid reusing these obvious history words unless necessary: ${prominentWords.join(", ")}.`
       : "Avoid reusing the most obvious wording from the memories.",
@@ -364,9 +348,9 @@ async function generateWellnessTips(memories: MemoryHistoryItem[]) {
         format: "json",
         keep_alive: -1,
         options: {
-          temperature: 1.25,
-          top_p: 0.94,
-          repeat_penalty: 1.25
+          temperature: 0.8,
+          top_p: 0.9,
+          repeat_penalty: 1.2
         }
       })
     });
