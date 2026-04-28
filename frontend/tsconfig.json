@@ -16,7 +16,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "react": ["./node_modules/preact/compat"],

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { Home, Clock, MessageCircle, Sparkles, Sprout, User, ShieldCheck, ChevronDown } from 'lucide-preact';
+import { Home, Clock, Sparkles, Sprout, User, ShieldCheck, ChevronDown } from 'lucide-preact';
 import { useLocation } from 'wouter';
 import { clsx as cn } from 'clsx';
 import { Avatar } from '../Avatar/Avatar';
@@ -8,7 +8,6 @@ import type { NavbarProps } from './Navbar.types';
 const NAV_ITEMS = [
   { href: '/today',    label: 'Today',    Icon: Home     },
   { href: '/timeline', label: 'Timeline', Icon: Clock    },
-  { href: '/chat',     label: 'Chat',     Icon: MessageCircle },
   { href: '/memories', label: 'Memories', Icon: Sparkles },
   { href: '/tree',     label: 'Tree',     Icon: Sprout   },
 ] as const;

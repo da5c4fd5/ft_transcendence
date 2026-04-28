@@ -29,7 +29,8 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
       body: AuthModel.signUpBody,
       response: {
         200: AuthModel.signUpResponse,
-        409: AuthModel.signUpConflict
+        409: AuthModel.signUpConflict,
+        422: AuthModel.signUpWeakPassword
       },
       detail: {
         description:

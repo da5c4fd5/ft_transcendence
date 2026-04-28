@@ -11,6 +11,7 @@ import {
 } from "../../lib/email-verification";
 import { buildUserDataExport } from "../../lib/data-export";
 import { isMailConfigured, sendMail } from "../../lib/mailer";
+import { renderAccountDeletedMail, renderDataExportMail } from "../../lib/mail-templates";
 import { assertImageFileSize } from "../../lib/images";
 import {
   collectUserOwnedFileUrls,
@@ -299,12 +300,12 @@ export abstract class UsersService {
     }
 
     if (isMailConfigured()) {
+      const mail = renderAccountDeletedMail(user.username, new Date());
       await sendMail({
         to: user.email,
         subject: "Your Capsul account was deleted",
-        text:
-          `Hello ${user.username},\n\n` +
-          `This is a confirmation that your Capsul account and related data were deleted on ${new Date().toISOString()}.\n`
+        text: mail.text,
+        html: mail.html,
       });
     }
 
@@ -324,12 +325,12 @@ export abstract class UsersService {
 
     const payload = await buildUserDataExport(id);
     if (isMailConfigured()) {
+      const mail = renderDataExportMail(user.username, new Date());
       await sendMail({
         to: user.email,
         subject: "Your Capsul data export",
-        text:
-          `Hello ${user.username},\n\n` +
-          `This is a confirmation that a readable export of your Capsul data was requested on ${new Date().toISOString()}.\n`
+        text: mail.text,
+        html: mail.html,
       });
     }
 

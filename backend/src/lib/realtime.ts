@@ -19,7 +19,9 @@ type RealtimeEvent =
         content: string;
         createdAt: string;
       };
-    };
+    }
+  | { type: "friend_request"; requestId: string; fromUserId: string; fromUsername: string; fromAvatarUrl: string | null }
+  | { type: "friend_accepted"; friendId: string; friendUsername: string; friendAvatarUrl: string | null; online: boolean };
 
 type ConnectionState = {
   socket: RealtimeSocket;
@@ -158,6 +160,33 @@ export async function sendFriendPing(fromUserId: string, toUserId: string) {
       fromUsername: sender.username
     }) > 0
   );
+}
+
+export function broadcastFriendRequest(
+  recipientId: string,
+  from: { id: string; username: string; avatarUrl: string | null },
+  requestId: string
+) {
+  sendToUser(recipientId, {
+    type: "friend_request",
+    requestId,
+    fromUserId: from.id,
+    fromUsername: from.username,
+    fromAvatarUrl: from.avatarUrl,
+  });
+}
+
+export function broadcastFriendAccepted(
+  requesterId: string,
+  acceptedBy: { id: string; username: string; avatarUrl: string | null }
+) {
+  sendToUser(requesterId, {
+    type: "friend_accepted",
+    friendId: acceptedBy.id,
+    friendUsername: acceptedBy.username,
+    friendAvatarUrl: acceptedBy.avatarUrl,
+    online: isUserOnline(acceptedBy.id),
+  });
 }
 
 export function broadcastChatMessage(message: {

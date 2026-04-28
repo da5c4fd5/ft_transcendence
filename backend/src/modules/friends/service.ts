@@ -1,6 +1,6 @@
 import { status } from "elysia";
 import { db } from "../../db";
-import { isUserOnline } from "../../lib/realtime";
+import { isUserOnline, broadcastFriendRequest, broadcastFriendAccepted } from "../../lib/realtime";
 
 const FRIEND_USER_SELECT = {
   id: true,
@@ -54,10 +54,17 @@ export abstract class FriendsService {
     });
     if (incoming) {
       if (incoming.status === "ACCEPTED") return { message: "Already friends" };
-      return db.friend.update({
+      const result = await db.friend.update({
         where: { id: incoming.id },
         data: { status: "ACCEPTED" }
       });
+      // Notify the original requester that their request was accepted
+      const acceptor = await db.user.findUnique({
+        where: { id: userId },
+        select: { id: true, username: true, avatarUrl: true }
+      });
+      if (acceptor) broadcastFriendAccepted(targetUserId, acceptor);
+      return result;
     }
 
     // Case B: we already sent them a request
@@ -77,17 +84,26 @@ export abstract class FriendsService {
     // Case C: verify target exists then create
     const target = await db.user.findUnique({
       where: { id: targetUserId },
-      select: { id: true }
+      select: { id: true, username: true, avatarUrl: true }
     });
     if (!target) throw status(404, { message: "User not found" });
 
-    return db.friend.create({
+    const requester = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true, avatarUrl: true }
+    });
+
+    const newRequest = await db.friend.create({
       data: {
         requesterId: userId,
         recipientId: targetUserId,
         status: "PENDING"
       }
     });
+
+    // Notify the recipient of the new incoming request
+    if (requester) broadcastFriendRequest(targetUserId, requester, newRequest.id);
+    return newRequest;
   }
 
   static async listRequests(userId: string) {
@@ -97,6 +113,18 @@ export abstract class FriendsService {
         id: true,
         requesterId: true,
         requester: { select: { id: true, username: true, avatarUrl: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+  }
+
+  static async listSentRequests(userId: string) {
+    return db.friend.findMany({
+      where: { requesterId: userId, status: "PENDING" },
+      select: {
+        id: true,
+        recipientId: true,
+        recipient: { select: { id: true, username: true, avatarUrl: true } }
       },
       orderBy: { createdAt: "desc" }
     });

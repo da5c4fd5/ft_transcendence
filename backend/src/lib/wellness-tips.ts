@@ -1,5 +1,4 @@
 import { createHash } from "crypto";
-import { status } from "elysia";
 import { db } from "../db";
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://ollama:11434";
@@ -202,6 +201,15 @@ async function loadMemoryHistory(userId: string) {
   });
 }
 
+async function safeLoadMemoryHistory(userId: string) {
+  try {
+    return await loadMemoryHistory(userId);
+  } catch (error) {
+    console.error("Failed to load memory history for wellness tips", error);
+    return [] as MemoryHistoryItem[];
+  }
+}
+
 function buildSystemPrompt(styleLanes: readonly string[]) {
   return `You generate gentle wellness tips for a private daily memory journal.
 
@@ -335,30 +343,37 @@ async function generateWellnessTips(memories: MemoryHistoryItem[]) {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < WELLNESS_MAX_ATTEMPTS; attempt += 1) {
-    const styleLanes = shuffle(WELLNESS_STYLE_LANES).slice(0, WELLNESS_TIP_COUNT);
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(WELLNESS_GENERATION_TIMEOUT_MS),
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: buildRequestPrompt(memories, styleLanes),
-        system: buildSystemPrompt(styleLanes),
-        stream: false,
-        format: "json",
-        keep_alive: -1,
-        options: {
-          temperature: 0.8,
-          top_p: 0.9,
-          repeat_penalty: 1.2
-        }
-      })
-    });
+    let response: Response;
+    try {
+      const styleLanes = shuffle(WELLNESS_STYLE_LANES).slice(0, WELLNESS_TIP_COUNT);
+      response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(WELLNESS_GENERATION_TIMEOUT_MS),
+        body: JSON.stringify({
+          model: OLLAMA_MODEL,
+          prompt: buildRequestPrompt(memories, styleLanes),
+          system: buildSystemPrompt(styleLanes),
+          stream: false,
+          format: "json",
+          keep_alive: -1,
+          options: {
+            temperature: 0.8,
+            top_p: 0.9,
+            repeat_penalty: 1.2
+          }
+        })
+      });
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      break;
+    }
 
     if (!response.ok) {
       const responseText = normalizeWhitespace(await response.text());
       const detail = responseText ? `: ${responseText.slice(0, 240)}` : "";
-      throw new Error(`Ollama returned ${response.status}${detail}`);
+      lastError = new Error(`Ollama returned ${response.status}${detail}`);
+      break;
     }
 
     const payload = await response.json() as { response?: unknown };
@@ -403,7 +418,7 @@ export function invalidateWellnessTipCache(userId: string) {
 }
 
 export async function getWellnessTips(userId: string, options?: { refresh?: boolean }) {
-  const memories = await loadMemoryHistory(userId);
+  const memories = await safeLoadMemoryHistory(userId);
   const contextHash = buildContextHash(memories);
   const cached = cache.get(userId);
   const refresh = options?.refresh === true;
@@ -421,24 +436,33 @@ export async function getWellnessTips(userId: string, options?: { refresh?: bool
   if (existing) {
     try {
       return { tips: await existing };
-    } catch {
-      throw status(503, {
-        message: "Wellness tips are taking longer than expected. Try again in a moment."
+    } catch (error) {
+      console.warn("Wellness tip generation failed (existing)", error);
+      const tips = fallbackWellnessTips(memories);
+      cache.set(userId, {
+        contextHash,
+        tips,
+        expiresAt: Date.now() + WELLNESS_CACHE_TTL_MS
       });
+      return { tips };
     }
   }
 
-  const generation = buildWellnessTips(userId).finally(() => {
-    generationControllers.delete(userId);
-  });
+  const generation = buildWellnessTips(userId)
+    .catch((error) => {
+      console.error("Failed to generate wellness tips", error);
+      const tips = fallbackWellnessTips(memories);
+      cache.set(userId, {
+        contextHash,
+        tips,
+        expiresAt: Date.now() + WELLNESS_CACHE_TTL_MS
+      });
+      return tips;
+    })
+    .finally(() => {
+      generationControllers.delete(userId);
+    });
   generationControllers.set(userId, generation);
 
-  try {
-    return { tips: await generation };
-  } catch (error) {
-    console.error("Failed to generate wellness tips", error);
-    throw status(503, {
-      message: "We could not generate wellness tips right now."
-    });
-  }
+  return { tips: await generation };
 }

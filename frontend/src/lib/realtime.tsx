@@ -38,7 +38,23 @@ type ChatMessageEvent = {
   };
 };
 
-type RealtimeServerEvent = PresenceSnapshotEvent | PresenceEvent | PingEvent | PingResultEvent | ChatMessageEvent;
+type FriendRequestEvent = {
+  type: 'friend_request';
+  requestId: string;
+  fromUserId: string;
+  fromUsername: string;
+  fromAvatarUrl: string | null;
+};
+
+type FriendAcceptedEvent = {
+  type: 'friend_accepted';
+  friendId: string;
+  friendUsername: string;
+  friendAvatarUrl: string | null;
+  online: boolean;
+};
+
+type RealtimeServerEvent = PresenceSnapshotEvent | PresenceEvent | PingEvent | PingResultEvent | ChatMessageEvent | FriendRequestEvent | FriendAcceptedEvent;
 
 type RealtimeContextValue = {
   connected: boolean;
@@ -88,6 +104,34 @@ function parseRealtimeEvent(raw: string): RealtimeServerEvent | null {
           content: parsed.message.content,
           createdAt: parsed.message.createdAt,
         },
+      };
+    }
+    if (
+      parsed?.type === 'friend_request' &&
+      typeof parsed.requestId === 'string' &&
+      typeof parsed.fromUserId === 'string' &&
+      typeof parsed.fromUsername === 'string'
+    ) {
+      return {
+        type: 'friend_request',
+        requestId: parsed.requestId,
+        fromUserId: parsed.fromUserId,
+        fromUsername: parsed.fromUsername,
+        fromAvatarUrl: typeof parsed.fromAvatarUrl === 'string' ? parsed.fromAvatarUrl : null,
+      };
+    }
+    if (
+      parsed?.type === 'friend_accepted' &&
+      typeof parsed.friendId === 'string' &&
+      typeof parsed.friendUsername === 'string' &&
+      typeof parsed.online === 'boolean'
+    ) {
+      return {
+        type: 'friend_accepted',
+        friendId: parsed.friendId,
+        friendUsername: parsed.friendUsername,
+        friendAvatarUrl: typeof parsed.friendAvatarUrl === 'string' ? parsed.friendAvatarUrl : null,
+        online: parsed.online,
       };
     }
   } catch {
@@ -176,6 +220,12 @@ export function RealtimeProvider({ enabled, children }: { enabled: boolean; chil
             break;
           case 'chat_message':
             window.dispatchEvent(new CustomEvent('capsul:chat-message', { detail: message }));
+            break;
+          case 'friend_request':
+            window.dispatchEvent(new CustomEvent('capsul:friend-request', { detail: message }));
+            break;
+          case 'friend_accepted':
+            window.dispatchEvent(new CustomEvent('capsul:friend-accepted', { detail: message }));
             break;
         }
       };

@@ -4,7 +4,6 @@ import { TreeVisual } from '../../components/TreeVisual/TreeVisual';
 import type { TreeData, Achievement } from './tree.types';
 import type { MemoryStats } from '../memories/memories.types';
 import { api } from '../../lib/api';
-import { getFormattedDate } from '../../lib/date';
 
 const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: 'first_memory', emoji: '🌱', title: 'First Memory', description: 'Create your first memory', unlocked: false },
@@ -98,21 +97,6 @@ export function TreePage() {
       <div className="text-center">
         <h1 className="text-4xl font-black text-darkgrey">My Tree</h1>
         <p className="text-mediumgrey mt-1 text-sm">Watch it grow with your daily presence</p>
-      </div>
-
-      <div className="bg-purple/40 rounded-3xl px-6 py-5 flex flex-col gap-2 text-center">
-        <p className="text-xs font-bold text-darkgrey/60 tracking-widest uppercase">Current Stage</p>
-        <p className="text-xl font-black text-darkgrey">{tree.stageLabel}</p>
-        <p className="text-sm text-darkgrey/70">
-          {tree.isDecreasing
-            ? 'Your tree is losing momentum until you write again.'
-            : 'Your tree is stable and fed by your recent memories.'}
-        </p>
-        <p className="text-xs text-darkgrey/55">
-          {tree.lastMemoryDate
-            ? `Last memory: ${getFormattedDate(tree.lastMemoryDate, { format: 'long', uppercase: false })}`
-            : 'No memories yet'}
-        </p>
       </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm">

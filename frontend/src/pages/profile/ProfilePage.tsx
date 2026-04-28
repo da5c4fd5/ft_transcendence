@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Copy, CheckCheck, Download, Mail } from 'lucide-preact';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
+import { useLocation } from 'wouter';
+import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Download, MessageCircle, Send, ChevronRight } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
@@ -7,6 +8,7 @@ import { formatSessionDateTime } from '../../lib/date';
 import { api, getApiErrorMessage, validateImageFile } from '../../lib/api';
 import type { ApiError } from '../../lib/api';
 import { useRealtime } from '../../lib/realtime';
+import type { ChatMessage } from '../chat/chat.types';
 
 const cardBase   = 'bg-white rounded-3xl p-6 flex flex-col gap-4 shadow-sm';
 const inputBase  = 'w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey';
@@ -59,6 +61,15 @@ function AvatarDisplay({ avatarUrl, className }: { avatarUrl: string | null; cla
   );
 }
 
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 px-1">
+      <span className="text-xs font-bold text-mediumgrey uppercase tracking-widest">{label}</span>
+      <div className="flex-1 h-px bg-black/10" />
+    </div>
+  );
+}
+
 function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogout: () => void; onUserUpdate: (u: UserType) => void }) {
   const [isEditing, setIsEditing]       = useState(false);
   const [editUsername, setEditUsername] = useState(user.username);
@@ -70,6 +81,12 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
   const [error, setError]               = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [verifyCode, setVerifyCode]             = useState('');
+  const [verifyError, setVerifyError]           = useState<string | null>(null);
+  const [verifyMessage, setVerifyMessage]       = useState<string | null>(null);
+  const [verifyResending, setVerifyResending]   = useState(false);
+  const [verifyConfirming, setVerifyConfirming] = useState(false);
 
   const emailChanged    = editEmail !== user.email;
   const usernameChanged = editUsername !== user.username;
@@ -102,19 +119,13 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
     setSaving(true);
     setError(null);
     try {
-      if (usernameChanged) {
-        await api.patch('/users/me', { username: editUsername });
-      }
-      if (emailChanged) {
-        await api.patch('/users/me/email', { email: editEmail, password: currentPw });
-      }
+      if (usernameChanged) await api.patch('/users/me', { username: editUsername });
+      if (emailChanged)    await api.patch('/users/me/email', { email: editEmail, password: currentPw });
       if (avatarFile) {
         const form = new FormData();
         form.append('file', avatarFile);
         setAvatarUploadProgress(0);
-        await api.upload('/users/me/avatar', form, {
-          onProgress: setAvatarUploadProgress,
-        });
+        await api.upload('/users/me/avatar', form, { onProgress: setAvatarUploadProgress });
         setAvatarUploadProgress(100);
       }
       const updated = await api.get<UserType>('/users/me');
@@ -140,6 +151,37 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
     setAvatarFile(null);
     setAvatarUploadProgress(null);
     setError(null);
+  };
+
+  const handleResendCode = async () => {
+    setVerifyResending(true);
+    setVerifyError(null);
+    setVerifyMessage(null);
+    try {
+      const result = await api.post<{ message: string }>('/users/me/email/verify/resend');
+      setVerifyMessage(result.message);
+    } catch (err) {
+      setVerifyError(getApiErrorMessage(err, 'Failed to send verification code.'));
+    } finally {
+      setVerifyResending(false);
+    }
+  };
+
+  const handleVerifyEmail = async (e: Event) => {
+    e.preventDefault();
+    if (verifyCode.trim().length !== 6) { setVerifyError('Enter the 6-digit code.'); return; }
+    setVerifyConfirming(true);
+    setVerifyError(null);
+    setVerifyMessage(null);
+    try {
+      const updated = await api.post<UserType>('/users/me/email/verify', { code: verifyCode.trim() });
+      onUserUpdate(updated);
+      setVerifyCode('');
+    } catch (err) {
+      setVerifyError(getApiErrorMessage(err, 'Failed to verify email.'));
+    } finally {
+      setVerifyConfirming(false);
+    }
   };
 
   if (isEditing) {
@@ -174,7 +216,6 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
             onInput={(e) => setEditEmail((e.target as HTMLInputElement).value)}
             className={cn(inputBase, 'placeholder:text-mediumgrey')}
           />
-
           {emailChanged && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 bg-verylightpink/30 rounded-2xl px-4 py-3">
@@ -190,7 +231,6 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
               />
             </div>
           )}
-
           {avatarUploadProgress !== null && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between text-xs font-bold text-darkgrey px-1">
@@ -205,7 +245,6 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
               </div>
             </div>
           )}
-
           {error && <p className="text-xs text-pink px-1">{error}</p>}
         </div>
 
@@ -242,18 +281,50 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
         <h2 className="text-xl font-black text-darkgrey">{user.username}</h2>
         <p className="text-sm text-mediumgrey mt-0.5">{user.email}</p>
         <div className="mt-2 flex justify-center">
-          <span
-            className={cn(
-              'text-[11px] font-bold rounded-full px-3 py-1',
-              user.emailVerified
-                ? 'bg-blue/15 text-blue'
-                : 'bg-orange/20 text-darkgrey',
-            )}
-          >
+          <span className={cn(
+            'text-[11px] font-bold rounded-full px-3 py-1',
+            user.emailVerified ? 'bg-yellow text-darkgrey' : 'bg-orange/20 text-darkgrey',
+          )}>
             {user.emailVerified ? 'Email verified' : 'Email not verified'}
           </span>
         </div>
       </div>
+
+      {!user.emailVerified && (
+        <form onSubmit={handleVerifyEmail} className="w-full flex flex-col gap-2 border-t border-black/8 pt-4">
+          <p className="text-xs text-mediumgrey text-center leading-relaxed">
+            Enter the 6-digit code sent to <span className="font-semibold text-darkgrey">{user.email}</span>
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            value={verifyCode}
+            onInput={(e) => { setVerifyCode((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6)); setVerifyError(null); }}
+            placeholder="000000"
+            className={cn(inputBase, 'tracking-[0.4em] text-center font-mono placeholder:tracking-normal placeholder:text-mediumgrey')}
+          />
+          {verifyMessage && <p className="text-xs text-darkgrey px-1">{verifyMessage}</p>}
+          {verifyError && <p className="text-xs text-pink px-1">{verifyError}</p>}
+          <div className="flex gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={verifyResending}
+              className="flex-1 py-2.5 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors disabled:opacity-50"
+            >
+              {verifyResending ? 'Sending…' : 'Resend code'}
+            </button>
+            <button
+              type="submit"
+              disabled={verifyConfirming || verifyCode.trim().length !== 6}
+              className="flex-1 py-2.5 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
+            >
+              {verifyConfirming ? 'Verifying…' : 'Verify email'}
+            </button>
+          </div>
+        </form>
+      )}
 
       <button
         type="button"
@@ -270,281 +341,23 @@ function ProfileCard({ user, onLogout, onUserUpdate }: { user: UserType; onLogou
   );
 }
 
-function EmailVerificationCard({ user, onUserUpdate }: { user: UserType; onUserUpdate: (u: UserType) => void }) {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-
-  const handleResend = async () => {
-    setSending(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await api.post<{ message: string }>('/users/me/email/verify/resend');
-      setMessage(result.message);
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to send a verification code.'));
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleVerify = async (e: Event) => {
-    e.preventDefault();
-    if (code.trim().length !== 6) {
-      setError('Enter the 6-digit code.');
-      return;
-    }
-    setVerifying(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const updated = await api.post<UserType>('/users/me/email/verify', { code: code.trim() });
-      onUserUpdate(updated);
-      setCode('');
-      setMessage('Email verified successfully.');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to verify the email.'));
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  if (user.emailVerified) {
-    return (
-      <div className={cn(cardBase, 'border border-blue/20 bg-blue/5')}>
-        <div className="flex items-center gap-2">
-          <Mail size={18} className="text-blue" />
-          <h2 className="text-lg font-black text-darkgrey">Email Verification</h2>
-        </div>
-        <div className="flex items-center gap-2 bg-blue/10 rounded-2xl px-4 py-3">
-          <CheckCheck size={15} className="text-blue shrink-0" />
-          <p className="text-sm text-blue font-medium">Your email address is verified.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cardBase}>
-      <div className="flex items-center gap-2">
-        <Mail size={18} className="text-pink" />
-        <h2 className="text-lg font-black text-darkgrey">Email Verification</h2>
-      </div>
-
-      <p className="text-sm text-mediumgrey leading-relaxed">
-        Verify <span className="font-semibold text-darkgrey">{user.email}</span> with the 6-digit code sent to your inbox.
-      </p>
-
-      <form onSubmit={handleVerify} className="flex flex-col gap-3">
-        <input
-          type="text"
-          inputMode="numeric"
-          maxLength={6}
-          value={code}
-          onInput={(e) => {
-            setCode((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6));
-            setError(null);
-          }}
-          placeholder="000000"
-          className={cn(inputBase, 'tracking-[0.4em] text-center font-mono placeholder:tracking-normal placeholder:text-mediumgrey')}
-        />
-
-        {message && <p className="text-xs text-blue px-1">{message}</p>}
-        {error && <p className="text-xs text-pink px-1">{error}</p>}
-
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={handleResend}
-            disabled={sending}
-            className="flex-1 py-3 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors disabled:opacity-50"
-          >
-            {sending ? 'Generating…' : 'Resend code'}
-          </button>
-          <button
-            type="submit"
-            disabled={verifying || code.trim().length !== 6}
-            className="flex-1 py-3 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
-          >
-            {verifying ? 'Verifying…' : 'Verify email'}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function PublicApiKeyCard({ user, onUserUpdate }: { user: UserType; onUserUpdate: (u: UserType) => void }) {
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [issuing, setIssuing] = useState(false);
-  const [revoking, setRevoking] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [revealedKey, setRevealedKey] = useState<string | null>(null);
-
-  const refreshUser = async () => {
-    const updated = await api.get<UserType>('/users/me');
-    onUserUpdate(updated);
-  };
-
-  const handleGenerate = async () => {
-    setIssuing(true);
-    setError(null);
-    setMessage(null);
-    setCopied(false);
-    try {
-      const issued = await api.post<IssuedPublicApiKey>('/users/me/public-api-key');
-      setRevealedKey(issued.key);
-      setMessage('New API key generated. Copy it now: it will not be shown again.');
-      await refreshUser();
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to generate the API key.'));
-    } finally {
-      setIssuing(false);
-    }
-  };
-
-  const handleRevoke = async () => {
-    setRevoking(true);
-    setError(null);
-    setMessage(null);
-    setCopied(false);
-    try {
-      await api.delete('/users/me/public-api-key');
-      setRevealedKey(null);
-      setMessage('API key revoked.');
-      await refreshUser();
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to revoke the API key.'));
-    } finally {
-      setRevoking(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!revealedKey) return;
-    try {
-      await navigator.clipboard.writeText(revealedKey);
-      setCopied(true);
-    } catch {
-      setError('Failed to copy the API key.');
-    }
-  };
-
-  const publicApiBase = `${window.location.origin}/api/public-api`;
-  const canIssuePublicApiKey = user.emailVerified;
-
-  return (
-    <div className={cardBase}>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-darkgrey">Public API</h2>
-          <p className="text-sm text-mediumgrey mt-1 leading-relaxed">
-            Generate an API key to access the documented rate-limited public API.
-          </p>
-        </div>
-        <div className={cn(
-          'px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase',
-          user.publicApi.enabled ? 'bg-blue/15 text-blue' : 'bg-lightgrey text-mediumgrey'
-        )}>
-          {user.publicApi.enabled ? 'Active' : 'Disabled'}
-        </div>
-      </div>
-
-      <div className="bg-verylightorange rounded-2xl px-4 py-3 flex flex-col gap-1">
-        <p className="text-xs font-bold tracking-widest text-mediumgrey uppercase">Current key</p>
-        <p className="text-sm font-semibold text-darkgrey">
-          {user.publicApi.preview ?? 'No API key generated yet'}
-        </p>
-        {user.publicApi.createdAt && (
-          <p className="text-xs text-mediumgrey">
-            Generated {new Date(user.publicApi.createdAt).toLocaleString()}
-          </p>
-        )}
-      </div>
-
-      {!canIssuePublicApiKey && (
-        <p className="text-sm text-mediumgrey leading-relaxed">
-          Verify your email before generating a public API key.
-        </p>
-      )}
-
-      {revealedKey && (
-        <div className="rounded-2xl border border-blue/20 bg-blue/5 px-4 py-3 flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold tracking-widest text-blue uppercase">Copy this key now</p>
-              <p className="text-xs text-mediumgrey mt-1">For security reasons it is only shown once.</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className={ghostBtn}
-            >
-              {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <code className="block rounded-2xl bg-white px-4 py-3 text-xs font-mono text-darkgrey break-all border border-blue/10">
-            {revealedKey}
-          </code>
-        </div>
-      )}
-
-      <div className="rounded-2xl bg-lightgrey/30 px-4 py-3 flex flex-col gap-2">
-        <p className="text-xs font-bold tracking-widest text-mediumgrey uppercase">Example</p>
-        <code className="text-xs font-mono text-darkgrey break-all">
-          {`curl -H "X-API-Key: ${revealedKey ?? 'YOUR_API_KEY'}" ${publicApiBase}/memories`}
-        </code>
-        <a
-          href="/api/docs"
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs font-semibold text-blue hover:underline"
-        >
-          Open API documentation
-        </a>
-      </div>
-
-      {message && <p className="text-xs text-blue px-1">{message}</p>}
-      {error && <p className="text-xs text-pink px-1">{error}</p>}
-
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={issuing || !canIssuePublicApiKey}
-          className="flex-1 py-3 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
-        >
-          {issuing ? 'Generating…' : user.publicApi.enabled ? 'Rotate API key' : 'Generate API key'}
-        </button>
-        <button
-          type="button"
-          onClick={handleRevoke}
-          disabled={revoking || !user.publicApi.enabled}
-          className="flex-1 py-3 rounded-full border border-black/10 text-sm font-semibold text-darkgrey hover:bg-lightgrey/50 transition-colors disabled:opacity-50"
-        >
-          {revoking ? 'Revoking…' : 'Revoke'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-type RawFriendUser = { id: string; username: string; avatarUrl: string | null };
+type RawFriendUser     = { id: string; username: string; avatarUrl: string | null };
 type RawFriendListUser = RawFriendUser & { online: boolean };
-type RawFriend = { id: string; requesterId: string; recipientId: string; requester: RawFriendListUser; recipient: RawFriendListUser };
+type RawFriend         = { id: string; requesterId: string; recipientId: string; requester: RawFriendListUser; recipient: RawFriendListUser };
+type RawRequest        = { id: string; requesterId: string; requester: RawFriendUser };
+type RawSentRequest    = { id: string; recipientId: string; recipient: RawFriendUser };
 
-type RawRequest = { id: string; requesterId: string; requester: RawFriendUser };
-type IssuedPublicApiKey = { key: string; preview: string; createdAt: string };
+const MAX_CHAT_CHARS = 500;
+
+function formatChatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 function FriendsCard({ userId }: { userId: string }) {
   const { onlineUserIds, presenceReady, sendPing } = useRealtime();
   const [friends, setFriends]           = useState<Friend[]>([]);
   const [requests, setRequests]         = useState<RawRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<RawSentRequest[]>([]);
   const [input, setInput]               = useState('');
   const [addError, setAddError]         = useState<string | null>(null);
   const [adding, setAdding]             = useState(false);
@@ -556,20 +369,31 @@ function FriendsCard({ userId }: { userId: string }) {
   const [selectedId, setSelectedId]     = useState<string | null>(null);
   const [respondingId, setRespondingId] = useState<string | null>(null);
 
+  const [chatFriendId, setChatFriendId] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatDraft, setChatDraft]       = useState('');
+  const [chatLoading, setChatLoading]   = useState(false);
+  const [chatSending, setChatSending]   = useState(false);
+  const [chatError, setChatError]       = useState<string | null>(null);
+
+  const chatFriend = useMemo(() => friends.find(f => f.id === chatFriendId) ?? null, [friends, chatFriendId]);
+
   const timersRef    = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const refreshFriends = useCallback(async () => {
-    const [raw, reqs] = await Promise.all([
+    const [raw, reqs, sent] = await Promise.all([
       api.get<RawFriend[]>('/friends'),
       api.get<RawRequest[]>('/friends/requests'),
+      api.get<RawSentRequest[]>('/friends/sent'),
     ]);
     setFriends(raw.map(f => {
       const other = f.requesterId === userId ? f.recipient : f.requester;
       return { id: other.id, username: other.username, avatarUrl: other.avatarUrl, online: other.online };
     }));
     setRequests(reqs);
+    setSentRequests(sent);
   }, [userId]);
 
   useEffect(() => {
@@ -589,47 +413,77 @@ function FriendsCard({ userId }: { userId: string }) {
     const handlePingResult = (event: Event) => {
       const detail = (event as CustomEvent<{ userId: string; delivered: boolean }>).detail;
       if (!detail?.userId) return;
-
-      setPendingPingIds(prev => {
-        const next = new Set(prev);
-        next.delete(detail.userId);
-        return next;
-      });
-
+      setPendingPingIds(prev => { const next = new Set(prev); next.delete(detail.userId); return next; });
       if (detail.delivered) {
         setPingedIds(prev => new Set(prev).add(detail.userId));
         const timer = setTimeout(() => {
-          setPingedIds(prev => {
-            const next = new Set(prev);
-            next.delete(detail.userId);
-            return next;
-          });
+          setPingedIds(prev => { const next = new Set(prev); next.delete(detail.userId); return next; });
           timersRef.current.delete(detail.userId);
         }, 3000);
-        const previousTimer = timersRef.current.get(detail.userId);
-        if (previousTimer) clearTimeout(previousTimer);
+        const prev = timersRef.current.get(detail.userId);
+        if (prev) clearTimeout(prev);
         timersRef.current.set(detail.userId, timer);
         return;
       }
-
-      setFriends(prev => prev.map(friend =>
-        friend.id === detail.userId ? { ...friend, online: false } : friend
-      ));
+      setFriends(prev => prev.map(f => f.id === detail.userId ? { ...f, online: false } : f));
     };
-
     window.addEventListener('capsul:ping-result', handlePingResult as EventListener);
     return () => window.removeEventListener('capsul:ping-result', handlePingResult as EventListener);
   }, []);
 
-  // Close dropdown on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
+    if (!chatFriendId) { setChatMessages([]); return; }
+    setChatLoading(true);
+    api.get<ChatMessage[]>(`/chat/${chatFriendId}/messages?limit=50`)
+      .then(msgs => { setChatMessages(msgs); setChatError(null); })
+      .catch(err => { setChatMessages([]); setChatError(getApiErrorMessage(err, 'Failed to load messages.')); })
+      .finally(() => setChatLoading(false));
+  }, [chatFriendId]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ type: 'chat_message'; message: ChatMessage }>).detail;
+      const message = detail?.message;
+      if (!message) return;
+      const friendId = message.senderId === userId ? message.recipientId : message.senderId;
+      if (chatFriendId === friendId) {
+        setChatMessages(prev => prev.some(m => m.id === message.id) ? prev : [...prev, message]);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    window.addEventListener('capsul:chat-message', handler as EventListener);
+    return () => window.removeEventListener('capsul:chat-message', handler as EventListener);
+  }, [userId, chatFriendId]);
+
+  // Incoming friend request (someone added us)
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ requestId: string; fromUserId: string; fromUsername: string; fromAvatarUrl: string | null }>).detail;
+      if (!detail?.fromUserId) return;
+      setRequests(prev => {
+        if (prev.some(r => r.requesterId === detail.fromUserId)) return prev;
+        return [
+          { id: detail.requestId, requesterId: detail.fromUserId, requester: { id: detail.fromUserId, username: detail.fromUsername, avatarUrl: detail.fromAvatarUrl } },
+          ...prev,
+        ];
+      });
+    };
+    window.addEventListener('capsul:friend-request', handler as EventListener);
+    return () => window.removeEventListener('capsul:friend-request', handler as EventListener);
+  }, []);
+
+  // Our sent request was accepted
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ friendId: string; friendUsername: string; friendAvatarUrl: string | null; online: boolean }>).detail;
+      if (!detail?.friendId) return;
+      setSentRequests(prev => prev.filter(r => r.recipientId !== detail.friendId));
+      setFriends(prev => {
+        if (prev.some(f => f.id === detail.friendId)) return prev;
+        return [...prev, { id: detail.friendId, username: detail.friendUsername, avatarUrl: detail.friendAvatarUrl, online: detail.online }];
+      });
+    };
+    window.addEventListener('capsul:friend-accepted', handler as EventListener);
+    return () => window.removeEventListener('capsul:friend-accepted', handler as EventListener);
   }, []);
 
   const searchUsers = (q: string) => {
@@ -638,7 +492,6 @@ function FriendsCard({ userId }: { userId: string }) {
     debounceRef.current = setTimeout(async () => {
       try {
         const results = await api.get<RawFriendUser[]>('/users/search', { q });
-        // Filter out already-friends and self
         const friendIds = new Set(friends.map(f => f.id));
         const filtered  = results.filter(r => r.id !== userId && !friendIds.has(r.id));
         setSuggestions(filtered);
@@ -668,7 +521,6 @@ function FriendsCard({ userId }: { userId: string }) {
   };
 
   const handleAdd = async () => {
-    // Keyboard: user highlighted a suggestion with arrow keys
     if (highlighted >= 0 && suggestions[highlighted]) {
       const s = suggestions[highlighted];
       setInput(s.username);
@@ -686,7 +538,6 @@ function FriendsCard({ userId }: { userId: string }) {
     setSuggestions([]);
     setShowDropdown(false);
     try {
-      // If user selected from dropdown, use that ID directly
       const targetId = selectedId;
       if (targetId) {
         await api.put(`/friends/${targetId}`);
@@ -728,7 +579,7 @@ function FriendsCard({ userId }: { userId: string }) {
   const handleAccept = async (requesterId: string) => {
     setRespondingId(requesterId);
     try {
-      await api.put(`/friends/${requesterId}`); // auto-accepts since they sent it
+      await api.put(`/friends/${requesterId}`);
       await refreshFriends();
     } catch { /* ignore */ } finally {
       setRespondingId(null);
@@ -745,10 +596,33 @@ function FriendsCard({ userId }: { userId: string }) {
     }
   };
 
+  const handleCancelRequest = async (targetId: string) => {
+    try {
+      await api.delete(`/friends/${targetId}`);
+      await refreshFriends();
+    } catch { /* ignore */ }
+  };
+
   const handlePing = async (id: string) => {
     if (pingedIds.has(id) || pendingPingIds.has(id)) return;
     if (!sendPing(id)) return;
     setPendingPingIds(prev => new Set(prev).add(id));
+  };
+
+  const handleSendChat = async (e: Event) => {
+    e.preventDefault();
+    if (!chatFriendId || !chatDraft.trim()) return;
+    setChatSending(true);
+    setChatError(null);
+    try {
+      const message = await api.post<ChatMessage>(`/chat/${chatFriendId}/messages`, { content: chatDraft.trim() });
+      setChatMessages((prev: ChatMessage[]) => prev.some(m => m.id === message.id) ? prev : [...prev, message]);
+      setChatDraft('');
+    } catch (err) {
+      setChatError(getApiErrorMessage(err, 'Failed to send the message.'));
+    } finally {
+      setChatSending(false);
+    }
   };
 
   return (
@@ -866,11 +740,42 @@ function FriendsCard({ userId }: { userId: string }) {
         </div>
       )}
 
+      {sentRequests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-bold text-mediumgrey uppercase tracking-wide px-1">
+            Requests sent · {sentRequests.length}
+          </p>
+          {sentRequests.map(r => (
+            <div key={r.id} className="flex items-center gap-3 p-3 rounded-2xl bg-lightgrey/20 border border-black/5">
+              {r.recipient.avatarUrl ? (
+                <img src={r.recipient.avatarUrl} alt={r.recipient.username} className={avatarBase} />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-yellow/60 flex items-center justify-center shrink-0">
+                  <User size={18} className="text-darkgrey" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-darkgrey truncate">{r.recipient.username}</p>
+                <p className="text-xs text-mediumgrey mt-0.5">Pending</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCancelRequest(r.recipient.id)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-lightgrey text-darkgrey hover:bg-mediumgrey/30 transition-colors shrink-0"
+                title="Cancel request"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {friends.map(f => {
-          const pinged = pingedIds.has(f.id);
+          const pinged      = pingedIds.has(f.id);
           const pingPending = pendingPingIds.has(f.id);
-          const pingLabel = !f.online ? `${f.username} is offline` : pinged ? 'Ping sent!' : pingPending ? 'Sending ping...' : 'Remind to create a memory';
+          const pingLabel   = !f.online ? `${f.username} is offline` : pinged ? 'Ping sent!' : pingPending ? 'Sending ping...' : 'Remind to create a memory';
           return (
             <div key={f.id} className="flex items-center gap-3 p-3 rounded-2xl border border-black/5">
               {f.avatarUrl ? (
@@ -883,36 +788,121 @@ function FriendsCard({ userId }: { userId: string }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-darkgrey">{f.username}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className={cn('w-2 h-2 rounded-full shrink-0', f.online ? 'bg-blue' : 'bg-mediumgrey')} />
-                  <span className={cn('text-xs font-medium', f.online ? 'text-blue' : 'text-mediumgrey')}>
+                  <span className={cn('w-2 h-2 rounded-full shrink-0', f.online ? 'bg-yellow border border-yellow/60' : 'bg-mediumgrey')} />
+                  <span className={cn('text-xs font-medium', f.online ? 'text-darkgrey' : 'text-mediumgrey')}>
                     {f.online ? 'Online' : 'Offline'}
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => handlePing(f.id)}
-                disabled={!f.online || pinged || pingPending}
-                aria-label={pingLabel}
-                title={pingLabel}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0',
-                  pinged
-                    ? 'bg-blue/20 text-blue cursor-default'
-                    : pingPending
-                      ? 'bg-yellow/30 text-darkgrey cursor-progress'
-                    : f.online
-                      ? 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey'
-                      : 'bg-verylightorange text-mediumgrey/40 cursor-not-allowed',
-                )}
-              >
-                {pinged ? <BellRing size={13} /> : <Bell size={13} />}
-                {pinged ? 'Pinged!' : pingPending ? 'Sending...' : 'Ping'}
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handlePing(f.id)}
+                  disabled={!f.online || pinged || pingPending}
+                  aria-label={pingLabel}
+                  title={pingLabel}
+                  className={cn(
+                    'w-8 h-8 flex items-center justify-center rounded-full transition-all',
+                    pinged
+                      ? 'bg-yellow/40 text-darkgrey cursor-default'
+                      : pingPending
+                        ? 'bg-yellow/30 text-darkgrey cursor-progress'
+                      : f.online
+                        ? 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey'
+                        : 'bg-verylightorange text-mediumgrey/40 cursor-not-allowed',
+                  )}
+                >
+                  {pinged ? <BellRing size={14} /> : <Bell size={14} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatFriendId((prev: string | null) => prev === f.id ? null : f.id)}
+                  aria-label={`Chat with ${f.username}`}
+                  title={`Chat with ${f.username}`}
+                  className={cn(
+                    'w-8 h-8 flex items-center justify-center rounded-full transition-all',
+                    chatFriendId === f.id
+                      ? 'bg-yellow text-darkgrey'
+                      : 'bg-verylightorange text-mediumgrey hover:bg-yellow/40 hover:text-darkgrey',
+                  )}
+                >
+                  <MessageCircle size={14} />
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {chatFriend && (
+        <div className="rounded-2xl border border-black/8 overflow-hidden flex flex-col relative">
+          <button
+            type="button"
+            onClick={() => setChatFriendId(null)}
+            className="absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center rounded-full text-mediumgrey hover:bg-lightgrey/60 hover:text-darkgrey transition-colors"
+            aria-label="Close chat"
+          >
+            <X size={12} />
+          </button>
+
+          <div className="overflow-y-auto flex flex-col gap-2.5 p-3 bg-verylightorange/20 cursor-default select-none" style={{ minHeight: '160px', maxHeight: '260px' }}>
+            {chatLoading ? (
+              <div className="flex items-center justify-center h-full text-xs text-mediumgrey py-8">Loading…</div>
+            ) : chatMessages.length === 0 ? (
+              <div className="flex items-center justify-center text-xs text-mediumgrey text-center px-4 py-8">
+                Start the conversation with {chatFriend.username}.
+              </div>
+            ) : (
+              chatMessages.map((message: ChatMessage) => {
+                const own = message.senderId === userId;
+                return (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      'max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm select-text cursor-text',
+                      own
+                        ? 'self-end bg-yellow text-darkgrey rounded-br-sm'
+                        : 'self-start bg-white text-darkgrey rounded-bl-sm',
+                    )}
+                  >
+                    <p className="leading-relaxed whitespace-pre-wrap wrap-break-word">{message.content}</p>
+                    <p className={cn('text-[10px] mt-1 select-none cursor-default', own ? 'text-darkgrey/60' : 'text-mediumgrey')}>
+                      {formatChatTime(message.createdAt)}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <form onSubmit={handleSendChat} className="p-3 border-t border-black/5 flex gap-2 items-end cursor-default select-none">
+            <textarea
+              value={chatDraft}
+              onInput={(e: Event) => {
+                const ta = e.target as HTMLTextAreaElement;
+                ta.style.height = 'auto';
+                ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
+                setChatDraft(ta.value);
+                setChatError(null);
+              }}
+              maxLength={MAX_CHAT_CHARS}
+              rows={1}
+              placeholder={`Message ${chatFriend.username}…`}
+              style={{ minHeight: '36px' }}
+              className="flex-1 bg-verylightorange rounded-2xl px-3 py-2 outline-none text-sm text-darkgrey placeholder:text-mediumgrey resize-none border-2 border-transparent focus:border-yellow transition-colors overflow-hidden"
+            />
+            <button
+              type="submit"
+              disabled={chatSending || !chatDraft.trim()}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-darkgrey text-white disabled:opacity-40 transition-opacity shrink-0 mb-0.5"
+              aria-label="Send message"
+            >
+              <Send size={14} />
+            </button>
+          </form>
+          {chatError && <p className="text-xs text-pink px-3 pb-2">{chatError}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -939,9 +929,7 @@ function SessionsCard() {
       await api.delete(`/auth/sessions/${id}`);
       setList(prev => prev.filter(s => s.id !== id));
       setConfirmId(null);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   };
 
   return (
@@ -950,7 +938,6 @@ function SessionsCard() {
         <ShieldOff size={18} className="text-pink" />
         <h2 className="text-lg font-black text-darkgrey">Active Sessions</h2>
       </div>
-
       <div className="flex flex-col gap-2">
         {list.map(s => (
           <div
@@ -1026,14 +1013,8 @@ function PasswordCard() {
   };
 
   const handleChange = async () => {
-    if (pwNew !== pwConfirm) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (pwNew.length < 8) {
-      setError('New password must be at least 8 characters.');
-      return;
-    }
+    if (pwNew !== pwConfirm) { setError('Passwords do not match.'); return; }
+    if (pwNew.length < 8)    { setError('New password must be at least 8 characters.'); return; }
     setError(null);
     setSaving(true);
     try {
@@ -1062,14 +1043,10 @@ function PasswordCard() {
           {isOpen ? <><X size={12} /> Cancel</> : <><Pencil size={12} /> Change Password</>}
         </button>
       </div>
-
       {isOpen && (
-        <form
-          onSubmit={(e) => { e.preventDefault(); handleChange(); }}
-          className="flex flex-col gap-3"
-        >
+        <form onSubmit={(e) => { e.preventDefault(); handleChange(); }} className="flex flex-col gap-3">
           {success && (
-            <p className="text-sm text-blue text-center py-1 font-semibold">Password updated successfully!</p>
+            <p className="text-sm text-darkgrey text-center py-1 font-semibold">Password updated successfully!</p>
           )}
           <PasswordInput placeholder="Current password" value={pwCurrent} onChange={(v) => { setPwCurrent(v); setError(null); }} />
           <PasswordInput placeholder="New password"     value={pwNew}     onChange={(v) => { setPwNew(v); setError(null); }} />
@@ -1091,14 +1068,14 @@ function PasswordCard() {
 type MfaStatus = 'idle' | 'loading-setup' | 'setup' | 'verifying' | 'active' | 'disabling' | 'loading-disable';
 
 function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
-  const [status, setStatus]         = useState<MfaStatus>(initialHasMfa ? 'active' : 'idle');
-  const [qrCode, setQrCode]         = useState<string | null>(null);
-  const [secret, setSecret]         = useState<string | null>(null);
-  const [totpCode, setTotpCode]     = useState('');
-  const [password, setPassword]     = useState('');
+  const [status, setStatus]           = useState<MfaStatus>(initialHasMfa ? 'active' : 'idle');
+  const [qrCode, setQrCode]           = useState<string | null>(null);
+  const [secret, setSecret]           = useState<string | null>(null);
+  const [totpCode, setTotpCode]       = useState('');
+  const [password, setPassword]       = useState('');
   const [disableCode, setDisableCode] = useState('');
-  const [error, setError]           = useState<string | null>(null);
-  const [copied, setCopied]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [copied, setCopied]           = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleStartSetup = async () => {
@@ -1134,8 +1111,8 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
 
   const handleDisable = async (e: Event) => {
     e.preventDefault();
-    if (!password.trim()) { setError('Please enter your password.'); return; }
-    if (disableCode.length < 6) { setError('Enter the 6-digit code from your app.'); return; }
+    if (!password.trim())      { setError('Please enter your password.'); return; }
+    if (disableCode.length < 6){ setError('Enter the 6-digit code from your app.'); return; }
     setError(null);
     setStatus('loading-disable');
     try {
@@ -1173,9 +1150,7 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
     <div className={cardBase}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {status === 'active'
-            ? <ShieldCheck size={18} className="text-pink" />
-            : <Shield size={18} className="text-pink" />}
+          {status === 'active' ? <ShieldCheck size={18} className="text-pink" /> : <Shield size={18} className="text-pink" />}
           <h2 className="text-lg font-black text-darkgrey">Two-Factor Authentication</h2>
         </div>
         {status === 'active' && (
@@ -1185,7 +1160,6 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
         )}
       </div>
 
-      {/* ─── Idle: MFA disabled ─── */}
       {(status === 'idle' || status === 'loading-setup') && (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-mediumgrey leading-relaxed">
@@ -1204,7 +1178,6 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
         </div>
       )}
 
-      {/* ─── Setup: scan QR + enter code ─── */}
       {(status === 'setup' || status === 'verifying') && qrCode && (
         <form onSubmit={handleVerify} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -1213,7 +1186,6 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
               <img src={qrCode} alt="MFA QR Code" className="w-36 h-36 rounded-2xl border border-black/5" />
             </div>
           </div>
-
           {secret && (
             <div className="flex flex-col gap-1">
               <p className="text-xs font-semibold text-mediumgrey">Or enter the secret manually:</p>
@@ -1225,19 +1197,18 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
                   aria-label="Copy secret"
                   className="text-mediumgrey hover:text-darkgrey transition-colors shrink-0"
                 >
-                  {copied ? <CheckCheck size={14} className="text-blue" /> : <Copy size={14} />}
+                  {copied
+                    ? <Check size={14} className="text-darkgrey" />
+                    : <Pencil size={14} />}
                 </button>
               </div>
             </div>
           )}
-
           <div className="flex flex-col gap-1">
             <p className="text-xs font-bold text-darkgrey">2. Enter the 6-digit code</p>
             {totpInput(totpCode, setTotpCode)}
           </div>
-
           {error && <p className="text-xs text-pink">{error}</p>}
-
           <div className="flex gap-3">
             <button
               type="button"
@@ -1257,7 +1228,6 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
         </form>
       )}
 
-      {/* ─── Active: MFA enabled ─── */}
       {status === 'active' && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 bg-verylightpink/40 rounded-2xl px-4 py-3">
@@ -1274,7 +1244,6 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
         </div>
       )}
 
-      {/* ─── Disabling: confirm with password + TOTP ─── */}
       {(status === 'disabling' || status === 'loading-disable') && (
         <form onSubmit={handleDisable} className="flex flex-col gap-3">
           <p className="text-sm text-mediumgrey">To disable 2FA, confirm your identity:</p>
@@ -1304,11 +1273,11 @@ function MfaCard({ initialHasMfa }: { initialHasMfa: boolean }) {
 }
 
 function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [password, setPassword] = useState('');
+  const [isOpen, setIsOpen]         = useState(false);
+  const [password, setPassword]     = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [deleting, setDeleting]     = useState(false);
 
   const handleClose = () => {
     if (deleting) return;
@@ -1320,31 +1289,19 @@ function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void 
 
   const handleDelete = async (e: Event) => {
     e.preventDefault();
-    if (!password.trim()) {
-      setError('Please enter your password.');
-      return;
-    }
-    if (confirmation !== DELETE_ACCOUNT_CONFIRMATION) {
-      setError('The confirmation phrase does not match.');
-      return;
-    }
-
+    if (!password.trim())                             { setError('Please enter your password.'); return; }
+    if (confirmation !== DELETE_ACCOUNT_CONFIRMATION) { setError('The confirmation phrase does not match.'); return; }
     setDeleting(true);
     setError(null);
     try {
-      await api.delete('/users/me', {
-        password,
-        confirmation,
-      });
+      await api.delete('/users/me', { password, confirmation });
       onAccountDeleted();
     } catch (err) {
       const apiErr = err as ApiError;
       setError(
-        apiErr.status === 401
-          ? 'Wrong password.'
-          : apiErr.status === 400
-            ? 'The confirmation phrase does not match.'
-            : (apiErr.message ?? 'Failed to delete account.')
+        apiErr.status === 401 ? 'Wrong password.'
+          : apiErr.status === 400 ? 'The confirmation phrase does not match.'
+          : (apiErr.message ?? 'Failed to delete account.')
       );
       setDeleting(false);
     }
@@ -1352,7 +1309,7 @@ function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void 
 
   return (
     <>
-      <div className={cn(cardBase, 'border border-pink/20 bg-verylightpink/20')}>
+      <div className={cardBase}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-2">
             <ShieldOff size={18} className="text-pink mt-0.5 shrink-0" />
@@ -1392,12 +1349,10 @@ function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void 
                 </p>
               </div>
             </div>
-
             <div className="bg-verylightpink/30 rounded-2xl px-4 py-3">
               <p className="text-xs font-bold text-pink uppercase tracking-wide">Required phrase</p>
               <p className="text-sm font-semibold text-darkgrey mt-1">{DELETE_ACCOUNT_CONFIRMATION}</p>
             </div>
-
             <div className="flex flex-col gap-3">
               <PasswordInput
                 placeholder="Current password"
@@ -1407,7 +1362,7 @@ function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void 
               <input
                 type="text"
                 autoComplete="off"
-                spellCheck={false}
+                spellcheck={false}
                 placeholder="Retype the exact phrase"
                 value={confirmation}
                 onInput={(e) => { setConfirmation((e.target as HTMLInputElement).value); setError(null); }}
@@ -1416,9 +1371,7 @@ function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void 
                 className={cn(inputBase, 'placeholder:text-mediumgrey')}
               />
             </div>
-
             {error && <p className="text-xs text-pink">{error}</p>}
-
             <div className="flex gap-3">
               <button
                 type="button"
@@ -1445,8 +1398,8 @@ function DeleteAccountCard({ onAccountDeleted }: { onAccountDeleted: () => void 
 
 function DataExportCard() {
   const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError]             = useState<string | null>(null);
+  const [message, setMessage]         = useState<string | null>(null);
 
   const handleExport = async () => {
     setDownloading(true);
@@ -1471,10 +1424,10 @@ function DataExportCard() {
   };
 
   return (
-    <div className={cn(cardBase, 'border border-blue/20 bg-blue/5')}>
+    <div className={cardBase}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-2">
-          <Download size={18} className="text-blue mt-0.5 shrink-0" />
+          <Download size={18} className="text-pink mt-0.5 shrink-0" />
           <div>
             <h2 className="text-lg font-black text-darkgrey">Data Export</h2>
             <p className="text-sm text-mediumgrey mt-1 leading-relaxed">
@@ -1486,29 +1439,27 @@ function DataExportCard() {
           type="button"
           onClick={handleExport}
           disabled={downloading}
-          className="shrink-0 px-4 py-2 rounded-full bg-blue text-white text-sm font-bold hover:bg-blue/80 transition-colors disabled:opacity-50"
+          className="shrink-0 px-4 py-2 rounded-full bg-yellow text-darkgrey text-sm font-bold hover:bg-yellow/80 transition-colors disabled:opacity-50"
         >
           {downloading ? 'Preparing…' : 'Download'}
         </button>
       </div>
-
       <p className="text-xs text-mediumgrey">
         Each export request also triggers a confirmation email for GDPR traceability.
       </p>
-
-      {message && <p className="text-xs text-blue">{message}</p>}
+      {message && <p className="text-xs text-darkgrey">{message}</p>}
       {error && <p className="text-xs text-pink">{error}</p>}
     </div>
   );
 }
 
 export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }: ProfilePageProps) {
+  const [, navigate] = useLocation();
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-12 flex flex-col gap-6">
 
       <ProfileCard user={user} onLogout={onLogout} onUserUpdate={onUserUpdate} />
-      <EmailVerificationCard user={user} onUserUpdate={onUserUpdate} />
-      <PublicApiKeyCard user={user} onUserUpdate={onUserUpdate} />
 
       {user.isAdmin && (
         <button
@@ -1526,12 +1477,26 @@ export function ProfilePage({ user, onLogout, onNavigateToAdmin, onUserUpdate }:
         </button>
       )}
 
+      <SectionHeader label="Social" />
       <FriendsCard userId={user.id} />
+
+      <SectionHeader label="Security" />
       <PasswordCard />
       <MfaCard initialHasMfa={user.hasMfa ?? false} />
       <SessionsCard />
+
+      <SectionHeader label="Account" />
       <DataExportCard />
       <DeleteAccountCard onAccountDeleted={onLogout} />
+
+      <button
+        type="button"
+        onClick={() => navigate('/developer')}
+        className="flex items-center justify-between px-5 py-3.5 rounded-2xl border border-black/8 text-sm text-mediumgrey hover:bg-lightgrey/20 hover:text-darkgrey transition-colors"
+      >
+        <span className="font-semibold">Developer settings</span>
+        <ChevronRight size={16} />
+      </button>
 
     </div>
   );

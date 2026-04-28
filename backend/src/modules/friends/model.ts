@@ -38,6 +38,16 @@ export const FriendsModel = {
       username: t.String(),
       avatarUrl: NullableString
     })
+  }),
+
+  friendSentRequestResponse: t.Object({
+    id: t.String(),
+    recipientId: t.String(),
+    recipient: t.Object({
+      id: t.String(),
+      username: t.String(),
+      avatarUrl: NullableString
+    })
   })
 } as const;
 

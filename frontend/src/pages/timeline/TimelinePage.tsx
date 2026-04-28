@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'preact/hooks';
-import { ChevronLeft, ChevronRight, Sparkles, Gamepad2, X } from 'lucide-preact';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
+import { ChevronLeft, ChevronRight, Sparkles, Gamepad2, X, Calendar, Trophy, Zap, Check } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import { Button } from '../../components/Button/Button';
 import { MemoryModal } from '../../components/MemoryModal/MemoryModal';
@@ -94,12 +94,13 @@ function daysBetweenDates(a: string, b: string) {
 
 function scoreGuess(guessedDate: string, actualDate: string): TimelineGameRoundResult {
   const daysOff = daysBetweenDates(guessedDate, actualDate);
-  return {
-    guessedDate,
-    actualDate,
-    daysOff,
-    score: Math.max(0, 1000 - daysOff * 2),
-  };
+  let score: number;
+  if (daysOff === 0) score = 1000;
+  else if (daysOff <= 7) score = 800;
+  else if (daysOff <= 30) score = 600;
+  else if (daysOff <= 90) score = 400;
+  else score = Math.max(0, 400 - Math.floor((daysOff - 90) / 3));
+  return { guessedDate, actualDate, daysOff, score };
 }
 
 function CalendarGrid({ summaries, year, onDayClick, onAddMemory }: {
@@ -274,6 +275,20 @@ function MoodBreakdown({ summaries }: { summaries: DaySummary[] }) {
   );
 }
 
+function getResultLabel(score: number) {
+  if (score >= 1000) return { emoji: '🎯', message: 'Perfect!' };
+  if (score >= 800) return { emoji: '🌟', message: 'So close!' };
+  if (score >= 600) return { emoji: '👍', message: 'Nice try!' };
+  if (score >= 400) return { emoji: '🤔', message: 'Keep trying!' };
+  return { emoji: '😅', message: 'Way off…' };
+}
+
+function formatGameDate(dateStr: string) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
 function TimelineGameModal({
   isOpen,
   loading,
@@ -299,44 +314,98 @@ function TimelineGameModal({
   onRestart: () => void;
   onClose: () => void;
 }) {
-  if (!isOpen) return null;
+  const [showResult, setShowResult] = useState(false);
+  const [pendingResult, setPendingResult] = useState<{
+    score: number; daysOff: number; actualDate: string; guessedDate: string;
+  } | null>(null);
+  const prevRoundRef = useRef(roundIndex);
+
+  useEffect(() => {
+    if (roundIndex !== prevRoundRef.current) {
+      prevRoundRef.current = roundIndex;
+      setShowResult(false);
+      setPendingResult(null);
+    }
+  }, [roundIndex]);
+
+  useEffect(() => {
+    if (loading) {
+      setShowResult(false);
+      setPendingResult(null);
+    }
+  }, [loading]);
 
   const isComplete = memories.length > 0 && roundIndex >= memories.length;
-  const currentMemory = !isComplete ? memories[roundIndex] : null;
-  const totalScore = results.reduce((sum, result) => sum + result.score, 0);
+  const activeMemory = isComplete ? null : memories[roundIndex];
+  const totalScore = results.reduce((sum, r) => sum + r.score, 0);
+  const avgDaysOff = results.length > 0
+    ? Math.round(results.reduce((sum, r) => sum + r.daysOff, 0) / results.length)
+    : 0;
+
+  const { minDate, maxDate } = useMemo(() => {
+    if (memories.length === 0) return { minDate: '', maxDate: '' };
+    const sorted = [...memories.map(m => m.date)].sort();
+    return { minDate: sorted[0], maxDate: sorted[sorted.length - 1] };
+  }, [memories]);
+
+  const minTime = minDate ? new Date(minDate + 'T00:00:00').getTime() : 0;
+  const maxTime = maxDate ? new Date(maxDate + 'T00:00:00').getTime() : 0;
+
+  const sliderValue = useMemo(() => {
+    if (!guessDate || !minTime || maxTime === minTime) return 50;
+    const t = new Date(guessDate + 'T00:00:00').getTime();
+    return Math.round(((t - minTime) / (maxTime - minTime)) * 100);
+  }, [guessDate, minTime, maxTime]);
+
+  useEffect(() => {
+    if (!guessDate && minDate && maxDate && !showResult && !isComplete) {
+      const mid = new Date((minTime + maxTime) / 2).toISOString().split('T')[0];
+      onGuessChange(mid);
+    }
+  }, [minDate, maxDate, showResult, isComplete]);
+
+  const handleSliderChange = (value: number) => {
+    if (!minTime || !maxTime) return;
+    const t = minTime + (value / 100) * (maxTime - minTime);
+    onGuessChange(new Date(t).toISOString().split('T')[0]);
+  };
+
+  const handleLockIn = () => {
+    if (!guessDate || !activeMemory) return;
+    const daysOff = daysBetweenDates(guessDate, activeMemory.date);
+    const score = Math.max(0, 1000 - daysOff * 2);
+    setPendingResult({ score, daysOff, actualDate: activeMemory.date, guessedDate: guessDate });
+    setShowResult(true);
+  };
+
+  const handleNext = () => {
+    onSubmit();
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
       <div className="absolute inset-0 bg-darkgrey/45 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-6 shadow-xl flex flex-col gap-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold tracking-widest text-darkgrey/60 uppercase">Timeline Game</p>
-            <h2 className="text-2xl font-black text-darkgrey">Guess the date</h2>
-            <p className="text-sm text-mediumgrey mt-1">
-              Five rounds. Each perfect guess is worth 1000 points.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-10 h-10 rounded-full bg-lightgrey/60 flex items-center justify-center hover:bg-lightgrey transition-colors shrink-0"
-            aria-label="Close game"
-          >
-            <X size={18} className="text-darkgrey" />
-          </button>
-        </div>
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl border border-black/5">
 
+        {/* Loading */}
         {loading && (
-          <div className="rounded-3xl bg-verylightorange p-8 text-center text-mediumgrey">
+          <div className="p-8 text-center text-mediumgrey">
+            <div className="w-10 h-10 bg-yellow rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Calendar size={18} className="text-darkgrey" />
+            </div>
             Loading a fresh game…
           </div>
         )}
 
+        {/* Error */}
         {!loading && error && (
-          <div className="rounded-3xl bg-verylightpink/40 p-6 flex flex-col gap-4">
-            <p className="text-sm text-pink font-medium">{error}</p>
+          <div className="p-6 flex flex-col gap-4">
+            <div className="rounded-3xl bg-verylightpink/40 p-5">
+              <p className="text-sm text-pink font-medium">{error}</p>
+            </div>
             <div className="flex gap-3">
               <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
               <Button variant="primary" size="sm" onClick={onRestart}>Try again</Button>
@@ -344,88 +413,237 @@ function TimelineGameModal({
           </div>
         )}
 
-        {!loading && !error && currentMemory && (
-          <>
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-bold text-darkgrey">
-                Round {roundIndex + 1} / {memories.length}
-              </span>
-              <span className="text-mediumgrey">Current score: {totalScore} / 5000</span>
+        {/* Playing */}
+        {!loading && !error && !isComplete && activeMemory && (
+          <div className="p-6 flex flex-col gap-5">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow rounded-2xl flex items-center justify-center shrink-0">
+                  <Calendar size={18} className="text-darkgrey" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-darkgrey leading-tight">When was this?</h2>
+                  <p className="text-xs text-mediumgrey">Memory {roundIndex + 1} of {memories.length}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-lightgrey/50 flex items-center justify-center hover:bg-lightgrey transition-colors shrink-0"
+              >
+                <X size={16} className="text-darkgrey" />
+              </button>
             </div>
 
-            <div className="bg-verylightorange rounded-3xl p-5 flex flex-col gap-4">
-              {currentMemory.mediaUrl && (
+            {/* Step indicators */}
+            <div className="flex items-center justify-center gap-2">
+              {memories.map((_, i) => {
+                const isDone = i < roundIndex;
+                const isCurrent = i === roundIndex;
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all',
+                      isDone
+                        ? 'bg-darkgrey text-white border-darkgrey'
+                        : isCurrent
+                          ? 'bg-white text-darkgrey border-yellow shadow-[0_0_0_2px_#FDE856]'
+                          : 'bg-white text-mediumgrey border-black/10',
+                    )}
+                  >
+                    {isDone
+                      ? (results[i]?.score === 1000 ? '✓' : results[i]?.score ?? i + 1)
+                      : i + 1}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Memory card */}
+            <div className="bg-verylightorange rounded-3xl overflow-hidden border border-black/5">
+              {activeMemory.mediaUrl && (
                 <MediaPreview
-                  src={currentMemory.mediaUrl}
+                  src={activeMemory.mediaUrl}
                   alt="Memory clue"
-                  className="w-full max-h-72 object-cover rounded-2xl"
+                  className="w-full max-h-64 object-cover"
                 />
               )}
-              <p className="text-darkgrey text-base leading-relaxed font-medium">{currentMemory.content}</p>
+              <div className="p-4">
+                <p className="text-darkgrey text-sm leading-relaxed font-medium">{activeMemory.content}</p>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <label className="text-sm font-bold text-darkgrey" htmlFor="timeline-game-date">
-                Your guess
-              </label>
-              <input
-                id="timeline-game-date"
-                type="date"
-                value={guessDate}
-                max={getTodayDateStr()}
-                onInput={(event) => onGuessChange((event.target as HTMLInputElement).value)}
-                className="w-full px-4 py-3 rounded-2xl bg-verylightorange border-2 border-transparent focus:border-yellow outline-none text-sm text-darkgrey"
-              />
-              <p className="text-xs text-mediumgrey">
-                Closer dates keep more points. A perfect game scores 5000.
+            {/* Guessing phase */}
+            {!showResult && (
+              <>
+                <div className="text-center">
+                  <p className="text-3xl font-black text-darkgrey">
+                    {guessDate ? formatGameDate(guessDate) : '—'}
+                  </p>
+                  <p className="text-xs text-mediumgrey mt-1">Slide to guess the date</p>
+                </div>
+
+                <div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={sliderValue}
+                    onInput={(e) => handleSliderChange(parseInt((e.target as HTMLInputElement).value))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer accent-yellow"
+                    style={{
+                      background: `linear-gradient(to right, #FDE856 ${sliderValue}%, rgba(74,74,74,0.12) ${sliderValue}%)`,
+                    }}
+                  />
+                  <div className="flex justify-between mt-2">
+                    <span className="text-xs text-mediumgrey">{minDate ? formatGameDate(minDate) : ''}</span>
+                    <span className="text-xs text-mediumgrey">{maxDate ? formatGameDate(maxDate) : ''}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLockIn}
+                  disabled={!guessDate}
+                  className="w-full py-4 bg-yellow text-darkgrey font-black rounded-2xl flex items-center justify-center gap-2 text-base disabled:opacity-40 hover:brightness-95 transition-all"
+                >
+                  <Check size={18} />
+                  Lock in my guess
+                </button>
+
+                <div className="flex items-center justify-between text-sm border-t border-black/5 pt-2">
+                  <span className="text-mediumgrey font-medium">Current Score</span>
+                  <span className="font-black text-darkgrey text-xl">{totalScore}</span>
+                </div>
+              </>
+            )}
+
+            {/* Result phase */}
+            {showResult && pendingResult && (
+              <>
+                <div className={cn(
+                  'rounded-3xl p-5 text-center',
+                  pendingResult.score >= 1000 ? 'bg-yellow' : 'bg-purple/40',
+                )}>
+                  <p className="text-3xl">{getResultLabel(pendingResult.score).emoji}</p>
+                  <p className="text-xl font-black text-darkgrey mt-2">
+                    {getResultLabel(pendingResult.score).message}
+                  </p>
+                  <p className="text-3xl font-black text-darkgrey mt-2">
+                    +{pendingResult.score} points
+                  </p>
+                  <p className="text-sm text-darkgrey/70 mt-1">
+                    {pendingResult.daysOff === 0
+                      ? 'Exact match!'
+                      : `You were ${pendingResult.daysOff} day${pendingResult.daysOff === 1 ? '' : 's'} off`}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center p-3 bg-verylightorange rounded-2xl border border-black/5">
+                    <p className="text-[10px] font-bold text-mediumgrey uppercase tracking-widest">Your Guess</p>
+                    <p className="text-sm font-black text-darkgrey mt-1.5">
+                      {formatGameDate(pendingResult.guessedDate)}
+                    </p>
+                  </div>
+                  <div className="text-center p-3 bg-verylightorange rounded-2xl border border-black/5">
+                    <p className="text-[10px] font-bold text-mediumgrey uppercase tracking-widest">Actual Date</p>
+                    <p className="text-sm font-black text-pink mt-1.5">
+                      {formatGameDate(pendingResult.actualDate)}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="w-full py-4 bg-darkgrey text-white font-black rounded-2xl flex items-center justify-center gap-2 text-base hover:bg-darkgrey/90 transition-all"
+                >
+                  {roundIndex + 1 < memories.length ? (
+                    <>Next Memory <Zap size={16} /></>
+                  ) : (
+                    'See Results'
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Game Complete */}
+        {!loading && !error && isComplete && (
+          <div className="p-6 flex flex-col gap-5">
+            <div className="text-center pt-2">
+              <div className="w-16 h-16 bg-yellow rounded-full flex items-center justify-center mx-auto shadow-md">
+                <Trophy size={30} className="text-darkgrey" />
+              </div>
+              <h2 className="text-2xl font-black text-darkgrey mt-4">Game Complete!</h2>
+              <p className="text-sm text-mediumgrey mt-1">Here's how you did:</p>
+            </div>
+
+            <div className="bg-yellow rounded-3xl p-6 text-center">
+              <p className="text-[11px] font-bold tracking-widest text-darkgrey/60 uppercase">Total Score</p>
+              <p className="text-5xl font-black text-darkgrey mt-2">
+                {totalScore.toLocaleString()}
+              </p>
+              <p className="text-sm text-darkgrey/70 mt-1">
+                {((totalScore / (memories.length * 1000)) * 100).toFixed(0)}% accuracy
               </p>
             </div>
 
-            <div className="flex justify-end">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={onSubmit}
-                disabled={!guessDate}
-              >
-                Lock in guess
-              </Button>
-            </div>
-          </>
-        )}
-
-        {!loading && !error && isComplete && (
-          <div className="flex flex-col gap-5">
-            <div className="bg-blue/15 rounded-3xl p-6 text-center">
-              <p className="text-xs font-bold tracking-widest text-darkgrey/60 uppercase">Final Score</p>
-              <p className="text-5xl font-black text-darkgrey mt-2">{totalScore}</p>
-              <p className="text-sm text-mediumgrey mt-1">out of 5000</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-verylightorange rounded-2xl p-4 text-center border border-black/5">
+                <p className="text-[10px] font-bold text-mediumgrey uppercase tracking-widest">Memories</p>
+                <p className="text-3xl font-black text-darkgrey mt-2">{results.length}</p>
+              </div>
+              <div className="bg-verylightorange rounded-2xl p-4 text-center border border-black/5">
+                <p className="text-[10px] font-bold text-mediumgrey uppercase tracking-widest">Avg Days Off</p>
+                <p className="text-3xl font-black text-darkgrey mt-2">{avgDaysOff}</p>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {results.map((result, index) => (
-                <div key={`${result.actualDate}-${index}`} className="rounded-2xl border border-black/5 p-4 flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-bold text-darkgrey">Round {index + 1}</span>
-                    <span className="text-sm font-bold text-pink">+{result.score}</span>
+            <div className="bg-verylightorange rounded-3xl p-4 border border-black/5">
+              <p className="text-[10px] font-bold text-mediumgrey uppercase tracking-widest text-center mb-3">
+                Round Breakdown
+              </p>
+              <div className="flex flex-col gap-2">
+                {results.map((result, i) => (
+                  <div
+                    key={`${result.actualDate}-${i}`}
+                    className={cn(
+                      'flex items-center justify-between px-4 py-2.5 rounded-full text-sm font-bold',
+                      result.score >= 1000 ? 'bg-yellow text-darkgrey' : 'bg-blue/50 text-darkgrey',
+                    )}
+                  >
+                    <span>Round {i + 1}</span>
+                    <span>{result.score} pts</span>
                   </div>
-                  <p className="text-sm text-mediumgrey">
-                    Guessed {getFormattedDate(result.guessedDate, { format: 'long', uppercase: false })}
-                  </p>
-                  <p className="text-sm text-mediumgrey">
-                    Actual date {getFormattedDate(result.actualDate, { format: 'long', uppercase: false })}
-                  </p>
-                  <p className="text-xs text-darkgrey/70">
-                    {result.daysOff === 0 ? 'Perfect guess.' : `${result.daysOff} day${result.daysOff === 1 ? '' : 's'} off`}
-                  </p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            <div className="flex gap-3 justify-end">
-              <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
-              <Button variant="primary" size="sm" onClick={onRestart}>Play again</Button>
+            <div className="bg-blue/20 rounded-3xl p-4 text-center border border-black/5">
+              <p className="text-[10px] font-bold text-mediumgrey uppercase tracking-widest mb-3">
+                Scoring System
+              </p>
+              <div className="flex flex-col gap-1.5 text-sm text-darkgrey">
+                <p>🎯 Perfect match: <strong>1000 pts</strong></p>
+                <p>🌟 Within 1 week: <strong>800+ pts</strong></p>
+                <p>👍 Within 1 month: <strong>600+ pts</strong></p>
+                <p>🤔 Within 3 months: <strong>400+ pts</strong></p>
+                <p>😅 More than 3 months: <strong>&lt;400 pts</strong></p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-4 bg-darkgrey text-white font-black rounded-2xl text-base hover:bg-darkgrey/90 transition-all"
+            >
+              Close
+            </button>
           </div>
         )}
       </div>
@@ -554,41 +772,41 @@ export function TimelinePage({ onNavigateToToday }: { onNavigateToToday?: () => 
       </div>
 
       {hasAnyEntry && (
-        <div className="flex flex-wrap items-center justify-center gap-4 mb-4">
+        <div className="flex flex-col items-center gap-3 mb-4">
           <button
             type="button"
-            onClick={() => setYear(years[yearIndex - 1])}
-            disabled={!canGoPrev}
-            className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow disabled:opacity-30"
-          >
-            <ChevronLeft size={18} className="text-darkgrey" />
-          </button>
-          <span className="text-2xl font-black text-darkgrey w-20 text-center">{year}</span>
-          <button
-            type="button"
-            onClick={() => setYear(years[yearIndex + 1])}
-            disabled={!canGoNext}
-            className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow disabled:opacity-30"
-          >
-            <ChevronRight size={18} className="text-darkgrey" />
-          </button>
-          <Button
-            variant="secondary"
-            size="sm"
             onClick={() => { void openGame(); }}
             disabled={!canPlayGame}
-            className="gap-2"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-yellow text-darkgrey font-bold text-sm rounded-full shadow-sm hover:brightness-95 transition-all disabled:opacity-40"
           >
             <Gamepad2 size={15} />
             Game
-          </Button>
+          </button>
+          {!canPlayGame && (
+            <p className="text-xs text-mediumgrey">
+              Add at least 5 memories to unlock the game.
+            </p>
+          )}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setYear(years[yearIndex - 1])}
+              disabled={!canGoPrev}
+              className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow disabled:opacity-30"
+            >
+              <ChevronLeft size={18} className="text-darkgrey" />
+            </button>
+            <span className="text-2xl font-black text-darkgrey w-20 text-center">{year}</span>
+            <button
+              type="button"
+              onClick={() => setYear(years[yearIndex + 1])}
+              disabled={!canGoNext}
+              className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow disabled:opacity-30"
+            >
+              <ChevronRight size={18} className="text-darkgrey" />
+            </button>
+          </div>
         </div>
-      )}
-
-      {hasAnyEntry && !canPlayGame && (
-        <p className="text-center text-xs text-mediumgrey mb-6">
-          Add at least 5 memories to unlock the date guessing game.
-        </p>
       )}
 
       <div className="bg-white rounded-3xl p-6 shadow-sm">

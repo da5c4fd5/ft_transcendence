@@ -4,7 +4,8 @@ const MAX_MEMORY_CONTENT_LENGTH = 180;
 
 export const MemoriesModel = {
   promptResponse: t.Object({
-    prompt: t.String()
+    prompt: t.Union([t.String(), t.Null()]),
+    generating: t.Optional(t.Boolean())
   }),
   wellnessTipsResponse: t.Object({
     tips: t.Array(t.String())

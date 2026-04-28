@@ -499,7 +499,8 @@ type RawReminder = {
 };
 
 type RawPromptResponse = {
-  prompt: string;
+  prompt: string | null;
+  generating?: boolean;
 };
 
 type RawWellnessResponse = {
@@ -557,39 +558,26 @@ export function TodayPage() {
 
     try {
       for (let attempt = 0; attempt < PROMPT_MAX_RETRIES; attempt += 1) {
-        try {
-          const next = await api.get<RawPromptResponse>("/memories/prompts");
-          if (promptRequestIdRef.current !== requestId) return;
+        const next = await api.get<RawPromptResponse>("/memories/prompts");
+        if (promptRequestIdRef.current !== requestId) return;
+        if (next.prompt !== null) {
           setPrompt(next.prompt);
           return;
-        } catch (error) {
-          if (
-            (error as { status?: number })?.status === 503 &&
-            attempt < PROMPT_MAX_RETRIES - 1
-          ) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, PROMPT_RETRY_DELAY_MS),
-            );
-            if (promptRequestIdRef.current !== requestId) return;
-            continue;
-          }
-          throw error;
         }
+        if (!next.generating || attempt >= PROMPT_MAX_RETRIES - 1) break;
+        await new Promise((resolve) => setTimeout(resolve, PROMPT_RETRY_DELAY_MS));
+        if (promptRequestIdRef.current !== requestId) return;
       }
-    } catch (error) {
-      if (promptRequestIdRef.current !== requestId) return;
-      if ((error as { status?: number })?.status === 503) {
+      if (promptRequestIdRef.current === requestId) {
         setPromptError(
           "Inspiration is taking longer than expected. Try again in a moment.",
         );
-      } else {
-        setPromptError(
-          getApiErrorMessage(
-            error,
-            "We could not generate inspiration right now.",
-          ),
-        );
       }
+    } catch (error) {
+      if (promptRequestIdRef.current !== requestId) return;
+      setPromptError(
+        getApiErrorMessage(error, "We could not generate inspiration right now."),
+      );
     } finally {
       if (promptRequestIdRef.current === requestId) {
         setPromptLoading(false);

@@ -20,6 +20,13 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function validatePasswordStrength(password: string): string | null {
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter";
+  if (!/[0-9]/.test(password)) return "Password must contain at least one number";
+  if (!/[^a-zA-Z0-9]/.test(password)) return "Password must contain at least one special character";
+  return null;
+}
+
 export abstract class Auth {
   static async logIn(
     { email, password }: AuthModel["logInBody"],
@@ -94,6 +101,8 @@ export abstract class Auth {
     userAgent?: string
   ) {
     const normalizedEmail = normalizeEmail(email);
+    const pwError = validatePasswordStrength(password);
+    if (pwError) throw status(422, { error: "Password does not meet requirements" } satisfies AuthModel["signUpWeakPassword"]);
     const passwordHash = await Bun.password.hash(password);
     let userId: string;
     try {

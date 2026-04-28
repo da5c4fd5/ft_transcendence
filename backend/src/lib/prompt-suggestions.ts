@@ -1,5 +1,4 @@
 import { createHash } from "crypto";
-import { status } from "elysia";
 import { db } from "../db";
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://ollama:11434";
@@ -516,7 +515,7 @@ export async function consumePromptSuggestion(userId: string) {
   if (state.expiresAt && state.expiresAt <= new Date()) {
     await deleteExpiredPromptQueue(userId);
     void schedulePromptSuggestionGeneration(userId, "replace");
-    throw status(503, { message: "Prompt suggestions are still being generated" });
+    return { prompt: null, generating: true };
   }
 
   const next = await db.promptSuggestion.findFirst({
@@ -526,7 +525,7 @@ export async function consumePromptSuggestion(userId: string) {
 
   if (!next) {
     void schedulePromptSuggestionGeneration(userId, "replace");
-    throw status(503, { message: "Prompt suggestions are still being generated" });
+    return { prompt: null, generating: true };
   }
 
   await db.promptSuggestion.delete({ where: { id: next.id } });
@@ -548,7 +547,7 @@ export async function consumePromptSuggestionsBatch(
   if (state.expiresAt && state.expiresAt <= new Date()) {
     await deleteExpiredPromptQueue(userId);
     void schedulePromptSuggestionGeneration(userId, "replace");
-    throw status(503, { message: "Prompt suggestions are still being generated" });
+    return { prompt: null, generating: true };
   }
 
   const limit = Math.max(1, Math.floor(count));
@@ -560,7 +559,7 @@ export async function consumePromptSuggestionsBatch(
 
   if (nextPrompts.length === 0) {
     void schedulePromptSuggestionGeneration(userId, "replace");
-    throw status(503, { message: "Prompt suggestions are still being generated" });
+    return { prompt: null, generating: true };
   }
 
   await db.promptSuggestion.deleteMany({

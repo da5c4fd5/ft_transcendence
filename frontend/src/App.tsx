@@ -13,7 +13,11 @@ import { MemoriesPage } from './pages/memories/MemoriesPage';
 import { TreePage } from './pages/tree/TreePage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { AdminPage } from './pages/admin/AdminPage';
+import { DeveloperPage } from './pages/developer/DeveloperPage';
 import { GuestPage } from './pages/guest/GuestPage';
+import { PrivacyPolicyPage } from './pages/legal/PrivacyPolicyPage';
+import { TermsOfServicePage } from './pages/legal/TermsOfServicePage';
+import { Footer } from './components/Footer/Footer';
 import type { SharedMemory } from './pages/guest/guest.types';
 import type { User } from './pages/profile/profile.types';
 import { api, setUnauthorizedHandler } from './lib/api';
@@ -91,11 +95,12 @@ function SharedMemoryRoute({ memoryId, shareToken, user, onNavigateToWelcome }: 
 // Layout wrapper for authenticated pages
 function AuthLayout({ user, children }: { user: User | null; children: ComponentChildren }) {
   return (
-    <div className="min-h-screen bg-verylightorange pt-16 pb-20 md:pb-0">
+    <div className="min-h-screen bg-verylightorange pt-16 pb-20 md:pb-0 flex flex-col">
       <Navbar
         user={user ? { username: user.username, avatarUrl: user.avatarUrl, isAdmin: user.isAdmin } : undefined}
       />
-      <main>{children}</main>
+      <main className="flex-1">{children}</main>
+      <Footer />
     </div>
   );
 }
@@ -219,6 +224,13 @@ function AppInner() {
               />
             </AuthLayout>}
       </Route>
+      <Route path="/developer">
+        {!isAuthenticated
+          ? <Redirect to="/login" />
+          : user && <AuthLayout user={user}>
+              <DeveloperPage user={user} onUserUpdate={setUser} />
+            </AuthLayout>}
+      </Route>
       <Route path="/admin">
         {!isAuthenticated
           ? <Redirect to="/login" />
@@ -230,6 +242,10 @@ function AppInner() {
               />
             </AuthLayout>}
       </Route>
+
+      {/* Legal pages — always public */}
+      <Route path="/privacy"><PrivacyPolicyPage /></Route>
+      <Route path="/terms"><TermsOfServicePage /></Route>
 
       {/* Catch-all fallback */}
       <Route>

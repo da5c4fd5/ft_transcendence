@@ -52,6 +52,9 @@ export const AuthModel = {
   signUpConflict: t.Object({
     error: t.Literal("Email already registered")
   }),
+  signUpWeakPassword: t.Object({
+    error: t.Literal("Password does not meet requirements")
+  }),
 
   revokeSessionResponse: t.Object({
     message: t.Literal("Logged out")

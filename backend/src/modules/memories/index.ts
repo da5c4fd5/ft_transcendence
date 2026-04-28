@@ -56,7 +56,7 @@ export const memories = new Elysia({
           }
         )
         .get("/today", ({ user }) => MemoriesService.today(user!.id), {
-          response: { 200: t.Any(), 404: t.Any() },
+          response: { 200: t.Any() },
           detail: {
             description:
               "Return the authenticated user's memory for today, if one exists. 404 if none."

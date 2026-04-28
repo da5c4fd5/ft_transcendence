@@ -27,6 +27,10 @@ export const friends = new Elysia({
           response: { 200: t.Array(FriendsModel.friendRequestResponse) },
           detail: { description: "List incoming pending friend requests." }
         })
+        .get("/sent", ({ user }) => FriendsService.listSentRequests(user!.id), {
+          response: { 200: t.Array(FriendsModel.friendSentRequestResponse) },
+          detail: { description: "List outgoing pending friend requests (sent by the current user, not yet accepted or declined)." }
+        })
         .put(
           "/:userId",
           ({ user, params }) => FriendsService.add(user!.id, params.userId),

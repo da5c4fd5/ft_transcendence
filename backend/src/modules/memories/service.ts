@@ -181,8 +181,7 @@ export abstract class MemoriesService {
       where: { userId, date: { gte: date, lt: nextDay } },
       include: { media: true }
     });
-    if (!memory) throw status(404, { message: "No memory for today" });
-    return memory;
+    return memory ?? null;
   }
 
   static async findByShareToken(memoryId: string, shareToken: string) {
