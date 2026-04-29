@@ -289,6 +289,11 @@ function formatGameDate(dateStr: string) {
   });
 }
 
+function timestampToLocalDate(t: number) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function TimelineGameModal({
   isOpen,
   loading,
@@ -348,26 +353,27 @@ function TimelineGameModal({
     return { minDate: sorted[0], maxDate: sorted[sorted.length - 1] };
   }, [memories]);
 
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
   const minTime = minDate ? new Date(minDate + 'T00:00:00').getTime() : 0;
   const maxTime = maxDate ? new Date(maxDate + 'T00:00:00').getTime() : 0;
+  const totalDays = minTime && maxTime ? Math.round((maxTime - minTime) / MS_PER_DAY) : 1;
 
   const sliderValue = useMemo(() => {
-    if (!guessDate || !minTime || maxTime === minTime) return 50;
+    if (!guessDate || !minTime || maxTime === minTime) return Math.round(totalDays / 2);
     const t = new Date(guessDate + 'T00:00:00').getTime();
-    return Math.round(((t - minTime) / (maxTime - minTime)) * 100);
-  }, [guessDate, minTime, maxTime]);
+    return Math.round((t - minTime) / MS_PER_DAY);
+  }, [guessDate, minTime, maxTime, totalDays]);
 
   useEffect(() => {
     if (!guessDate && minDate && maxDate && !showResult && !isComplete) {
-      const mid = new Date((minTime + maxTime) / 2).toISOString().split('T')[0];
+      const mid = timestampToLocalDate(minTime + Math.round(totalDays / 2) * MS_PER_DAY);
       onGuessChange(mid);
     }
   }, [minDate, maxDate, showResult, isComplete]);
 
   const handleSliderChange = (value: number) => {
-    if (!minTime || !maxTime) return;
-    const t = minTime + (value / 100) * (maxTime - minTime);
-    onGuessChange(new Date(t).toISOString().split('T')[0]);
+    if (!minTime) return;
+    onGuessChange(timestampToLocalDate(minTime + value * MS_PER_DAY));
   };
 
   const handleLockIn = () => {
@@ -489,13 +495,16 @@ function TimelineGameModal({
                   <input
                     type="range"
                     min={0}
-                    max={100}
+                    max={totalDays}
+                    step={1}
                     value={sliderValue}
                     onInput={(e) => handleSliderChange(parseInt((e.target as HTMLInputElement).value))}
-                    className="w-full h-2 rounded-full appearance-none cursor-pointer accent-yellow"
-                    style={{
-                      background: `linear-gradient(to right, #FDE856 ${sliderValue}%, rgba(74,74,74,0.12) ${sliderValue}%)`,
-                    }}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                    style={(() => {
+                      const pct = totalDays > 0 ? (sliderValue / totalDays) * 100 : 0;
+                      const stop = `calc(${pct.toFixed(2)}% - ${(pct * 20 / 100 - 10).toFixed(2)}px)`;
+                      return { background: `linear-gradient(to right, #FDE856 ${stop}, rgba(74,74,74,0.12) ${stop})` };
+                    })()}
                   />
                   <div className="flex justify-between mt-2">
                     <span className="text-xs text-mediumgrey">{minDate ? formatGameDate(minDate) : ''}</span>
