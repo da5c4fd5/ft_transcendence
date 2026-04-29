@@ -1,24 +1,8 @@
 name: capsul
 
 services:
-  certificate:
-    build:
-      context: ./docker/certs
-    environment:
-      DOMAIN: ${DOMAIN:-transcen.dence.fr}
-      PROD: ${PROD:-false}
-      TLS_MODE: ${TLS_MODE:-selfsigned}
-    volumes:
-      - ${ROOT_DIR:-./.capsul}/certs:/certs:z
-    restart: "no"
-    networks:
-      - capsul_net
-
   postgres:
     image: docker.io/library/postgres:17-alpine
-    depends_on:
-      certificate:
-        condition: service_completed_successfully
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-capsul}
       POSTGRES_USER: ${POSTGRES_USER:-capsul}
@@ -75,8 +59,6 @@ services:
     build:
       context: ./backend
     depends_on:
-      certificate:
-        condition: service_completed_successfully
       mood-classifier:
         condition: service_healthy
       ollama:
@@ -179,8 +161,6 @@ services:
     build:
       context: ./docker/nginx
     depends_on:
-      certificate:
-        condition: service_completed_successfully
       backend:
         condition: service_started
       frontend:

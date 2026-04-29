@@ -1,9 +1,4 @@
 services:
-  certificate:
-    environment:
-      PROD: "false"
-      TLS_MODE: selfsigned
-
   backend:
     command: sh -lc 'bun --bun run db:generate && bun --bun run db:migrate:prod && bun run dev'
     volumes:

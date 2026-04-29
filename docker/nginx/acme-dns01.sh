@@ -19,6 +19,7 @@ export DNS_PROPAGATION_SECONDS="${DNS_PROPAGATION_SECONDS:-5}"
 
 base="/etc/nginx/certs/public"
 mkdir -p "${base}"
+rm -f "${base}/lock"
 acme_ca="${ACME_CA:-letsencrypt}"
 account_name="$(printf '%s' "${acme_ca}" | tr -c 'A-Za-z0-9_.-' '_')"
 
@@ -40,10 +41,12 @@ printf '%s\n' "${DOMAIN}" > "${base}/domains.txt"
 
 force_arg=""
 [ ! -f "${base}/certs/${DOMAIN}/.selfsigned" ] || force_arg="--force"
+if [ -s "${base}/certs/${DOMAIN}/fullchain.pem" ] && ! /usr/local/bin/validate-public-cert.sh >/dev/null 2>&1; then
+	force_arg="--force"
+fi
 
 dehydrated --register --accept-terms --config "${base}/config"
 dehydrated --cron --accept-terms --config "${base}/config" ${force_arg} "$@"
 
-[ -s "${base}/certs/${DOMAIN}/fullchain.pem" ]
-[ -s "${base}/certs/${DOMAIN}/privkey.pem" ]
+/usr/local/bin/validate-public-cert.sh
 rm -f "${base}/certs/${DOMAIN}/.selfsigned"

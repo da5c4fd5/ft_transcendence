@@ -10,11 +10,13 @@ COPY nginx.conf.template /etc/nginx/templates/capsul.conf.template
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY acme-dns01.sh /usr/local/bin/acme-dns01.sh
 COPY challenge.sh /usr/local/bin/challenge.sh
+COPY validate-public-cert.sh /usr/local/bin/validate-public-cert.sh
 
 RUN chmod +x \
 	/usr/local/bin/entrypoint.sh \
 	/usr/local/bin/acme-dns01.sh \
-	/usr/local/bin/challenge.sh
+	/usr/local/bin/challenge.sh \
+	/usr/local/bin/validate-public-cert.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

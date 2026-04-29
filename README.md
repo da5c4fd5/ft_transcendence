@@ -66,6 +66,7 @@ GPU=0 make
 make stop      # Stop all containers
 make logs      # Stream logs
 make fclean    # Full teardown (removes volumes and images)
+make cert-status # Inspect the certificate currently served by nginx
 ```
 
 ---
