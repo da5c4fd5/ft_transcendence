@@ -41,7 +41,7 @@ case "${hook}" in
 			shift 3
 		done
 
-		[ "${hook}" != "deploy_challenge" ] || sleep "${DNS_PROPAGATION_SECONDS:-30}"
+		[ "${hook}" != "deploy_challenge" ] || sleep "${DNS_PROPAGATION_SECONDS:-5}"
 		;;
 	deploy_cert|unchanged_cert|startup_hook|exit_hook|invalid_challenge)
 		;;

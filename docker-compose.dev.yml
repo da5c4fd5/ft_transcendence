@@ -18,11 +18,11 @@ services:
       target: dev
       args:
         DOMAIN: ${DOMAIN:-transcen.dence.fr}
-        HTTPS_PORT: ${HTTPS_PORT:-443}
+        HTTPS_PORT: ${HTTPS_PORT:-8433}
     command: bun run dev -- --host 0.0.0.0 --port 6767
     environment:
       DOMAIN: ${DOMAIN:-transcen.dence.fr}
-      HTTPS_PORT: ${HTTPS_PORT:-443}
+      HTTPS_PORT: ${HTTPS_PORT:-8433}
       VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-transcen.dence.fr,localhost,127.0.0.1}
     volumes:
       - ./frontend/src:/app/src

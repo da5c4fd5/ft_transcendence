@@ -10,6 +10,15 @@ all: start
 
 start up: generate
 	$(PROD) up -d --build
+	@container_id="capsul_nginx_1"; \
+		for i in $$(seq 1 120); do \
+			status="$$(podman container inspect "$${container_id}" --format '{{.State.Health.Status}}' 2>/dev/null || true)"; \
+			test "$${status}" != healthy || exit 0; \
+			test "$$(podman container inspect "$${container_id}" --format '{{.State.Status}}' 2>/dev/null || true)" = running; \
+			sleep 2; \
+		done; \
+		podman logs "$${container_id}"; \
+		exit 1
 
 seed: start
 	$(PROD) run --rm backend sh -lc 'bun --bun run db:generate && bun --bun run db:seed'
@@ -31,23 +40,20 @@ stop:
 clean: stop
 
 fclean:
-	$(PROD) down --volumes --remove-orphans
-	podman image prune -a -f
-	podman builder prune -a -f
-	podman volume prune -f
-	podman network prune -f
-	podman system prune -a -f --volumes
+	@$(PROD) down --volumes --remove-orphans >/dev/null 2>&1 || true
+	@podman system reset -f >/dev/null 2>&1 || true
+	@test -n "$(ROOT_DIR)" && test "$(ROOT_DIR)" != "/"
+	@if test -e "$(ROOT_DIR)"; then \
+		podman unshare rm -rf "$(ROOT_DIR)" || \
+		{ chmod -R u+rwX "$(ROOT_DIR)" 2>/dev/null || true; rm -rf "$(ROOT_DIR)"; }; \
+	fi
 
 restart: stop start
 
 logs:
 	$(PROD) logs -f --tail=200
 
-renew: generate
-	$(PROD) run --rm nginx /usr/local/bin/acme-dns01.sh --force
-	$(PROD) restart nginx
-
 ps:
 	$(PROD) ps
 
-.PHONY: all start up seed dev stop clean fclean restart logs renew ps generate
+.PHONY: all start up seed dev stop clean fclean restart logs ps generate

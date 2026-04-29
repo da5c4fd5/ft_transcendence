@@ -32,7 +32,7 @@ make
 ```
 
 `make` (or `make start`) will:
-1. Generate TLS certificates (self-signed by default, or Let's Encrypt with `TLS_MODE=acme`)
+1. Generate TLS certificates (self-signed by default, or Let's Encrypt with `TLS_MODE=letsencrypt`; falls back to self-signed if ACME fails)
 2. Build and start all containers (Nginx, backend, frontend, PostgreSQL, Ollama, mood-classifier)
 
 The app will be available at `https://<DOMAIN>` (or `https://localhost` with a self-signed cert).
@@ -42,8 +42,9 @@ The app will be available at `https://<DOMAIN>` (or `https://localhost` with a s
 | Variable | Description | Default |
 |---|---|---|
 | `DOMAIN` | Public domain name | `transcen.dence.fr` |
-| `TLS_MODE` | `selfsigned` or `acme` | `selfsigned` |
-| `HTTPS_PORT` | HTTPS port | `443` |
+| `TLS_MODE` | `selfsigned` or `letsencrypt` | `selfsigned` |
+| `HTTP_PORT` | HTTP redirect port | `8080` |
+| `HTTPS_PORT` | HTTPS port | `8433` |
 | `POSTGRES_DB` | Database name | `capsul` |
 | `POSTGRES_USER` | Database user | `capsul` |
 | `ROOT_DIR` | Data directory for certs, database, media, models | `~/goinfre/capsul` |
@@ -65,7 +66,6 @@ GPU=0 make
 make stop      # Stop all containers
 make logs      # Stream logs
 make fclean    # Full teardown (removes volumes and images)
-make renew     # Renew Let's Encrypt certificate
 ```
 
 ---

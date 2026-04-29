@@ -15,7 +15,7 @@ export DOMAIN
 export PDA_API_URL="${PDA_API_URL:-}"
 export PDA_SERVER_ID="${PDA_SERVER_ID:-localhost}"
 export PDA_ZONE="${PDA_ZONE:-${DOMAIN}}"
-export DNS_PROPAGATION_SECONDS="${DNS_PROPAGATION_SECONDS:-30}"
+export DNS_PROPAGATION_SECONDS="${DNS_PROPAGATION_SECONDS:-5}"
 
 base="/etc/nginx/certs/public"
 mkdir -p "${base}"
@@ -43,4 +43,7 @@ force_arg=""
 
 dehydrated --register --accept-terms --config "${base}/config"
 dehydrated --cron --accept-terms --config "${base}/config" ${force_arg} "$@"
+
+[ -s "${base}/certs/${DOMAIN}/fullchain.pem" ]
+[ -s "${base}/certs/${DOMAIN}/privkey.pem" ]
 rm -f "${base}/certs/${DOMAIN}/.selfsigned"
