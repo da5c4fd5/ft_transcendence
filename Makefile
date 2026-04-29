@@ -1,8 +1,9 @@
+GPU ?= 1
 GPU_COMPOSE := $(if $(filter 1 true yes,$(GPU)),-f docker-compose.ollama-gpu.yml)
 COMPOSE := podman-compose --in-pod=false -p capsul -f docker-compose.yml $(GPU_COMPOSE)
 PROD := $(COMPOSE)
 DEV := $(COMPOSE) -f docker-compose.dev.yml
-DATA_ROOT := $${ROOT_DIR:-./.capsul}
+DATA_ROOT := $${ROOT_DIR:-$$HOME/goinfre/capsul}
 
 all: start
 

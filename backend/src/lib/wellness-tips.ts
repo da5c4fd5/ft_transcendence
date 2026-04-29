@@ -233,11 +233,11 @@ Hard rules:
 - do not diagnose, label, or mention disorders
 - do not mention therapy, medication, trauma, abuse, or crisis services unless explicitly present
 - do not invent events, relationships, or problems
-- do not mention the memory history directly
+- explicitly reference specific recent memories when relevant — name a concrete detail, moment, or feeling from the history so the tip feels personal
 - do not use markdown, numbering, headings, or explanations
 - avoid duplicates and near-duplicates
 - prefer emotional carry-over, reflection, reassurance, or one realistic next step
-- it is good to reuse concrete details that are explicitly present in the memories
+- reuse concrete details that are explicitly present in the memories
 - never invent random props, rituals, scents, clothing, plants, or body-part actions
 - never sound quirky, surreal, cute, or performative
 - never ask the user to do something bizarre just to seem original
