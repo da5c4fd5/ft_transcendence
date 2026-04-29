@@ -8,7 +8,7 @@ A personal memory journal where your consistency shapes a living tree. Write dai
 
 ## Description
 
-**Capsul** is a digital memory journal built as the final project of the 42 cursus. Users write daily memory entries (*capsuls*), attach photos, classify their mood with AI, and optionally share entries with friends who can contribute their own perspective.
+**Capsul** is a digital memory journal built as the final project of the 42 cursus. Users write daily memory entries (*capsuls*), attach photos or audio, classify their mood with AI, and optionally share entries with friends who can contribute their own perspective.
 
 The central gamification mechanic is a **living tree** whose health is computed from four factors: recency of last entry, writing streak, total capsuls, and words written. The tree decays over time if the user stops engaging, creating a gentle retention loop. A companion mini-game on the Timeline page challenges users to guess when one of their past memories was written.
 
@@ -103,11 +103,11 @@ All AI-generated code was reviewed, tested, and integrated by team members.
 | Login | Name | Role |
 |---|---|---|
 | **smamalig** | Serghei | Tech Lead |
-| **ldubois** | Louis | Product Manager + DevOps |
-| **cscache** | Clothilde | Product Owner + Product Designer |
-| **llechert** | Lancelot | Frontend Developer |
+| **ldubois** | Louis | Product Owner + DevOps |
+| **cscache** | Clothilde | Product Designer |
+| **llechert** | Lancelot | Product Manager |
 
-All four members contributed to development across the full stack. Primary areas of ownership are described in the Individual Contributions section below.
+Primary areas of ownership are described in the Individual Contributions section below.
 
 ---
 
@@ -206,7 +206,7 @@ PromptSuggestion / PromptSuggestionState
 
 | Feature | Description | Author(s) |
 |---|---|---|
-| User profile | Editable display name, avatar upload, account settings | smamalig, cscache |
+| User profile | Editable display name, avatar upload, account settings | cscache, smamalig |
 | Friends system | Friend requests, friend list, real-time online presence | cscache, smamalig |
 | Ping | Send a real-time notification ping to a friend | cscache, smamalig |
 | Direct chat | Real-time messages between friends | cscache, smamalig |
@@ -318,27 +318,27 @@ PromptSuggestion / PromptSuggestionState
 
 Designed and built the entire backend: Elysia.js module structure, Prisma schema, authentication (JWT, argon2id, cookie hardening), 2FA (TOTP + AES-256-GCM), public API (rate limiting, API keys, Swagger), memory sharing, admin endpoints, GDPR export, and security hardening across the board (MIME validation, session binding, anti-spoofing, SVG rejection).
 
-**Challenge:** Collaborating effectively in a team setting — coordinating API design and decisions across four people working simultaneously.
+**Challenge:** Collaborating effectively in a team setting, coordinating API design and decisions across four people working simultaneously.
 
 ---
 
-### ldubois — Louis (Product Manager, DevOps, AI, DB)
+### ldubois — Louis (Product Owner, DevOps, AI, DB)
 
 Managed the team and project organization. Built the full container infrastructure (Podman Compose, Dockerfiles, Makefile, Nginx TLS with ACME support). Integrated Ollama for streaming writing prompts and wellness tips. Built the Python mood-classifier microservice (FastAPI + go_emotions model) and its async job queue. Implemented the HTML email system (reminders, inactivity alerts, AI digests).
 
-**Challenge:** Setting up self-hosted AI inference infrastructure from scratch — getting Ollama, the mood-classifier, and their inter-service communication to work reliably inside containers.
+**Challenge:** Setting up self-hosted AI inference infrastructure from scratch: getting Ollama, the mood-classifier, and their inter-service communication to work reliably inside containers.
 
 ---
 
-### cscache — Clothilde (Product Owner, Product Designer, Frontend)
+### cscache — Clothilde (Product Designer, Frontend)
 
-Defined the product vision and UX. Built the living tree (8-stage component with animations), the "When was this?" timeline game, the friends and chat UI, the MemoryModal, the Today page, and memory search. Also contributed to the backend (email verification flow, chat, image uploads for contributions).
+Defined the product vision and UX. Built the living tree (8-stage component with animations), the "When was this?" timeline game, the friends and chat UI, the MemoryModal, the Today page, and memory search. Help to connect the backend.
 
 **Challenge:** Discovering a completely unfamiliar stack (TypeScript, Preact, Elysia) mid-project and becoming productive quickly enough to own large frontend features.
 
 ---
 
-### llechert — Lancelot (Frontend Developer)
+### llechert — Lancelot (Product Manager, Frontend Developer)
 
 Set up Tailwind CSS and the frontend scaffold. Built auth pages, Navbar, Footer, and the Memories page with calendar date filter. Iteratively improved the Admin page. Added audio upload with progress, account deletion flow, and frontend–backend synchronization. Fixed animations and UI details across Timeline, Guest, and Profile pages.
 
