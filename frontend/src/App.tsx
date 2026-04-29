@@ -112,16 +112,19 @@ function AppInner() {
   const [user, setUser]                       = useState<User | null>(null);
   const authenticatedHome = user && !user.emailVerified ? '/profile' : '/today';
 
-  // Load user on startup if already authenticated
+  // Load user on startup or after login
   useEffect(() => {
     if (!isAuthenticated) return;
-    api.get<User>('/users/me').then(setUser).catch(() => {
+    api.get<User>('/users/me').then(u => {
+      setUser(u);
+      if (!u.emailVerified) navigate('/profile');
+    }).catch(() => {
       localStorage.removeItem(TOKEN_KEY);
       setUser(null);
       setIsAuthenticated(false);
       navigate('/login');
     });
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Register global 401 handler
   useEffect(() => {
@@ -133,12 +136,10 @@ function AppInner() {
     });
   }, [navigate]);
 
-  const handleLogin = async (token?: string) => {
+  const handleLogin = (token?: string) => {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     setIsAuthenticated(true);
-    const u = await api.get<User>('/users/me');
-    setUser(u);
-    navigate(u.emailVerified ? '/today' : '/profile');
+    // Navigation and user loading are handled by the useEffect above
   };
 
   const handleLogout = async () => {

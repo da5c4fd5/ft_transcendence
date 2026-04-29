@@ -10,10 +10,10 @@ import type { ApiError } from '../../lib/api';
 import { clsx as cn } from 'clsx';
 
 const RULES = [
-  { id: 'length',    label: 'At least 8 characters',      test: (p: string) => p.length >= 8 },
-  { id: 'uppercase', label: 'One uppercase letter',        test: (p: string) => /[A-Z]/.test(p) },
-  { id: 'digit',     label: 'One number',                  test: (p: string) => /[0-9]/.test(p) },
-  { id: 'special',   label: 'One special character',       test: (p: string) => /[^a-zA-Z0-9]/.test(p) },
+  { id: 'length',    label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
+  { id: 'uppercase', label: 'One uppercase letter',  test: (p: string) => /[A-Z]/.test(p) },
+  { id: 'digit',     label: 'One number',            test: (p: string) => /[0-9]/.test(p) },
+  { id: 'special',   label: 'One special character', test: (p: string) => /[^a-zA-Z0-9]/.test(p) },
 ];
 
 const STRENGTH_CONFIG = [

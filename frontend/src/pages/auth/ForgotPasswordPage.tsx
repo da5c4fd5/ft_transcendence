@@ -28,7 +28,7 @@ export function ForgotPasswordPage() {
     setLoading(true);
     try {
       await api.post('/auth/forgot-password', { email });
-    } catch { /* always show check-email — backend never reveals if email exists */ }
+    } catch { /* always show check-email -> backend never reveals if email exists */ }
     setLoading(false);
     setStep('check-email');
   };

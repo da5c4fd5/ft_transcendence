@@ -76,7 +76,6 @@ export function getApiErrorMessage(err: unknown, fallback = 'Something went wron
 
 let _onUnauthorized: (() => void) | null = null;
 
-/** Register a callback that fires on any 401 response (e.g. to trigger logout). */
 export function setUnauthorizedHandler(cb: () => void) {
   _onUnauthorized = cb;
 }

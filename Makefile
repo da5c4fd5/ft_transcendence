@@ -1,9 +1,10 @@
 GPU ?= 1
+ROOT_DIR ?= $(HOME)/goinfre/capsul
+export ROOT_DIR
 GPU_COMPOSE := $(if $(filter 1 true yes,$(GPU)),-f docker-compose.ollama-gpu.yml)
 COMPOSE := podman-compose --in-pod=false -p capsul -f docker-compose.yml $(GPU_COMPOSE)
 PROD := $(COMPOSE)
 DEV := $(COMPOSE) -f docker-compose.dev.yml
-DATA_ROOT := $${ROOT_DIR:-$$HOME/goinfre/capsul}
 
 all: start
 
@@ -17,11 +18,11 @@ dev: generate
 	$(DEV) up --build
 
 generate:
-	@mkdir -p "$(DATA_ROOT)"/certs
-	@mkdir -p "$(DATA_ROOT)"/database
-	@mkdir -p "$(DATA_ROOT)"/media
-	@mkdir -p "$(DATA_ROOT)"/ollama
-	@mkdir -p "$(DATA_ROOT)"/mood-classifier
+	@mkdir -p "$(ROOT_DIR)"/certs
+	@mkdir -p "$(ROOT_DIR)"/database
+	@mkdir -p "$(ROOT_DIR)"/media
+	@mkdir -p "$(ROOT_DIR)"/ollama
+	@mkdir -p "$(ROOT_DIR)"/mood-classifier
 	@sh docker/secrets.sh
 
 stop:

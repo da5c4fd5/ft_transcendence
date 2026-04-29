@@ -229,9 +229,6 @@ function StageTree({ s, isPetting, isDecreasing }: { s: StageData; isPetting: bo
   );
 }
 
-// ─── Particle data ────────────────────────────────────────────────────────────
-
-/** 6 ambient leaves — each with a unique arcing trajectory */
 const LEAVES = [
   { anim: 'tree-leaf-1', delay: '0s',    left: '47%', top: '38%' },
   { anim: 'tree-leaf-2', delay: '1.1s',  left: '54%', top: '34%' },
@@ -241,14 +238,12 @@ const LEAVES = [
   { anim: 'tree-leaf-6', delay: '1.8s',  left: '49%', top: '44%' },
 ];
 
-/** Sparkles at diagonal positions, matching reference layout */
 const SPARKLES = [
   { delay: '0s',   left: '18%', top: '20%' },
   { delay: '0.7s', left: '76%', top: '30%' },
   { delay: '1.4s', left: '50%', top: '10%' },
 ];
 
-/** 5 hearts — all burst from center, each with a unique x-drift via keyframe */
 const HEARTS = [
   { anim: 'tree-heart-1', delay: '0s',    left: '50%' },
   { anim: 'tree-heart-2', delay: '0.12s', left: '50%' },
@@ -273,11 +268,7 @@ const PET_FRUITS = [
 
 const SIZE_PX = { small: 110, medium: 160, large: 220 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface HeartBurst { id: number; x: number; y: number }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function TreeVisual({ health, size = 'medium', showDetails = false, isDecreasing = false }: TreeVisualProps) {
   const [isPetting,   setIsPetting]   = useState(false);
@@ -295,28 +286,23 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
   const svgPx  = SIZE_PX[size];
 
   const handlePet = () => {
-    // Always spawn a heart burst — rapid clicks accumulate independently.
     const rect = buttonRef.current?.getBoundingClientRect();
     const x = rect ? rect.left + rect.width  * 0.5 : window.innerWidth  * 0.5;
     const y = rect ? rect.top  + rect.height * 0.58 : window.innerHeight * 0.5;
     const id = ++burstId.current;
     setBursts(prev => [...prev, { id, x, y }]);
-    // Remove this burst after animation completes (2.4s + longest delay 0.28s + margin)
     setTimeout(() => setBursts(prev => prev.filter(b => b.id !== id)), 3000);
 
-    // Petting bounce — only start if not already mid-bounce
     if (!isPetting) {
       setIsPetting(true);
       setTimeout(() => setIsPetting(false), 600);
     }
 
-    // Leaves / fruits — fall near the tree, reset on each pet is fine
     setShowLeaves(true);
     setLeavesKey(k => k + 1);
     if (leavesTimer.current) clearTimeout(leavesTimer.current);
     leavesTimer.current = setTimeout(() => setShowLeaves(false), 2800);
 
-    // "Thanks" text — extends on each pet
     setShowThanks(true);
     if (thanksTimer.current) clearTimeout(thanksTimer.current);
     thanksTimer.current = setTimeout(() => setShowThanks(false), 3600);
@@ -327,13 +313,11 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
 
       <div className="relative flex items-center justify-center" style={{ width: svgPx, height: svgPx }}>
 
-        {/* Ambient glow halo */}
         <div
           className="absolute inset-0 rounded-full blur-3xl opacity-30 pointer-events-none transition-colors duration-1000"
           style={{ backgroundColor: s.color }}
         />
 
-        {/* Tree (interactive) */}
         <button
           ref={buttonRef}
           type="button"
@@ -350,7 +334,6 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
           </svg>
         </button>
 
-        {/* Ambient floating leaves (health ≥ 51) */}
         {health >= 51 && LEAVES.map((l, i) => (
           <div
             key={i}
@@ -365,7 +348,6 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
           />
         ))}
 
-        {/* Scintillating sparkles (health ≥ 76) */}
         {health >= 76 && SPARKLES.map((sp, i) => (
           <div
             key={i}
@@ -380,7 +362,6 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
           </div>
         ))}
 
-        {/* Leaves + fruits burst — absolute, near the tree, resets on each pet */}
         {showLeaves && (
           <div key={leavesKey} className="contents">
             {s.stage >= 3 && PET_LEAVES.map((l, i) => (
@@ -418,8 +399,6 @@ export function TreeVisual({ health, size = 'medium', showDetails = false, isDec
         )}
       </div>
 
-      {/* Hearts — position: fixed so they escape the container and travel to viewport top.
-          Each burst is independent: rapid clicks accumulate bursts instead of resetting them. */}
       {bursts.map(burst => (
         <div key={burst.id} className="contents">
           {HEARTS.map((h, i) => (

@@ -31,10 +31,10 @@ export function getRelativeLabel(dateStr: string, options?: { showAnniversary?: 
  * Formats a "YYYY-MM-DD" string to a date label (uppercase by default).
  *
  * @param format
- *   - `'short'` (default): "WED, APR 9, 2025" — short weekday + short month
- *   - `'long'`:  "APRIL 9, 2025"              — long month, no weekday
- *   - `'full'`:  "WEDNESDAY, APRIL 9, 2025"   — long weekday + long month
- * @param uppercase - Pass `false` to skip uppercasing (e.g. for tooltip strings). Defaults to `true`.
+ *   - `'short'` (default): "WED, APR 9, 2025" -> short weekday + short month
+ *   - `'long'`:  "APRIL 9, 2025"              -> long month, no weekday
+ *   - `'full'`:  "WEDNESDAY, APRIL 9, 2025"   -> long weekday + long month
+ * @param uppercase
  */
 export function getFormattedDate(
   dateStr: string,
@@ -62,10 +62,6 @@ export function getTodayDateStr(): string {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
 
-/**
- * Formats an ISO datetime string to "14 Apr 2026 · 09:22".
- * Intended for session / timestamp display.
- */
 export function formatSessionDateTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
 import { useLocation } from 'wouter';
-import { User, Camera, Pencil, LogOut, UserPlus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Download, MessageCircle, Send, ChevronRight } from 'lucide-preact';
+import { User, Camera, Pencil, LogOut, UserPlus, UserMinus, Lock, Eye, EyeOff, LayoutDashboard, X, Check, Bell, BellRing, Monitor, Smartphone, Globe, ShieldOff, Shield, ShieldCheck, Download, MessageCircle, Send, ChevronRight } from 'lucide-preact';
 import { clsx as cn } from 'clsx';
 import type { ProfilePageProps, Friend, Session } from './profile.types';
 import type { User as UserType } from './profile.types';
@@ -368,6 +368,7 @@ function FriendsCard({ userId }: { userId: string }) {
   const [highlighted, setHighlighted]   = useState(-1);
   const [selectedId, setSelectedId]     = useState<string | null>(null);
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const [chatFriendId, setChatFriendId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -603,6 +604,16 @@ function FriendsCard({ userId }: { userId: string }) {
     } catch { /* ignore */ }
   };
 
+  const handleRemoveFriend = async (friendId: string) => {
+    try {
+      await api.delete(`/friends/${friendId}`);
+      setFriends(prev => prev.filter(f => f.id !== friendId));
+      if (chatFriendId === friendId) setChatFriendId(null);
+    } catch { /* ignore */ } finally {
+      setConfirmRemoveId(null);
+    }
+  };
+
   const handlePing = async (id: string) => {
     if (pingedIds.has(id) || pendingPingIds.has(id)) return;
     if (!sendPing(id)) return;
@@ -795,39 +806,69 @@ function FriendsCard({ userId }: { userId: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handlePing(f.id)}
-                  disabled={!f.online || pinged || pingPending}
-                  aria-label={pingLabel}
-                  title={pingLabel}
-                  className={cn(
-                    'w-8 h-8 flex items-center justify-center rounded-full transition-all',
-                    pinged
-                      ? 'bg-yellow/40 text-darkgrey cursor-default'
-                      : pingPending
-                        ? 'bg-yellow/30 text-darkgrey cursor-progress'
-                      : f.online
-                        ? 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey'
-                        : 'bg-verylightorange text-mediumgrey/40 cursor-not-allowed',
-                  )}
-                >
-                  {pinged ? <BellRing size={14} /> : <Bell size={14} />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChatFriendId((prev: string | null) => prev === f.id ? null : f.id)}
-                  aria-label={`Chat with ${f.username}`}
-                  title={`Chat with ${f.username}`}
-                  className={cn(
-                    'w-8 h-8 flex items-center justify-center rounded-full transition-all',
-                    chatFriendId === f.id
-                      ? 'bg-yellow text-darkgrey'
-                      : 'bg-verylightorange text-mediumgrey hover:bg-yellow/40 hover:text-darkgrey',
-                  )}
-                >
-                  <MessageCircle size={14} />
-                </button>
+                {confirmRemoveId === f.id ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRemoveId(null)}
+                      className="text-xs font-semibold text-mediumgrey hover:text-darkgrey transition-colors px-2 py-1"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFriend(f.id)}
+                      className="text-xs font-bold text-white bg-pink rounded-full px-3 py-1.5 hover:bg-pink/80 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handlePing(f.id)}
+                      disabled={!f.online || pinged || pingPending}
+                      aria-label={pingLabel}
+                      title={pingLabel}
+                      className={cn(
+                        'w-8 h-8 flex items-center justify-center rounded-full transition-all',
+                        pinged
+                          ? 'bg-yellow/40 text-darkgrey cursor-default'
+                          : pingPending
+                            ? 'bg-yellow/30 text-darkgrey cursor-progress'
+                          : f.online
+                            ? 'bg-verylightorange text-mediumgrey hover:bg-orange/30 hover:text-darkgrey'
+                            : 'bg-verylightorange text-mediumgrey/40 cursor-not-allowed',
+                      )}
+                    >
+                      {pinged ? <BellRing size={14} /> : <Bell size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChatFriendId((prev: string | null) => prev === f.id ? null : f.id)}
+                      aria-label={`Chat with ${f.username}`}
+                      title={`Chat with ${f.username}`}
+                      className={cn(
+                        'w-8 h-8 flex items-center justify-center rounded-full transition-all',
+                        chatFriendId === f.id
+                          ? 'bg-yellow text-darkgrey'
+                          : 'bg-verylightorange text-mediumgrey hover:bg-yellow/40 hover:text-darkgrey',
+                      )}
+                    >
+                      <MessageCircle size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRemoveId(f.id)}
+                      aria-label={`Remove ${f.username}`}
+                      title={`Remove ${f.username}`}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-verylightorange text-mediumgrey hover:bg-lightpink/60 hover:text-pink transition-all"
+                    >
+                      <UserMinus size={14} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           );
