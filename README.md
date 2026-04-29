@@ -43,7 +43,7 @@ The app will be available at `https://<DOMAIN>` (or `https://localhost` with a s
 |---|---|---|
 | `DOMAIN` | Public domain name | `transcen.dence.fr` |
 | `HTTP_PORT` | HTTP redirect port | `8080` |
-| `HTTPS_PORT` | HTTPS port | `8433` |
+| `HTTPS_PORT` | HTTPS port | `8443` |
 | `POSTGRES_DB` | Database name | `capsul` |
 | `POSTGRES_USER` | Database user | `capsul` |
 | `ROOT_DIR` | Data directory for certs, database, media, models | `~/goinfre/capsul` |
