@@ -137,7 +137,7 @@ export function PrivacyPolicyPage() {
         </div>
 
         <p className="text-center text-xs text-mediumgrey pb-4">
-          © 2025 Capsul · <button onClick={() => navigate('/terms')} className="hover:text-darkgrey underline">Terms of Service</button>
+          © 2026 Capsul · <button onClick={() => navigate('/terms')} className="hover:text-darkgrey underline">Terms of Service</button>
         </p>
       </div>
     </div>

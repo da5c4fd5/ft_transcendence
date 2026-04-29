@@ -144,7 +144,7 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
-    assertMemoryCanBeModifiedToday(memory.date);
+    if (data.content !== undefined) assertMemoryCanBeModifiedToday(memory.date);
 
     // Generate a share token when opening for the first time
     const shareToken =
@@ -208,7 +208,6 @@ export abstract class MemoriesService {
     const memory = await db.memory.findUnique({ where: { id } });
     if (!memory) throw status(404, { message: "Memory not found" });
     if (memory.userId !== userId) throw status(403, { message: "Forbidden" });
-    assertMemoryCanBeModifiedToday(memory.date);
     const memoryFileUrls = await collectMemoryFileUrls(id);
     await db.memory.delete({ where: { id } });
     await deleteStoredFilesIfUnused(memoryFileUrls);

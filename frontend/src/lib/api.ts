@@ -113,6 +113,7 @@ async function request<T>(
   path: string,
   body?: unknown,
   params?: Record<string, string | number | boolean | undefined | null>,
+  options?: { skipUnauthorized?: boolean },
 ): Promise<T> {
   let urlStr = `${BASE_URL}${path}`;
   if (params) {
@@ -136,7 +137,7 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    _onUnauthorized?.();
+    if (!options?.skipUnauthorized) _onUnauthorized?.();
     throw { status: 401, message: 'Unauthorized' } satisfies ApiError;
   }
 
@@ -176,8 +177,8 @@ export const api = {
   post<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('POST', path, body);
   },
-  patch<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>('PATCH', path, body);
+  patch<T>(path: string, body?: unknown, options?: { skipUnauthorized?: boolean }): Promise<T> {
+    return request<T>('PATCH', path, body, undefined, options);
   },
   put<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('PUT', path, body);

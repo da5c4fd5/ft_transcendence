@@ -5,7 +5,7 @@ export function Footer() {
 
   return (
     <footer className="w-full py-5 px-6 flex items-center justify-center gap-4 text-xs text-mediumgrey border-t border-black/5 mt-8">
-      <span>© 2025 Capsul</span>
+      <span>© 2026 Capsul</span>
       <span className="text-black/10">·</span>
       <button
         onClick={() => navigate('/privacy')}

@@ -16,7 +16,7 @@ export const MOOD_EMOJI: Record<Mood, string> = {
   Anxious:   '😰',
 };
 
-export function MemoryModal({ entry, onClose, onDelete }: MemoryModalProps) {
+export function MemoryModal({ entry, onClose, onDelete, canDelete }: MemoryModalProps) {
   const [isOpen, setIsOpen]     = useState(entry.isOpen);
   const [shareUrl, setShareUrl] = useState<string | null>(entry.shareUrl);
   const [shareStep, setShareStep] = useState<'idle' | 'confirming'>('idle');
@@ -180,7 +180,7 @@ export function MemoryModal({ entry, onClose, onDelete }: MemoryModalProps) {
             </div>
           )}
 
-          {confirmDelete ? (
+          {canDelete && (confirmDelete ? (
             <div className="bg-verylightpink/50 rounded-3xl p-5 flex flex-col gap-4">
               <div className="flex flex-col gap-1 text-center">
                 <p className="text-lg font-black text-darkgrey">Delete this memory?</p>
@@ -213,7 +213,7 @@ export function MemoryModal({ entry, onClose, onDelete }: MemoryModalProps) {
             >
               Delete Memory
             </button>
-          )}
+          ))}
 
         </div>
       </div>

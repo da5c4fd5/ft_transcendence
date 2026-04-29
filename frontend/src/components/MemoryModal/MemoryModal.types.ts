@@ -25,4 +25,5 @@ export interface MemoryModalProps {
   entry: MemoryDetails;
   onClose: () => void;
   onDelete: () => void;
+  canDelete?: boolean;
 }

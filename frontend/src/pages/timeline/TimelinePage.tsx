@@ -837,6 +837,7 @@ export function TimelinePage({ onNavigateToToday }: { onNavigateToToday?: () => 
       {selectedEntry && (
         <MemoryModal
           entry={selectedEntry}
+          canDelete={true}
           onClose={() => {
             setSelectedEntry(null);
             setSelectedId(null);

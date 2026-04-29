@@ -117,7 +117,8 @@ function AppInner() {
     if (!isAuthenticated) return;
     api.get<User>('/users/me').then(u => {
       setUser(u);
-      if (!u.emailVerified) navigate('/profile');
+      const onSharedLink = /^\/memories\/[^/]+\/[^/]+/.test(location);
+      if (!u.emailVerified && !onSharedLink) navigate('/profile');
     }).catch(() => {
       localStorage.removeItem(TOKEN_KEY);
       setUser(null);
@@ -155,7 +156,7 @@ function AppInner() {
   let content: ComponentChildren;
 
   if (sharedMatch) {
-    content = (
+    const shared = (
       <SharedMemoryRoute
         memoryId={sharedMatch[1]}
         shareToken={sharedMatch[2]}
@@ -163,6 +164,9 @@ function AppInner() {
         onNavigateToWelcome={() => navigate('/')}
       />
     );
+    content = user
+      ? <AuthLayout user={user}>{shared}</AuthLayout>
+      : shared;
   } else if (isAuthenticated && !user) {
     // Still fetching user after page refresh — show nothing while loading
     content = null;

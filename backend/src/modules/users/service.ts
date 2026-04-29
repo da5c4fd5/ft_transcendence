@@ -395,10 +395,10 @@ export abstract class UsersService {
     }
 
     const daysSinceLastMemory = getDaysSinceLocalDate(latestMemory.date);
-    const recentScore = Math.max(0, 45 - daysSinceLastMemory * 12);
-    const streakScore = Math.min(25, stats.dayStreak * 5);
-    const memoryScore = Math.min(20, stats.totalCapsuls * 1.5);
-    const wordsScore = Math.min(10, stats.wordsWritten / 200);
+    const recentScore = Math.max(0, 10 - daysSinceLastMemory * 4);
+    const streakScore = Math.min(50, stats.dayStreak * 1.5);
+    const memoryScore = Math.min(30, stats.totalCapsuls * 0.6);
+    const wordsScore = Math.min(10, stats.wordsWritten / 400);
     const lifeForce = Math.max(
       0,
       Math.min(

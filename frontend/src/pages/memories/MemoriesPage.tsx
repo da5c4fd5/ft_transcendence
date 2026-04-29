@@ -924,6 +924,7 @@ export function MemoriesPage() {
           entry={selectedEntry}
           onClose={() => { setSelectedEntry(null); setSelectedId(null); }}
           onDelete={handleDelete}
+          canDelete={true}
         />
       )}
 

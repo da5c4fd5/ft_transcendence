@@ -1059,7 +1059,7 @@ function PasswordCard() {
     setError(null);
     setSaving(true);
     try {
-      await api.patch('/users/me/password', { currentPassword: pwCurrent, newPassword: pwNew });
+      await api.patch('/users/me/password', { currentPassword: pwCurrent, newPassword: pwNew }, { skipUnauthorized: true });
       setSuccess(true);
       setPwCurrent(''); setPwNew(''); setPwConfirm('');
     } catch (err) {
