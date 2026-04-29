@@ -107,18 +107,6 @@ export function TreePage() {
             showDetails
             isDecreasing={tree.isDecreasing}
           />
-          <div className="w-full max-w-sm flex flex-col gap-2">
-            <div className="flex items-center justify-between text-xs font-bold text-darkgrey">
-              <span>Life Force</span>
-              <span className="text-pink">{tree.lifeForce}%</span>
-            </div>
-            <div className="h-2 bg-white/70 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-pink rounded-full transition-all duration-1000"
-                style={{ width: `${tree.lifeForce}%` }}
-              />
-            </div>
-          </div>
         </div>
       </div>
 
