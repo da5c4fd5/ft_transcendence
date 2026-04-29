@@ -158,6 +158,8 @@ User
 ├── memories[] → Memory
 ├── contributions[] → Contribution
 ├── sentChatMessages[] / receivedChatMessages[] → ChatMessage
+├── moodClassificationJobs[] → MoodClassificationJob
+├── promptSuggestionState → PromptSuggestionState
 └── promptSuggestions[] → PromptSuggestion
 
 Session
@@ -184,7 +186,7 @@ ChatMessage
 └── senderId, recipientId, content, readAt
 
 MoodClassificationJob
-└── memoryId, status, model, rawLabel, rawScore, mood
+└── memoryId, userId, status, model, rawLabel, rawScore, mood
 
 PromptSuggestion / PromptSuggestionState
 └── userId, prompt, position, generationStatus
