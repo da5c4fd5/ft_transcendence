@@ -4,12 +4,8 @@ set -eu
 DOMAIN="${DOMAIN:-transcen.dence.fr}"
 export DOMAIN
 
-is_prod_tls() {
-	[ "${PROD:-false}" = "true" ] || [ "${TLS_MODE:-selfsigned}" = "letsencrypt" ]
-}
-
-has_public_cert() {
-	[ -f "${cert_dir}/fullchain.pem" ] && [ -f "${cert_dir}/privkey.pem" ]
+has_public_selfsigned() {
+	[ -f "${cert_dir}/fullchain.pem" ] && [ -f "${cert_dir}/privkey.pem" ] && [ -f "${cert_dir}/.selfsigned" ]
 }
 
 make_public_selfsigned() {
@@ -31,17 +27,8 @@ make_public_selfsigned() {
 	chmod 644 "${cert_dir}/fullchain.pem" "${cert_dir}/cert.pem"
 }
 
-if [ "${1:-}" = "/usr/local/bin/acme-dns01.sh" ]; then
-	exec "$@"
-fi
-
 cert_dir="/etc/nginx/certs/public/certs/${DOMAIN}"
-if is_prod_tls; then
-	if ! /usr/local/bin/acme-dns01.sh || ! has_public_cert; then
-		printf '%s\n' "Let's Encrypt certificate unavailable; falling back to self-signed certificate for ${DOMAIN}." >&2
-		make_public_selfsigned
-	fi
-elif ! has_public_cert; then
+if ! has_public_selfsigned; then
 	make_public_selfsigned
 fi
 

@@ -2,8 +2,6 @@
 set -eu
 
 DOMAIN="${DOMAIN:-transcen.dence.fr}"
-PROD="${PROD:-false}"
-TLS_MODE="${TLS_MODE:-selfsigned}"
 CERT_ROOT="/certs"
 INTERNAL_DIR="${CERT_ROOT}/internal"
 PUBLIC_DIR="${CERT_ROOT}/public/certs/${DOMAIN}"
@@ -71,13 +69,11 @@ EOF
 }
 
 make_public_selfsigned() {
-	if [ "${PROD}" = "true" ] || [ "${TLS_MODE}" = "letsencrypt" ]; then
+	if [ -f "${PUBLIC_DIR}/fullchain.pem" ] && [ -f "${PUBLIC_DIR}/privkey.pem" ] && [ -f "${PUBLIC_DIR}/.selfsigned" ]; then
 		return
 	fi
 
-	if [ -f "${PUBLIC_DIR}/fullchain.pem" ] && [ -f "${PUBLIC_DIR}/privkey.pem" ]; then
-		return
-	fi
+	rm -f "${PUBLIC_DIR}/fullchain.pem" "${PUBLIC_DIR}/privkey.pem" "${PUBLIC_DIR}/cert.pem"
 
 	openssl req \
 		-x509 \

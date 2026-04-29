@@ -32,7 +32,7 @@ make
 ```
 
 `make` (or `make start`) will:
-1. Generate TLS certificates (self-signed by default, or Let's Encrypt with `TLS_MODE=letsencrypt`; falls back to self-signed if ACME fails)
+1. Generate self-signed TLS certificates
 2. Build and start all containers (Nginx, backend, frontend, PostgreSQL, Ollama, mood-classifier)
 
 The app will be available at `https://<DOMAIN>` (or `https://localhost` with a self-signed cert).
@@ -42,7 +42,6 @@ The app will be available at `https://<DOMAIN>` (or `https://localhost` with a s
 | Variable | Description | Default |
 |---|---|---|
 | `DOMAIN` | Public domain name | `transcen.dence.fr` |
-| `TLS_MODE` | `selfsigned` or `letsencrypt` | `selfsigned` |
 | `HTTP_PORT` | HTTP redirect port | `8080` |
 | `HTTPS_PORT` | HTTPS port | `8433` |
 | `POSTGRES_DB` | Database name | `capsul` |
@@ -244,7 +243,7 @@ PromptSuggestion / PromptSuggestionState
 | Public API | Rate-limited REST API with API key auth and Swagger docs | smamalig |
 | GDPR compliance | Full data export as JSON, confirmed account deletion | smamalig |
 | Email notifications | Branded HTML emails: verification, reminders, inactivity alerts | ldubois, cscache |
-| Infra & deployment | Podman Compose, Nginx TLS (self-signed or ACME), Makefile, GPU support | ldubois |
+| Infra & deployment | Podman Compose, Nginx self-signed TLS, Makefile, GPU support | ldubois |
 
 ---
 
@@ -325,7 +324,7 @@ Designed and built the entire backend: Elysia.js module structure, Prisma schema
 
 ### ldubois — Louis (Product Owner, DevOps, AI, DB)
 
-Managed the team and project organization. Built the full container infrastructure (Podman Compose, Dockerfiles, Makefile, Nginx TLS with ACME support). Integrated Ollama for streaming writing prompts and wellness tips. Built the Python mood-classifier microservice (FastAPI + go_emotions model) and its async job queue. Implemented the HTML email system (reminders, inactivity alerts, AI digests).
+Managed the team and project organization. Built the full container infrastructure (Podman Compose, Dockerfiles, Makefile, Nginx self-signed TLS). Integrated Ollama for streaming writing prompts and wellness tips. Built the Python mood-classifier microservice (FastAPI + go_emotions model) and its async job queue. Implemented the HTML email system (reminders, inactivity alerts, AI digests).
 
 **Challenge:** Setting up self-hosted AI inference infrastructure from scratch: getting Ollama, the mood-classifier, and their inter-service communication to work reliably inside containers.
 

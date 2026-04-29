@@ -167,22 +167,12 @@ services:
         condition: service_started
     environment:
       DOMAIN: ${DOMAIN:-transcen.dence.fr}
-      PROD: ${PROD:-false}
-      TLS_MODE: ${TLS_MODE:-selfsigned}
       HTTPS_PORT: ${HTTPS_PORT:-8433}
-      ACME_CONTACT_EMAIL: ${ACME_CONTACT_EMAIL:-}
-      ACME_CA: ${ACME_CA:-letsencrypt}
-      PDA_API_URL: ${PDA_API_URL:-}
-      PDA_API_KEY_FILE: /run/secrets/powerdnsadmin_api_key
-      PDA_SERVER_ID: ${PDA_SERVER_ID:-localhost}
-      PDA_ZONE: ${PDA_ZONE:-}
-      DNS_PROPAGATION_SECONDS: ${DNS_PROPAGATION_SECONDS:-5}
     ports:
       - "${HTTP_PORT:-8080}:80"
       - "${HTTPS_PORT:-8433}:443"
     volumes:
       - ${ROOT_DIR:-./.capsul}/certs:/etc/nginx/certs:z
-      - ./docker/secrets/powerdnsadmin_api_key:/run/secrets/powerdnsadmin_api_key:ro,Z
     healthcheck:
       test: ["CMD-SHELL", "wget --no-check-certificate -q -O /dev/null https://127.0.0.1/"]
       interval: 2s
